@@ -4,6 +4,8 @@ export type FinancialAssumptions = {
   discountRate: number;
   debtInterestRate: number;
   debtMaturityYears: number;
+  tariffInflationRate: number;
+  opexInflationRate: number;
 };
 
 export const DEFAULT_FINANCIAL_ASSUMPTIONS: FinancialAssumptions = {
@@ -12,4 +14,6 @@ export const DEFAULT_FINANCIAL_ASSUMPTIONS: FinancialAssumptions = {
   discountRate: 6,
   debtInterestRate: 4,
   debtMaturityYears: 20,
+  tariffInflationRate: 0,
+  opexInflationRate: 2,
 };

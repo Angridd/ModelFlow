@@ -21,6 +21,7 @@ export type FinanceEngineResult = {
 
 export type AnnualCashFlow = {
   year: number;
+  annualTariff: number;
   productionMwh: number;
   revenueKeuro: number;
   opexKeuro: number;
@@ -111,12 +112,13 @@ export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashF
   const degradationRate = asRate(input.degradationRate);
   const discountRate = asRate(input.discountRate);
   const debtInterestRate = asRate(input.debtInterestRate);
+  const tariffInflationRate = asRate(input.tariffInflationRate);
+  const opexInflationRate = asRate(input.opexInflationRate);
   const annualDebtService = calculateAnnualDebtService(
     initialDebt,
     debtInterestRate,
     input.debtMaturityYears,
   );
-  const annualOpex = input.opex * input.capacityMw;
   const rows: AnnualCashFlow[] = [];
 
   for (let year = 1; year <= input.projectLifeYears; year += 1) {
@@ -125,16 +127,23 @@ export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashF
     // Production year N = yield MWh/MW/year * MW * annual degradation.
     const production = input.yieldMwh * input.capacityMw * degradationFactor;
 
-    // Revenue kEUR = production MWh * tariff EUR/MWh / 1000.
-    const revenue = (production * input.tariff) / 1000;
+    // Tariff year N = base tariff EUR/MWh * tariff inflation factor.
+    const annualTariff = input.tariff * (1 + tariffInflationRate) ** year;
 
-    // Annual OPEX kEUR = opex kEUR/MW/year * MW.
+    // Revenue kEUR = production MWh * annual tariff EUR/MWh / 1000.
+    const revenue = (production * annualTariff) / 1000;
+
+    // Annual OPEX kEUR = opex kEUR/MW/year * MW * OPEX inflation factor.
+    const annualOpex =
+      input.opex * input.capacityMw * (1 + opexInflationRate) ** year;
+
     // CFADS kEUR = revenue kEUR - annual OPEX kEUR.
     const cfads = revenue - annualOpex;
     const debtService = year <= input.debtMaturityYears ? annualDebtService : 0;
 
     rows.push({
       year,
+      annualTariff,
       productionMwh: production,
       revenueKeuro: revenue,
       opexKeuro: annualOpex,

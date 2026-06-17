@@ -18,6 +18,8 @@ const scenarioImportColumns = {
   discountRate: "taux actualisation",
   debtInterestRate: "taux dette",
   debtMaturityYears: "maturite dette",
+  tariffInflationRate: "inflation tarif",
+  opexInflationRate: "inflation opex",
   dscr: "dscr",
   npv: "van",
   irr: "tri",
@@ -162,6 +164,8 @@ function readScenarioAssumptions(formData: FormData) {
     discountRate: readNumber(formData, "discountRate"),
     debtInterestRate: readNumber(formData, "debtInterestRate"),
     debtMaturityYears: readInteger(formData, "debtMaturityYears"),
+    tariffInflationRate: readNumber(formData, "tariffInflationRate"),
+    opexInflationRate: readNumber(formData, "opexInflationRate"),
   };
 }
 
@@ -338,6 +342,8 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
       discountRate: scenario.discountRate,
       debtInterestRate: scenario.debtInterestRate,
       debtMaturityYears: scenario.debtMaturityYears,
+      tariffInflationRate: scenario.tariffInflationRate,
+      opexInflationRate: scenario.opexInflationRate,
       dscr: scenario.dscr,
       npv: scenario.npv,
       irr: scenario.irr,
@@ -481,6 +487,16 @@ export async function importScenarios(projectId: string, formData: FormData) {
         scenarioImportColumns.debtMaturityYears,
         DEFAULT_FINANCIAL_ASSUMPTIONS.debtMaturityYears,
         "Maturite dette",
+      ),
+      tariffInflationRate: readOptionalNumber(
+        scenarioImportColumns.tariffInflationRate,
+        DEFAULT_FINANCIAL_ASSUMPTIONS.tariffInflationRate,
+        "Inflation tarif",
+      ),
+      opexInflationRate: readOptionalNumber(
+        scenarioImportColumns.opexInflationRate,
+        DEFAULT_FINANCIAL_ASSUMPTIONS.opexInflationRate,
+        "Inflation OPEX",
       ),
       dscr: parseImportedNumber(readColumn(scenarioImportColumns.dscr), "DSCR"),
       npv: parseImportedNumber(readColumn(scenarioImportColumns.npv), "VAN"),

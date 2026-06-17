@@ -105,6 +105,8 @@ export default async function ProjectDetailPage({
         discountRate: projectReferenceScenario.discountRate,
         debtInterestRate: projectReferenceScenario.debtInterestRate,
         debtMaturityYears: projectReferenceScenario.debtMaturityYears,
+        tariffInflationRate: projectReferenceScenario.tariffInflationRate,
+        opexInflationRate: projectReferenceScenario.opexInflationRate,
       })
     : null;
   const kpiNpv =
@@ -130,6 +132,8 @@ export default async function ProjectDetailPage({
         discountRate: cashFlowScenario.discountRate,
         debtInterestRate: cashFlowScenario.debtInterestRate,
         debtMaturityYears: cashFlowScenario.debtMaturityYears,
+        tariffInflationRate: cashFlowScenario.tariffInflationRate,
+        opexInflationRate: cashFlowScenario.opexInflationRate,
       })
     : [];
 
@@ -272,7 +276,7 @@ export default async function ProjectDetailPage({
             {cashFlowScenario?.name ?? "-"}
           </p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-7">
           <div>
             <p className="text-sm font-medium text-zinc-500">Duree projet</p>
             <p className="mt-1 text-zinc-950">
@@ -301,6 +305,18 @@ export default async function ProjectDetailPage({
             <p className="text-sm font-medium text-zinc-500">Maturite dette</p>
             <p className="mt-1 text-zinc-950">
               {cashFlowScenario ? `${cashFlowScenario.debtMaturityYears} ans` : "-"}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-zinc-500">Inflation tarif</p>
+            <p className="mt-1 text-zinc-950">
+              {formatNumber(cashFlowScenario?.tariffInflationRate ?? null, " %")}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-zinc-500">Inflation OPEX</p>
+            <p className="mt-1 text-zinc-950">
+              {formatNumber(cashFlowScenario?.opexInflationRate ?? null, " %")}
             </p>
           </div>
         </div>
@@ -347,13 +363,14 @@ export default async function ProjectDetailPage({
           </p>
         </div>
         <div className="overflow-x-auto rounded-md border border-zinc-200 bg-white">
-          <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[1260px] border-collapse text-left text-sm">
             <thead className="bg-zinc-100 text-zinc-600">
               <tr>
                 <th className="px-4 py-3 font-medium">Annee</th>
+                <th className="px-4 py-3 font-medium">Tarif annuel</th>
                 <th className="px-4 py-3 font-medium">Production MWh</th>
                 <th className="px-4 py-3 font-medium">CA kEUR</th>
-                <th className="px-4 py-3 font-medium">OPEX kEUR</th>
+                <th className="px-4 py-3 font-medium">OPEX annuel kEUR</th>
                 <th className="px-4 py-3 font-medium">Cash-flow kEUR</th>
                 <th className="px-4 py-3 font-medium">Service dette kEUR</th>
                 <th className="px-4 py-3 font-medium">DSCR</th>
@@ -365,6 +382,9 @@ export default async function ProjectDetailPage({
                 <tr key={row.year}>
                   <td className="px-4 py-3 font-medium text-zinc-950">
                     {row.year}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.annualTariff, " €/MWh")}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
                     {formatNumber(row.productionMwh)}
@@ -391,7 +411,7 @@ export default async function ProjectDetailPage({
               ))}
               {annualCashFlows.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-center text-zinc-500" colSpan={8}>
+                  <td className="px-4 py-8 text-center text-zinc-500" colSpan={9}>
                     -
                   </td>
                 </tr>

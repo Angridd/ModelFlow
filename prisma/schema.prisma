@@ -29,23 +29,25 @@ model Project {
 }
 
 model Scenario {
-  id                String  @id @default(cuid())
-  name              String
-  capex             Float
-  opex              Float
-  yieldMwh          Float
-  tariff            Float
-  debtRate          Float
-  projectLifeYears  Int     @default(30)
-  degradationRate   Float   @default(0.3)
-  discountRate      Float   @default(6)
-  debtInterestRate  Float   @default(4)
-  debtMaturityYears Int     @default(20)
-  dscr              Float
-  npv               Float
-  irr               Float
-  lcoe              Float
-  isReference       Boolean @default(false)
-  projectId         String
-  project           Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id                  String  @id @default(cuid())
+  name                String
+  capex               Float
+  opex                Float
+  yieldMwh            Float
+  tariff              Float
+  debtRate            Float
+  projectLifeYears    Int     @default(30)
+  degradationRate     Float   @default(0.3)
+  discountRate        Float   @default(6)
+  debtInterestRate    Float   @default(4)
+  debtMaturityYears   Int     @default(20)
+  tariffInflationRate Float   @default(0)
+  opexInflationRate   Float   @default(2)
+  dscr                Float
+  npv                 Float
+  irr                 Float
+  lcoe                Float
+  isReference         Boolean @default(false)
+  projectId           String
+  project             Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }

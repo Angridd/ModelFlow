@@ -32,6 +32,16 @@ const assumptionFields = [
     label: "Maturite dette",
     step: "1",
   },
+  {
+    name: "tariffInflationRate",
+    label: "Inflation tarif",
+    step: "0.01",
+  },
+  {
+    name: "opexInflationRate",
+    label: "Inflation OPEX",
+    step: "0.01",
+  },
 ] as const;
 
 export default async function EditScenarioPage({

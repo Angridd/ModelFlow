@@ -38,6 +38,18 @@ const assumptionFields = [
     step: "1",
     defaultValue: DEFAULT_FINANCIAL_ASSUMPTIONS.debtMaturityYears,
   },
+  {
+    name: "tariffInflationRate",
+    label: "Inflation tarif",
+    step: "0.01",
+    defaultValue: DEFAULT_FINANCIAL_ASSUMPTIONS.tariffInflationRate,
+  },
+  {
+    name: "opexInflationRate",
+    label: "Inflation OPEX",
+    step: "0.01",
+    defaultValue: DEFAULT_FINANCIAL_ASSUMPTIONS.opexInflationRate,
+  },
 ] as const;
 
 export default async function NewScenarioPage({
