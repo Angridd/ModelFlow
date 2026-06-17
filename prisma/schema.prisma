@@ -11,29 +11,36 @@ datasource db {
 }
 
 model Project {
-  id         String     @id @default(cuid())
-  name       String
-  technology String
-  country    String
-  capacityMw Float
-  status     String
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
-  scenarios  Scenario[]
+  id                String     @id @default(cuid())
+  name              String
+  technology        String
+  country           String
+  capacityMw        Float
+  status            String
+  ao                String     @default("Non renseigne")
+  priority          String     @default("Medium")
+  caseType          String     @default("Base")
+  region            String     @default("Non renseignee")
+  tariff            Float      @default(0)
+  commissioningYear Int        @default(0)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  scenarios         Scenario[]
 }
 
 model Scenario {
-  id        String  @id @default(cuid())
-  name      String
-  capex     Float
-  opex      Float
-  yieldMwh  Float
-  tariff    Float
-  debtRate  Float
-  dscr      Float
-  npv       Float
-  irr       Float
-  lcoe      Float
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id          String  @id @default(cuid())
+  name        String
+  capex       Float
+  opex        Float
+  yieldMwh    Float
+  tariff      Float
+  debtRate    Float
+  dscr        Float
+  npv         Float
+  irr         Float
+  lcoe        Float
+  isReference Boolean @default(false)
+  projectId   String
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }

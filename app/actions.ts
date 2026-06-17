@@ -38,6 +38,16 @@ function readNumber(formData: FormData, key: string) {
   return value;
 }
 
+function readInteger(formData: FormData, key: string) {
+  const value = readNumber(formData, key);
+
+  if (!Number.isInteger(value)) {
+    throw new Error(`Le champ ${key} doit etre un entier.`);
+  }
+
+  return value;
+}
+
 function normalizeHeader(value: string) {
   return value
     .replace(/^\uFEFF/, "")
@@ -131,6 +141,12 @@ export async function createProject(formData: FormData) {
       country: readText(formData, "country"),
       capacityMw: readNumber(formData, "capacityMw"),
       status: readText(formData, "status"),
+      ao: readText(formData, "ao"),
+      priority: readText(formData, "priority"),
+      caseType: readText(formData, "caseType"),
+      region: readText(formData, "region"),
+      tariff: readNumber(formData, "tariff"),
+      commissioningYear: readInteger(formData, "commissioningYear"),
     },
   });
 
@@ -150,6 +166,12 @@ export async function updateProject(projectId: string, formData: FormData) {
       country: readText(formData, "country"),
       capacityMw: readNumber(formData, "capacityMw"),
       status: readText(formData, "status"),
+      ao: readText(formData, "ao"),
+      priority: readText(formData, "priority"),
+      caseType: readText(formData, "caseType"),
+      region: readText(formData, "region"),
+      tariff: readNumber(formData, "tariff"),
+      commissioningYear: readInteger(formData, "commissioningYear"),
     },
   });
 
@@ -256,6 +278,32 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
       projectId,
     },
   });
+
+  revalidatePath("/");
+  revalidatePath(`/projects/${projectId}`);
+  redirect(`/projects/${projectId}`);
+}
+
+export async function setReferenceScenario(projectId: string, scenarioId: string) {
+  await prisma.$transaction([
+    prisma.scenario.updateMany({
+      where: {
+        projectId,
+      },
+      data: {
+        isReference: false,
+      },
+    }),
+    prisma.scenario.updateMany({
+      where: {
+        id: scenarioId,
+        projectId,
+      },
+      data: {
+        isReference: true,
+      },
+    }),
+  ]);
 
   revalidatePath("/");
   revalidatePath(`/projects/${projectId}`);

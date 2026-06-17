@@ -91,6 +91,76 @@ export default async function EditProjectPage({
           </select>
         </label>
 
+        <label className="grid gap-2 text-sm font-medium text-zinc-700">
+          AO
+          <input
+            name="ao"
+            required
+            defaultValue={project.ao}
+            className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900"
+          />
+        </label>
+
+        <label className="grid gap-2 text-sm font-medium text-zinc-700">
+          Priorite
+          <select
+            name="priority"
+            required
+            defaultValue={project.priority}
+            className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900"
+          >
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+        </label>
+
+        <label className="grid gap-2 text-sm font-medium text-zinc-700">
+          Cas
+          <input
+            name="caseType"
+            required
+            defaultValue={project.caseType}
+            className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900"
+          />
+        </label>
+
+        <label className="grid gap-2 text-sm font-medium text-zinc-700">
+          Region
+          <input
+            name="region"
+            required
+            defaultValue={project.region}
+            className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900"
+          />
+        </label>
+
+        <label className="grid gap-2 text-sm font-medium text-zinc-700">
+          Tarif
+          <input
+            name="tariff"
+            required
+            type="number"
+            min="0"
+            step="0.01"
+            defaultValue={project.tariff}
+            className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900"
+          />
+        </label>
+
+        <label className="grid gap-2 text-sm font-medium text-zinc-700">
+          Annee de mise en service
+          <input
+            name="commissioningYear"
+            required
+            type="number"
+            min="1900"
+            step="1"
+            defaultValue={project.commissioningYear}
+            className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900"
+          />
+        </label>
+
         <div className="flex justify-end gap-3 pt-2">
           <Link
             href="/projects"

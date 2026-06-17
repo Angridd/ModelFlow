@@ -29,6 +29,10 @@ function formatMw(value: number) {
   })} MW`;
 }
 
+function formatYear(value: number) {
+  return value > 0 ? String(value) : "-";
+}
+
 export default async function Home() {
   await connection();
 
@@ -73,6 +77,11 @@ export default async function Home() {
       ? bestIrrValues.reduce((total, value) => total + value, 0) /
         bestIrrValues.length
       : null;
+  const averagePortfolioTariff =
+    projects.length > 0
+      ? projects.reduce((total, project) => total + project.tariff, 0) /
+        projects.length
+      : null;
 
   const mwByTechnology = Array.from(
     projects
@@ -87,6 +96,29 @@ export default async function Home() {
   ).sort((a, b) => b[1] - a[1]);
   const maxTechnologyMw = Math.max(0, ...mwByTechnology.map(([, mw]) => mw));
 
+  const mwByAo = Array.from(
+    projects
+      .reduce((totals, project) => {
+        totals.set(project.ao, (totals.get(project.ao) ?? 0) + project.capacityMw);
+        return totals;
+      }, new Map<string, number>())
+      .entries(),
+  ).sort((a, b) => b[1] - a[1]);
+  const maxAoMw = Math.max(0, ...mwByAo.map(([, mw]) => mw));
+
+  const mwByPriority = Array.from(
+    projects
+      .reduce((totals, project) => {
+        totals.set(
+          project.priority,
+          (totals.get(project.priority) ?? 0) + project.capacityMw,
+        );
+        return totals;
+      }, new Map<string, number>())
+      .entries(),
+  ).sort((a, b) => b[1] - a[1]);
+  const maxPriorityMw = Math.max(0, ...mwByPriority.map(([, mw]) => mw));
+
   const projectsByStatus = Array.from(
     projects
       .reduce((totals, project) => {
@@ -96,6 +128,19 @@ export default async function Home() {
       .entries(),
   ).sort((a, b) => b[1] - a[1]);
   const maxStatusCount = Math.max(0, ...projectsByStatus.map(([, count]) => count));
+
+  const projectsByCaseType = Array.from(
+    projects
+      .reduce((totals, project) => {
+        totals.set(project.caseType, (totals.get(project.caseType) ?? 0) + 1);
+        return totals;
+      }, new Map<string, number>())
+      .entries(),
+  ).sort((a, b) => b[1] - a[1]);
+  const maxCaseTypeCount = Math.max(
+    0,
+    ...projectsByCaseType.map(([, count]) => count),
+  );
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-10">
@@ -122,7 +167,7 @@ export default async function Home() {
         </div>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <div className="rounded-md border border-zinc-200 bg-white p-5">
           <p className="text-sm font-medium text-zinc-500">Projets</p>
           <p className="mt-3 text-3xl font-semibold text-zinc-950">
@@ -130,13 +175,13 @@ export default async function Home() {
           </p>
         </div>
         <div className="rounded-md border border-zinc-200 bg-white p-5">
-          <p className="text-sm font-medium text-zinc-500">Scénarios</p>
+          <p className="text-sm font-medium text-zinc-500">Scenarios</p>
           <p className="mt-3 text-3xl font-semibold text-zinc-950">
             {totalScenarioCount}
           </p>
         </div>
         <div className="rounded-md border border-zinc-200 bg-white p-5">
-          <p className="text-sm font-medium text-zinc-500">Capacité totale</p>
+          <p className="text-sm font-medium text-zinc-500">Capacite totale</p>
           <p className="mt-3 text-3xl font-semibold text-zinc-950">
             {formatNumber(totalCapacityMw, " MW")}
           </p>
@@ -153,82 +198,68 @@ export default async function Home() {
             {formatNumber(averageBestIrr, " %")}
           </p>
         </div>
+        <div className="rounded-md border border-zinc-200 bg-white p-5">
+          <p className="text-sm font-medium text-zinc-500">Tarif moyen</p>
+          <p className="mt-3 text-3xl font-semibold text-zinc-950">
+            {formatNumber(averagePortfolioTariff, " €/MWh")}
+          </p>
+        </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-md border border-zinc-200 bg-white p-5">
-          <h2 className="text-lg font-semibold text-zinc-950">
-            MW par technologie
-          </h2>
-          <div className="mt-5 flex flex-col gap-4">
-            {mwByTechnology.map(([technology, mw]) => (
-              <div key={technology} className="grid gap-2">
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="font-medium text-zinc-700">{technology}</span>
-                  <span className="text-zinc-500">{formatMw(mw)}</span>
-                </div>
-                <div className="h-3 overflow-hidden rounded-full bg-zinc-100">
-                  <div
-                    className="h-full rounded-full bg-zinc-900"
-                    style={{
-                      width:
-                        maxTechnologyMw === 0
-                          ? "0%"
-                          : `${(mw / maxTechnologyMw) * 100}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-            {mwByTechnology.length === 0 ? (
-              <p className="text-sm text-zinc-500">-</p>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="rounded-md border border-zinc-200 bg-white p-5">
-          <h2 className="text-lg font-semibold text-zinc-950">
-            Projets par statut
-          </h2>
-          <div className="mt-5 flex flex-col gap-4">
-            {projectsByStatus.map(([status, count]) => (
-              <div key={status} className="grid gap-2">
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="font-medium text-zinc-700">{status}</span>
-                  <span className="text-zinc-500">{count}</span>
-                </div>
-                <div className="h-3 overflow-hidden rounded-full bg-zinc-100">
-                  <div
-                    className="h-full rounded-full bg-zinc-500"
-                    style={{
-                      width:
-                        maxStatusCount === 0
-                          ? "0%"
-                          : `${(count / maxStatusCount) * 100}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-            {projectsByStatus.length === 0 ? (
-              <p className="text-sm text-zinc-500">-</p>
-            ) : null}
-          </div>
-        </div>
+        <PortfolioBars
+          title="MW par technologie"
+          rows={mwByTechnology}
+          maxValue={maxTechnologyMw}
+          formatValue={formatMw}
+          barClassName="bg-zinc-900"
+        />
+        <PortfolioBars
+          title="MW par AO"
+          rows={mwByAo}
+          maxValue={maxAoMw}
+          formatValue={formatMw}
+          barClassName="bg-zinc-900"
+        />
+        <PortfolioBars
+          title="MW par priorite"
+          rows={mwByPriority}
+          maxValue={maxPriorityMw}
+          formatValue={formatMw}
+          barClassName="bg-zinc-700"
+        />
+        <PortfolioBars
+          title="Projets par statut"
+          rows={projectsByStatus}
+          maxValue={maxStatusCount}
+          formatValue={(value) => String(value)}
+          barClassName="bg-zinc-500"
+        />
+        <PortfolioBars
+          title="Projets par cas"
+          rows={projectsByCaseType}
+          maxValue={maxCaseTypeCount}
+          formatValue={(value) => String(value)}
+          barClassName="bg-zinc-500"
+        />
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold text-zinc-950">
-          Portefeuille
-        </h2>
+        <h2 className="text-lg font-semibold text-zinc-950">Portefeuille</h2>
         <div className="overflow-x-auto rounded-md border border-zinc-200 bg-white">
-          <table className="w-full min-w-[840px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[1320px] border-collapse text-left text-sm">
             <thead className="bg-zinc-100 text-zinc-600">
               <tr>
                 <th className="px-4 py-3 font-medium">Projet</th>
                 <th className="px-4 py-3 font-medium">Technologie</th>
+                <th className="px-4 py-3 font-medium">AO</th>
+                <th className="px-4 py-3 font-medium">Priorite</th>
+                <th className="px-4 py-3 font-medium">Cas</th>
+                <th className="px-4 py-3 font-medium">Region</th>
                 <th className="px-4 py-3 font-medium">MW</th>
-                <th className="px-4 py-3 font-medium">Scénarios</th>
+                <th className="px-4 py-3 font-medium">Tarif</th>
+                <th className="px-4 py-3 font-medium">MES</th>
+                <th className="px-4 py-3 font-medium">Scenarios</th>
                 <th className="px-4 py-3 font-medium">Meilleure VAN</th>
                 <th className="px-4 py-3 font-medium">Meilleur TRI</th>
                 <th className="px-4 py-3 font-medium">Statut</th>
@@ -246,8 +277,18 @@ export default async function Home() {
                     </Link>
                   </td>
                   <td className="px-4 py-3 text-zinc-700">{project.technology}</td>
+                  <td className="px-4 py-3 text-zinc-700">{project.ao}</td>
+                  <td className="px-4 py-3 text-zinc-700">{project.priority}</td>
+                  <td className="px-4 py-3 text-zinc-700">{project.caseType}</td>
+                  <td className="px-4 py-3 text-zinc-700">{project.region}</td>
                   <td className="px-4 py-3 text-zinc-700">
                     {formatNumber(project.capacityMw)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(project.tariff, " €/MWh")}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatYear(project.commissioningYear)}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
                     {project.scenarioCount}
@@ -263,7 +304,7 @@ export default async function Home() {
               ))}
               {rows.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-center text-zinc-500" colSpan={7}>
+                  <td className="px-4 py-8 text-center text-zinc-500" colSpan={13}>
                     Aucun projet pour le moment.
                   </td>
                 </tr>
@@ -273,5 +314,45 @@ export default async function Home() {
         </div>
       </section>
     </main>
+  );
+}
+
+function PortfolioBars({
+  title,
+  rows,
+  maxValue,
+  formatValue,
+  barClassName,
+}: {
+  title: string;
+  rows: [string, number][];
+  maxValue: number;
+  formatValue: (value: number) => string;
+  barClassName: string;
+}) {
+  return (
+    <div className="rounded-md border border-zinc-200 bg-white p-5">
+      <h2 className="text-lg font-semibold text-zinc-950">{title}</h2>
+      <div className="mt-5 flex flex-col gap-4">
+        {rows.map(([label, value]) => (
+          <div key={label} className="grid gap-2">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="font-medium text-zinc-700">{label}</span>
+              <span className="text-zinc-500">{formatValue(value)}</span>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-zinc-100">
+              <div
+                className={`h-full rounded-full ${barClassName}`}
+                style={{
+                  width:
+                    maxValue === 0 ? "0%" : `${(value / maxValue) * 100}%`,
+                }}
+              />
+            </div>
+          </div>
+        ))}
+        {rows.length === 0 ? <p className="text-sm text-zinc-500">-</p> : null}
+      </div>
+    </div>
   );
 }

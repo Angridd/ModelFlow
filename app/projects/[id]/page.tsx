@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { cloneScenario, importScenarios } from "@/app/actions";
+import {
+  cloneScenario,
+  importScenarios,
+  setReferenceScenario,
+} from "@/app/actions";
 import { DeleteScenarioButton } from "@/app/projects/[id]/delete-scenario-button";
 import { generateSensitivityRows } from "@/app/lib/sensitivity";
 import { prisma } from "@/app/lib/prisma";
@@ -22,6 +26,10 @@ function formatNumber(value: number | null, suffix = "") {
   return `${value.toLocaleString("fr-FR", {
     maximumFractionDigits: 2,
   })}${suffix}`;
+}
+
+function formatYear(value: number) {
+  return value > 0 ? String(value) : "-";
 }
 
 function formatMillionEuros(value: number | null) {
@@ -65,20 +73,29 @@ export default async function ProjectDetailPage({
   }
 
   const scenarios = project.scenarios;
+  const projectReferenceScenario = scenarios.find((scenario) => scenario.isReference);
   const selectedScenarioId =
-    typeof scenarioId === "string" ? scenarioId : scenarios[0]?.id;
-  const referenceScenario =
-    scenarios.find((scenario) => scenario.id === selectedScenarioId) ?? scenarios[0];
-  const tariffSensitivityRows = referenceScenario
-    ? generateSensitivityRows(referenceScenario, "tariff")
+    typeof scenarioId === "string"
+      ? scenarioId
+      : (projectReferenceScenario?.id ?? scenarios[0]?.id);
+  const analysisScenario =
+    scenarios.find((scenario) => scenario.id === selectedScenarioId) ??
+    projectReferenceScenario ??
+    scenarios[0];
+  const tariffSensitivityRows = analysisScenario
+    ? generateSensitivityRows(analysisScenario, "tariff")
     : [];
-  const capexSensitivityRows = referenceScenario
-    ? generateSensitivityRows(referenceScenario, "capex")
+  const capexSensitivityRows = analysisScenario
+    ? generateSensitivityRows(analysisScenario, "capex")
     : [];
-  const bestNpv = maxValue(scenarios.map((scenario) => scenario.npv));
-  const bestIrr = maxValue(scenarios.map((scenario) => scenario.irr));
-  const minDscr = minValue(scenarios.map((scenario) => scenario.dscr));
-  const minLcoe = minValue(scenarios.map((scenario) => scenario.lcoe));
+  const kpiNpv =
+    projectReferenceScenario?.npv ?? maxValue(scenarios.map((scenario) => scenario.npv));
+  const kpiIrr =
+    projectReferenceScenario?.irr ?? maxValue(scenarios.map((scenario) => scenario.irr));
+  const kpiDscr =
+    projectReferenceScenario?.dscr ?? minValue(scenarios.map((scenario) => scenario.dscr));
+  const kpiLcoe =
+    projectReferenceScenario?.lcoe ?? minValue(scenarios.map((scenario) => scenario.lcoe));
   const importScenariosForProject = importScenarios.bind(null, project.id);
 
   return (
@@ -129,7 +146,7 @@ export default async function ProjectDetailPage({
         </div>
       </div>
 
-      <section className="grid gap-4 rounded-md border border-zinc-200 bg-white p-5 sm:grid-cols-2">
+      <section className="grid gap-4 rounded-md border border-zinc-200 bg-white p-5 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <p className="text-sm font-medium text-zinc-500">Technologie</p>
           <p className="mt-1 text-zinc-950">{project.technology}</p>
@@ -146,31 +163,67 @@ export default async function ProjectDetailPage({
           <p className="text-sm font-medium text-zinc-500">Statut</p>
           <p className="mt-1 text-zinc-950">{project.status}</p>
         </div>
+        <div>
+          <p className="text-sm font-medium text-zinc-500">AO</p>
+          <p className="mt-1 text-zinc-950">{project.ao}</p>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-zinc-500">Priorite</p>
+          <p className="mt-1 text-zinc-950">{project.priority}</p>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-zinc-500">Cas</p>
+          <p className="mt-1 text-zinc-950">{project.caseType}</p>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-zinc-500">Region</p>
+          <p className="mt-1 text-zinc-950">{project.region}</p>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-zinc-500">Tarif projet</p>
+          <p className="mt-1 text-zinc-950">
+            {formatNumber(project.tariff, " €/MWh")}
+          </p>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-zinc-500">Mise en service</p>
+          <p className="mt-1 text-zinc-950">
+            {formatYear(project.commissioningYear)}
+          </p>
+        </div>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-md border border-zinc-200 bg-white p-5">
-          <p className="text-sm font-medium text-zinc-500">Meilleure VAN</p>
+          <p className="text-sm font-medium text-zinc-500">
+            {projectReferenceScenario ? "VAN référence" : "Meilleure VAN"}
+          </p>
           <p className="mt-3 text-2xl font-semibold text-zinc-950">
-            {formatMillionEuros(bestNpv)}
+            {formatMillionEuros(kpiNpv)}
           </p>
         </div>
         <div className="rounded-md border border-zinc-200 bg-white p-5">
-          <p className="text-sm font-medium text-zinc-500">Meilleur TRI</p>
+          <p className="text-sm font-medium text-zinc-500">
+            {projectReferenceScenario ? "TRI référence" : "Meilleur TRI"}
+          </p>
           <p className="mt-3 text-2xl font-semibold text-zinc-950">
-            {formatNumber(bestIrr, " %")}
+            {formatNumber(kpiIrr, " %")}
           </p>
         </div>
         <div className="rounded-md border border-zinc-200 bg-white p-5">
-          <p className="text-sm font-medium text-zinc-500">DSCR minimum</p>
+          <p className="text-sm font-medium text-zinc-500">
+            {projectReferenceScenario ? "DSCR référence" : "DSCR minimum"}
+          </p>
           <p className="mt-3 text-2xl font-semibold text-zinc-950">
-            {formatNumber(minDscr)}
+            {formatNumber(kpiDscr)}
           </p>
         </div>
         <div className="rounded-md border border-zinc-200 bg-white p-5">
-          <p className="text-sm font-medium text-zinc-500">LCOE minimum</p>
+          <p className="text-sm font-medium text-zinc-500">
+            {projectReferenceScenario ? "LCOE référence" : "LCOE minimum"}
+          </p>
           <p className="mt-3 text-2xl font-semibold text-zinc-950">
-            {formatNumber(minLcoe, " €/MWh")}
+            {formatNumber(kpiLcoe, " €/MWh")}
           </p>
         </div>
       </section>
@@ -186,7 +239,7 @@ export default async function ProjectDetailPage({
           <form className="flex gap-2">
             <select
               name="scenarioId"
-              defaultValue={referenceScenario?.id}
+              defaultValue={analysisScenario?.id}
               className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
             >
               {scenarios.map((scenario) => (
@@ -244,7 +297,16 @@ export default async function ProjectDetailPage({
             <tbody className="divide-y divide-zinc-200">
               {scenarios.map((scenario) => (
                 <tr key={scenario.id}>
-                  <td className="px-4 py-3 font-medium text-zinc-950">{scenario.name}</td>
+                  <td className="px-4 py-3 font-medium text-zinc-950">
+                    <div className="flex items-center gap-2">
+                      <span>{scenario.name}</span>
+                      {scenario.isReference ? (
+                        <span className="rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white">
+                          Référence
+                        </span>
+                      ) : null}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-zinc-700">
                     {formatNumber(scenario.capex, " k€/MW")}
                   </td>
@@ -288,6 +350,22 @@ export default async function ProjectDetailPage({
                           Dupliquer
                         </button>
                       </form>
+                      {!scenario.isReference ? (
+                        <form
+                          action={setReferenceScenario.bind(
+                            null,
+                            project.id,
+                            scenario.id,
+                          )}
+                        >
+                          <button
+                            type="submit"
+                            className="inline-flex h-8 items-center justify-center rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
+                          >
+                            Définir comme référence
+                          </button>
+                        </form>
+                      ) : null}
                       <DeleteScenarioButton
                         projectId={project.id}
                         scenarioId={scenario.id}
