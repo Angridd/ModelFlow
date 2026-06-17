@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { importScenarios } from "@/app/actions";
+import { cloneScenario, importScenarios } from "@/app/actions";
 import { DeleteScenarioButton } from "@/app/projects/[id]/delete-scenario-button";
 import { prisma } from "@/app/lib/prisma";
 
@@ -208,11 +208,27 @@ export default async function ProjectDetailPage({
                     {formatNumber(scenario.lcoe, " €/MWh")}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
+                    <div className="flex gap-2">
+                      <Link
+                        href={`/projects/${project.id}/scenarios/${scenario.id}/edit`}
+                        className="inline-flex h-8 items-center justify-center rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
+                      >
+                        Modifier
+                      </Link>
+                      <form action={cloneScenario.bind(null, project.id, scenario.id)}>
+                        <button
+                          type="submit"
+                          className="inline-flex h-8 items-center justify-center rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
+                        >
+                          Dupliquer
+                        </button>
+                      </form>
                     <DeleteScenarioButton
                       projectId={project.id}
                       scenarioId={scenario.id}
                       scenarioName={scenario.name}
                     />
+                    </div>
                   </td>
                 </tr>
               ))}

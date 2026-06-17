@@ -1,33 +1,128 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import { bestIrr, bestNpv, scenarioCount } from "@/app/lib/portfolio";
 import { prisma } from "@/app/lib/prisma";
+
+function formatNumber(value: number | null, suffix = "") {
+  if (value === null) {
+    return "-";
+  }
+
+  return `${value.toLocaleString("fr-FR", {
+    maximumFractionDigits: 2,
+  })}${suffix}`;
+}
+
+function formatMillionEuros(value: number | null) {
+  if (value === null) {
+    return "-";
+  }
+
+  return `${(value / 1_000_000).toLocaleString("fr-FR", {
+    maximumFractionDigits: 2,
+  })} M€`;
+}
+
+function formatMw(value: number) {
+  return `${value.toLocaleString("fr-FR", {
+    maximumFractionDigits: 2,
+  })} MW`;
+}
 
 export default async function Home() {
   await connection();
 
-  const [projectCount, scenarioCount] = await Promise.all([
-    prisma.project.count(),
-    prisma.scenario.count(),
-  ]);
+  const projects = await prisma.project.findMany({
+    include: {
+      scenarios: {
+        select: {
+          npv: true,
+          irr: true,
+        },
+      },
+    },
+  });
+
+  const rows = projects
+    .map((project) => ({
+      ...project,
+      scenarioCount: scenarioCount(project),
+      bestNpv: bestNpv(project),
+      bestIrr: bestIrr(project),
+    }))
+    .sort((a, b) => (b.bestNpv ?? -Infinity) - (a.bestNpv ?? -Infinity));
+
+  const projectCount = projects.length;
+  const totalScenarioCount = projects.reduce(
+    (total, project) => total + scenarioCount(project),
+    0,
+  );
+  const totalCapacityMw = projects.reduce(
+    (total, project) => total + project.capacityMw,
+    0,
+  );
+  const totalBestNpv = projects.reduce(
+    (total, project) => total + (bestNpv(project) ?? 0),
+    0,
+  );
+  const bestIrrValues = projects
+    .map((project) => bestIrr(project))
+    .filter((value): value is number => value !== null);
+  const averageBestIrr =
+    bestIrrValues.length > 0
+      ? bestIrrValues.reduce((total, value) => total + value, 0) /
+        bestIrrValues.length
+      : null;
+
+  const mwByTechnology = Array.from(
+    projects
+      .reduce((totals, project) => {
+        totals.set(
+          project.technology,
+          (totals.get(project.technology) ?? 0) + project.capacityMw,
+        );
+        return totals;
+      }, new Map<string, number>())
+      .entries(),
+  ).sort((a, b) => b[1] - a[1]);
+  const maxTechnologyMw = Math.max(0, ...mwByTechnology.map(([, mw]) => mw));
+
+  const projectsByStatus = Array.from(
+    projects
+      .reduce((totals, project) => {
+        totals.set(project.status, (totals.get(project.status) ?? 0) + 1);
+        return totals;
+      }, new Map<string, number>())
+      .entries(),
+  ).sort((a, b) => b[1] - a[1]);
+  const maxStatusCount = Math.max(0, ...projectsByStatus.map(([, count]) => count));
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-6 py-10">
+    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-6 py-10">
       <div className="flex flex-col gap-4 border-b border-zinc-200 pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-zinc-500">Business plans energie</p>
+          <p className="text-sm font-medium text-zinc-500">Cockpit portefeuille</p>
           <h1 className="mt-2 text-4xl font-semibold tracking-normal text-zinc-950">
             ModelFlow
           </h1>
         </div>
-        <Link
-          href="/projects/new"
-          className="inline-flex h-10 items-center justify-center rounded-md bg-zinc-950 px-4 text-sm font-medium text-white hover:bg-zinc-800"
-        >
-          Nouveau projet
-        </Link>
+        <div className="flex gap-3">
+          <Link
+            href="/projects"
+            className="inline-flex h-10 items-center justify-center rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
+          >
+            Projets
+          </Link>
+          <Link
+            href="/projects/new"
+            className="inline-flex h-10 items-center justify-center rounded-md bg-zinc-950 px-4 text-sm font-medium text-white hover:bg-zinc-800"
+          >
+            Nouveau projet
+          </Link>
+        </div>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-md border border-zinc-200 bg-white p-5">
           <p className="text-sm font-medium text-zinc-500">Projets</p>
           <p className="mt-3 text-3xl font-semibold text-zinc-950">
@@ -35,28 +130,146 @@ export default async function Home() {
           </p>
         </div>
         <div className="rounded-md border border-zinc-200 bg-white p-5">
-          <p className="text-sm font-medium text-zinc-500">Scenarios</p>
+          <p className="text-sm font-medium text-zinc-500">Scénarios</p>
           <p className="mt-3 text-3xl font-semibold text-zinc-950">
-            {scenarioCount}
+            {totalScenarioCount}
+          </p>
+        </div>
+        <div className="rounded-md border border-zinc-200 bg-white p-5">
+          <p className="text-sm font-medium text-zinc-500">Capacité totale</p>
+          <p className="mt-3 text-3xl font-semibold text-zinc-950">
+            {formatNumber(totalCapacityMw, " MW")}
+          </p>
+        </div>
+        <div className="rounded-md border border-zinc-200 bg-white p-5">
+          <p className="text-sm font-medium text-zinc-500">VAN totale</p>
+          <p className="mt-3 text-3xl font-semibold text-zinc-950">
+            {formatMillionEuros(totalBestNpv)}
+          </p>
+        </div>
+        <div className="rounded-md border border-zinc-200 bg-white p-5">
+          <p className="text-sm font-medium text-zinc-500">TRI moyen</p>
+          <p className="mt-3 text-3xl font-semibold text-zinc-950">
+            {formatNumber(averageBestIrr, " %")}
           </p>
         </div>
       </section>
 
+      <section className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-md border border-zinc-200 bg-white p-5">
+          <h2 className="text-lg font-semibold text-zinc-950">
+            MW par technologie
+          </h2>
+          <div className="mt-5 flex flex-col gap-4">
+            {mwByTechnology.map(([technology, mw]) => (
+              <div key={technology} className="grid gap-2">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="font-medium text-zinc-700">{technology}</span>
+                  <span className="text-zinc-500">{formatMw(mw)}</span>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-zinc-100">
+                  <div
+                    className="h-full rounded-full bg-zinc-900"
+                    style={{
+                      width:
+                        maxTechnologyMw === 0
+                          ? "0%"
+                          : `${(mw / maxTechnologyMw) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+            {mwByTechnology.length === 0 ? (
+              <p className="text-sm text-zinc-500">-</p>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="rounded-md border border-zinc-200 bg-white p-5">
+          <h2 className="text-lg font-semibold text-zinc-950">
+            Projets par statut
+          </h2>
+          <div className="mt-5 flex flex-col gap-4">
+            {projectsByStatus.map(([status, count]) => (
+              <div key={status} className="grid gap-2">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="font-medium text-zinc-700">{status}</span>
+                  <span className="text-zinc-500">{count}</span>
+                </div>
+                <div className="h-3 overflow-hidden rounded-full bg-zinc-100">
+                  <div
+                    className="h-full rounded-full bg-zinc-500"
+                    style={{
+                      width:
+                        maxStatusCount === 0
+                          ? "0%"
+                          : `${(count / maxStatusCount) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+            {projectsByStatus.length === 0 ? (
+              <p className="text-sm text-zinc-500">-</p>
+            ) : null}
+          </div>
+        </div>
+      </section>
+
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold text-zinc-950">Acces rapide</h2>
-        <div className="flex gap-3">
-          <Link
-            href="/projects"
-            className="inline-flex h-10 items-center justify-center rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
-          >
-            Voir les projets
-          </Link>
-          <Link
-            href="/projects/new"
-            className="inline-flex h-10 items-center justify-center rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
-          >
-            Creer un projet
-          </Link>
+        <h2 className="text-lg font-semibold text-zinc-950">
+          Portefeuille
+        </h2>
+        <div className="overflow-x-auto rounded-md border border-zinc-200 bg-white">
+          <table className="w-full min-w-[840px] border-collapse text-left text-sm">
+            <thead className="bg-zinc-100 text-zinc-600">
+              <tr>
+                <th className="px-4 py-3 font-medium">Projet</th>
+                <th className="px-4 py-3 font-medium">Technologie</th>
+                <th className="px-4 py-3 font-medium">MW</th>
+                <th className="px-4 py-3 font-medium">Scénarios</th>
+                <th className="px-4 py-3 font-medium">Meilleure VAN</th>
+                <th className="px-4 py-3 font-medium">Meilleur TRI</th>
+                <th className="px-4 py-3 font-medium">Statut</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-200">
+              {rows.map((project) => (
+                <tr key={project.id}>
+                  <td className="px-4 py-3 font-medium">
+                    <Link
+                      href={`/projects/${project.id}`}
+                      className="text-zinc-950 hover:text-zinc-600"
+                    >
+                      {project.name}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">{project.technology}</td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(project.capacityMw)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {project.scenarioCount}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatMillionEuros(project.bestNpv)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(project.bestIrr, " %")}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">{project.status}</td>
+                </tr>
+              ))}
+              {rows.length === 0 ? (
+                <tr>
+                  <td className="px-4 py-8 text-center text-zinc-500" colSpan={7}>
+                    Aucun projet pour le moment.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
       </section>
     </main>

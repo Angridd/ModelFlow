@@ -161,6 +161,68 @@ export async function createScenario(projectId: string, formData: FormData) {
   redirect(`/projects/${projectId}`);
 }
 
+export async function updateScenario(
+  projectId: string,
+  scenarioId: string,
+  formData: FormData,
+) {
+  await prisma.scenario.updateMany({
+    where: {
+      id: scenarioId,
+      projectId,
+    },
+    data: {
+      name: readText(formData, "name"),
+      capex: readNumber(formData, "capex"),
+      opex: readNumber(formData, "opex"),
+      yieldMwh: readNumber(formData, "yieldMwh"),
+      tariff: readNumber(formData, "tariff"),
+      debtRate: readNumber(formData, "debtRate"),
+      dscr: readNumber(formData, "dscr"),
+      npv: readNumber(formData, "npv"),
+      irr: readNumber(formData, "irr"),
+      lcoe: readNumber(formData, "lcoe"),
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath(`/projects/${projectId}`);
+  redirect(`/projects/${projectId}`);
+}
+
+export async function cloneScenario(projectId: string, scenarioId: string) {
+  const scenario = await prisma.scenario.findFirst({
+    where: {
+      id: scenarioId,
+      projectId,
+    },
+  });
+
+  if (!scenario) {
+    redirect(`/projects/${projectId}`);
+  }
+
+  await prisma.scenario.create({
+    data: {
+      name: `${scenario.name} - Copy`,
+      capex: scenario.capex,
+      opex: scenario.opex,
+      yieldMwh: scenario.yieldMwh,
+      tariff: scenario.tariff,
+      debtRate: scenario.debtRate,
+      dscr: scenario.dscr,
+      npv: scenario.npv,
+      irr: scenario.irr,
+      lcoe: scenario.lcoe,
+      projectId,
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath(`/projects/${projectId}`);
+  redirect(`/projects/${projectId}`);
+}
+
 export async function deleteScenario(projectId: string, scenarioId: string) {
   await prisma.scenario.deleteMany({
     where: {
