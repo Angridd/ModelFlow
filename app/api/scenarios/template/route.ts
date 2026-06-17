@@ -1,6 +1,22 @@
 const csv = [
-  ["Scénario", "CAPEX", "OPEX", "Productible", "Tarif", "Dette", "DSCR", "VAN", "TRI", "LCOE"],
-  ["Base", "650", "18", "1450", "79", "70", "1.15", "4.2", "8.5", "52"],
+  [
+    "Scenario",
+    "CAPEX",
+    "OPEX",
+    "Productible",
+    "Tarif",
+    "Dette",
+    "Duree projet",
+    "Degradation",
+    "Taux actualisation",
+    "Taux dette",
+    "Maturite dette",
+    "DSCR",
+    "VAN",
+    "TRI",
+    "LCOE",
+  ],
+  ["Base", "650", "18", "1450", "79", "70", "30", "0.3", "6", "4", "20", "1.15", "4.2", "8.5", "52"],
 ]
   .map((row) => row.join(","))
   .join("\n");

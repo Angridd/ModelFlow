@@ -2,14 +2,42 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { createScenario } from "@/app/actions";
+import { DEFAULT_FINANCIAL_ASSUMPTIONS } from "@/app/lib/finance/types";
 import { prisma } from "@/app/lib/prisma";
 
-const numericFields = [
-  "capex",
-  "opex",
-  "yieldMwh",
-  "tariff",
-  "debtRate",
+const numericFields = ["capex", "opex", "yieldMwh", "tariff", "debtRate"] as const;
+
+const assumptionFields = [
+  {
+    name: "projectLifeYears",
+    label: "Duree projet",
+    step: "1",
+    defaultValue: DEFAULT_FINANCIAL_ASSUMPTIONS.projectLifeYears,
+  },
+  {
+    name: "degradationRate",
+    label: "Degradation",
+    step: "0.01",
+    defaultValue: DEFAULT_FINANCIAL_ASSUMPTIONS.degradationRate,
+  },
+  {
+    name: "discountRate",
+    label: "Taux actualisation",
+    step: "0.01",
+    defaultValue: DEFAULT_FINANCIAL_ASSUMPTIONS.discountRate,
+  },
+  {
+    name: "debtInterestRate",
+    label: "Taux dette",
+    step: "0.01",
+    defaultValue: DEFAULT_FINANCIAL_ASSUMPTIONS.debtInterestRate,
+  },
+  {
+    name: "debtMaturityYears",
+    label: "Maturite dette",
+    step: "1",
+    defaultValue: DEFAULT_FINANCIAL_ASSUMPTIONS.debtMaturityYears,
+  },
 ] as const;
 
 export default async function NewScenarioPage({
@@ -67,6 +95,26 @@ export default async function NewScenarioPage({
                 required
                 type="number"
                 step="0.01"
+                className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900"
+              />
+            </label>
+          ))}
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          {assumptionFields.map((field) => (
+            <label
+              key={field.name}
+              className="grid gap-2 text-sm font-medium text-zinc-700"
+            >
+              {field.label}
+              <input
+                name={field.name}
+                required
+                type="number"
+                min="0"
+                step={field.step}
+                defaultValue={field.defaultValue}
                 className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900"
               />
             </label>

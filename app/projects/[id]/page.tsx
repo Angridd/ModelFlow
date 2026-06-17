@@ -100,6 +100,11 @@ export default async function ProjectDetailPage({
         yieldMwh: projectReferenceScenario.yieldMwh,
         tariff: projectReferenceScenario.tariff,
         debtRate: projectReferenceScenario.debtRate,
+        projectLifeYears: projectReferenceScenario.projectLifeYears,
+        degradationRate: projectReferenceScenario.degradationRate,
+        discountRate: projectReferenceScenario.discountRate,
+        debtInterestRate: projectReferenceScenario.debtInterestRate,
+        debtMaturityYears: projectReferenceScenario.debtMaturityYears,
       })
     : null;
   const kpiNpv =
@@ -120,6 +125,11 @@ export default async function ProjectDetailPage({
         yieldMwh: cashFlowScenario.yieldMwh,
         tariff: cashFlowScenario.tariff,
         debtRate: cashFlowScenario.debtRate,
+        projectLifeYears: cashFlowScenario.projectLifeYears,
+        degradationRate: cashFlowScenario.degradationRate,
+        discountRate: cashFlowScenario.discountRate,
+        debtInterestRate: cashFlowScenario.debtInterestRate,
+        debtMaturityYears: cashFlowScenario.debtMaturityYears,
       })
     : [];
 
@@ -250,6 +260,49 @@ export default async function ProjectDetailPage({
           <p className="mt-3 text-2xl font-semibold text-zinc-950">
             {formatNumber(kpiLcoe, " €/MWh")}
           </p>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-white p-5">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <h2 className="text-lg font-semibold text-zinc-950">
+            Hypotheses financieres
+          </h2>
+          <p className="text-sm font-medium text-zinc-500">
+            {cashFlowScenario?.name ?? "-"}
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div>
+            <p className="text-sm font-medium text-zinc-500">Duree projet</p>
+            <p className="mt-1 text-zinc-950">
+              {cashFlowScenario ? `${cashFlowScenario.projectLifeYears} ans` : "-"}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-zinc-500">Taux actualisation</p>
+            <p className="mt-1 text-zinc-950">
+              {formatNumber(cashFlowScenario?.discountRate ?? null, " %")}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-zinc-500">Degradation</p>
+            <p className="mt-1 text-zinc-950">
+              {formatNumber(cashFlowScenario?.degradationRate ?? null, " %")}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-zinc-500">Taux dette</p>
+            <p className="mt-1 text-zinc-950">
+              {formatNumber(cashFlowScenario?.debtInterestRate ?? null, " %")}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-zinc-500">Maturite dette</p>
+            <p className="mt-1 text-zinc-950">
+              {cashFlowScenario ? `${cashFlowScenario.debtMaturityYears} ans` : "-"}
+            </p>
+          </div>
         </div>
       </section>
 

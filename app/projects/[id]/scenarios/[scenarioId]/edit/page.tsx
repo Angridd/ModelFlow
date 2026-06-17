@@ -4,12 +4,34 @@ import { connection } from "next/server";
 import { updateScenario } from "@/app/actions";
 import { prisma } from "@/app/lib/prisma";
 
-const numericFields = [
-  "capex",
-  "opex",
-  "yieldMwh",
-  "tariff",
-  "debtRate",
+const numericFields = ["capex", "opex", "yieldMwh", "tariff", "debtRate"] as const;
+
+const assumptionFields = [
+  {
+    name: "projectLifeYears",
+    label: "Duree projet",
+    step: "1",
+  },
+  {
+    name: "degradationRate",
+    label: "Degradation",
+    step: "0.01",
+  },
+  {
+    name: "discountRate",
+    label: "Taux actualisation",
+    step: "0.01",
+  },
+  {
+    name: "debtInterestRate",
+    label: "Taux dette",
+    step: "0.01",
+  },
+  {
+    name: "debtMaturityYears",
+    label: "Maturite dette",
+    step: "1",
+  },
 ] as const;
 
 export default async function EditScenarioPage({
@@ -83,6 +105,26 @@ export default async function EditScenarioPage({
                 type="number"
                 step="0.01"
                 defaultValue={scenario[field]}
+                className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900"
+              />
+            </label>
+          ))}
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          {assumptionFields.map((field) => (
+            <label
+              key={field.name}
+              className="grid gap-2 text-sm font-medium text-zinc-700"
+            >
+              {field.label}
+              <input
+                name={field.name}
+                required
+                type="number"
+                min="0"
+                step={field.step}
+                defaultValue={scenario[field.name]}
                 className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900"
               />
             </label>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { calculateScenarioMetrics } from "@/app/lib/finance/engine";
+import { DEFAULT_FINANCIAL_ASSUMPTIONS } from "@/app/lib/finance/types";
 import { prisma } from "@/app/lib/prisma";
 
 const scenarioImportColumns = {
@@ -12,6 +13,11 @@ const scenarioImportColumns = {
   yieldMwh: "productible",
   tariff: "tarif",
   debtRate: "dette",
+  projectLifeYears: "duree projet",
+  degradationRate: "degradation",
+  discountRate: "taux actualisation",
+  debtInterestRate: "taux dette",
+  debtMaturityYears: "maturite dette",
   dscr: "dscr",
   npv: "van",
   irr: "tri",
@@ -134,6 +140,16 @@ function parseImportedNumber(value: string, key: string) {
   return number;
 }
 
+function parseImportedInteger(value: string, key: string) {
+  const number = parseImportedNumber(value, key);
+
+  if (!Number.isInteger(number)) {
+    throw new Error(`La colonne ${key} doit etre un entier.`);
+  }
+
+  return number;
+}
+
 function readScenarioAssumptions(formData: FormData) {
   return {
     capex: readNumber(formData, "capex"),
@@ -141,6 +157,11 @@ function readScenarioAssumptions(formData: FormData) {
     yieldMwh: readNumber(formData, "yieldMwh"),
     tariff: readNumber(formData, "tariff"),
     debtRate: readNumber(formData, "debtRate"),
+    projectLifeYears: readInteger(formData, "projectLifeYears"),
+    degradationRate: readNumber(formData, "degradationRate"),
+    discountRate: readNumber(formData, "discountRate"),
+    debtInterestRate: readNumber(formData, "debtInterestRate"),
+    debtMaturityYears: readInteger(formData, "debtMaturityYears"),
   };
 }
 
@@ -312,6 +333,11 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
       yieldMwh: scenario.yieldMwh,
       tariff: scenario.tariff,
       debtRate: scenario.debtRate,
+      projectLifeYears: scenario.projectLifeYears,
+      degradationRate: scenario.degradationRate,
+      discountRate: scenario.discountRate,
+      debtInterestRate: scenario.debtInterestRate,
+      debtMaturityYears: scenario.debtMaturityYears,
       dscr: scenario.dscr,
       npv: scenario.npv,
       irr: scenario.irr,
@@ -394,6 +420,26 @@ export async function importScenarios(projectId: string, formData: FormData) {
 
       return row[index]?.trim() ?? "";
     };
+    const readOptionalNumber = (column: string, fallback: number, label: string) => {
+      const index = headerIndexes.get(column);
+
+      if (index === undefined) {
+        return fallback;
+      }
+
+      const value = row[index]?.trim() ?? "";
+      return value === "" ? fallback : parseImportedNumber(value, label);
+    };
+    const readOptionalInteger = (column: string, fallback: number, label: string) => {
+      const index = headerIndexes.get(column);
+
+      if (index === undefined) {
+        return fallback;
+      }
+
+      const value = row[index]?.trim() ?? "";
+      return value === "" ? fallback : parseImportedInteger(value, label);
+    };
 
     const name = readColumn(scenarioImportColumns.name);
 
@@ -411,6 +457,31 @@ export async function importScenarios(projectId: string, formData: FormData) {
       ),
       tariff: parseImportedNumber(readColumn(scenarioImportColumns.tariff), "Tarif"),
       debtRate: parseImportedNumber(readColumn(scenarioImportColumns.debtRate), "Dette"),
+      projectLifeYears: readOptionalInteger(
+        scenarioImportColumns.projectLifeYears,
+        DEFAULT_FINANCIAL_ASSUMPTIONS.projectLifeYears,
+        "Duree projet",
+      ),
+      degradationRate: readOptionalNumber(
+        scenarioImportColumns.degradationRate,
+        DEFAULT_FINANCIAL_ASSUMPTIONS.degradationRate,
+        "Degradation",
+      ),
+      discountRate: readOptionalNumber(
+        scenarioImportColumns.discountRate,
+        DEFAULT_FINANCIAL_ASSUMPTIONS.discountRate,
+        "Taux actualisation",
+      ),
+      debtInterestRate: readOptionalNumber(
+        scenarioImportColumns.debtInterestRate,
+        DEFAULT_FINANCIAL_ASSUMPTIONS.debtInterestRate,
+        "Taux dette",
+      ),
+      debtMaturityYears: readOptionalInteger(
+        scenarioImportColumns.debtMaturityYears,
+        DEFAULT_FINANCIAL_ASSUMPTIONS.debtMaturityYears,
+        "Maturite dette",
+      ),
       dscr: parseImportedNumber(readColumn(scenarioImportColumns.dscr), "DSCR"),
       npv: parseImportedNumber(readColumn(scenarioImportColumns.npv), "VAN"),
       irr: parseImportedNumber(readColumn(scenarioImportColumns.irr), "TRI"),

@@ -1,12 +1,9 @@
-const PROJECT_YEARS = 30;
-const ANNUAL_DEGRADATION_RATE = 0.003;
-const DISCOUNT_RATE = 0.06;
-const DEBT_INTEREST_RATE = 0.04;
-const DEBT_MATURITY_YEARS = 20;
+import type { FinancialAssumptions } from "@/app/lib/finance/types";
+
 const IRR_MIN_RATE = -0.9999;
 const IRR_MAX_RATE = 10;
 
-export type FinanceEngineInput = {
+export type FinanceEngineInput = FinancialAssumptions & {
   capacityMw: number;
   capex: number;
   opex: number;
@@ -84,27 +81,46 @@ function calculateIrr(initialInvestment: number, cashFlows: number[]) {
   return (low + high) / 2;
 }
 
-function calculateAnnualDebtService(initialDebt: number) {
-  if (initialDebt <= 0) {
+function asRate(percent: number) {
+  return percent / 100;
+}
+
+function calculateAnnualDebtService(
+  initialDebt: number,
+  debtInterestRate: number,
+  debtMaturityYears: number,
+) {
+  if (initialDebt <= 0 || debtMaturityYears <= 0) {
     return 0;
   }
 
   // Debt is modeled as a constant annuity: same total debt service every year.
+  if (debtInterestRate === 0) {
+    return initialDebt / debtMaturityYears;
+  }
+
   return (
-    (initialDebt * DEBT_INTEREST_RATE) /
-    (1 - (1 + DEBT_INTEREST_RATE) ** -DEBT_MATURITY_YEARS)
+    (initialDebt * debtInterestRate) /
+    (1 - (1 + debtInterestRate) ** -debtMaturityYears)
   );
 }
 
 export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashFlow[] {
   const initialInvestment = input.capex * input.capacityMw;
   const initialDebt = initialInvestment * (input.debtRate / 100);
-  const annualDebtService = calculateAnnualDebtService(initialDebt);
+  const degradationRate = asRate(input.degradationRate);
+  const discountRate = asRate(input.discountRate);
+  const debtInterestRate = asRate(input.debtInterestRate);
+  const annualDebtService = calculateAnnualDebtService(
+    initialDebt,
+    debtInterestRate,
+    input.debtMaturityYears,
+  );
   const annualOpex = input.opex * input.capacityMw;
   const rows: AnnualCashFlow[] = [];
 
-  for (let year = 1; year <= PROJECT_YEARS; year += 1) {
-    const degradationFactor = (1 - ANNUAL_DEGRADATION_RATE) ** (year - 1);
+  for (let year = 1; year <= input.projectLifeYears; year += 1) {
+    const degradationFactor = (1 - degradationRate) ** (year - 1);
 
     // Production year N = yield MWh/MW/year * MW * annual degradation.
     const production = input.yieldMwh * input.capacityMw * degradationFactor;
@@ -115,7 +131,7 @@ export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashF
     // Annual OPEX kEUR = opex kEUR/MW/year * MW.
     // CFADS kEUR = revenue kEUR - annual OPEX kEUR.
     const cfads = revenue - annualOpex;
-    const debtService = year <= DEBT_MATURITY_YEARS ? annualDebtService : 0;
+    const debtService = year <= input.debtMaturityYears ? annualDebtService : 0;
 
     rows.push({
       year,
@@ -123,7 +139,7 @@ export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashF
       revenueKeuro: revenue,
       opexKeuro: annualOpex,
       cashFlowKeuro: cfads,
-      discountedCashFlowKeuro: discounted(cfads, year, DISCOUNT_RATE),
+      discountedCashFlowKeuro: discounted(cfads, year, discountRate),
       debtServiceKeuro: debtService,
       dscr: debtService > 0 ? cfads / debtService : null,
     });
@@ -142,11 +158,12 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
     0,
   );
   const discountedOpex = annualCashFlows.reduce(
-    (total, row) => total + discounted(row.opexKeuro, row.year, DISCOUNT_RATE),
+    (total, row) => total + discounted(row.opexKeuro, row.year, asRate(input.discountRate)),
     0,
   );
   const discountedProduction = annualCashFlows.reduce(
-    (total, row) => total + discounted(row.productionMwh, row.year, DISCOUNT_RATE),
+    (total, row) =>
+      total + discounted(row.productionMwh, row.year, asRate(input.discountRate)),
     0,
   );
   const dscrValues = annualCashFlows
