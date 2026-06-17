@@ -7,6 +7,7 @@ import {
   setReferenceScenario,
 } from "@/app/actions";
 import { DeleteScenarioButton } from "@/app/projects/[id]/delete-scenario-button";
+import { calculateAnnualCashFlows } from "@/app/lib/finance/engine";
 import { generateSensitivityRows } from "@/app/lib/sensitivity";
 import { prisma } from "@/app/lib/prisma";
 
@@ -97,6 +98,16 @@ export default async function ProjectDetailPage({
   const kpiLcoe =
     projectReferenceScenario?.lcoe ?? minValue(scenarios.map((scenario) => scenario.lcoe));
   const importScenariosForProject = importScenarios.bind(null, project.id);
+  const cashFlowScenario = projectReferenceScenario ?? analysisScenario;
+  const annualCashFlows = cashFlowScenario
+    ? calculateAnnualCashFlows({
+        capacityMw: project.capacityMw,
+        capex: cashFlowScenario.capex,
+        opex: cashFlowScenario.opex,
+        yieldMwh: cashFlowScenario.yieldMwh,
+        tariff: cashFlowScenario.tariff,
+      })
+    : [];
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-10">
@@ -256,6 +267,62 @@ export default async function ProjectDetailPage({
               {formatNumber(analysisScenario?.lcoe ?? null, " â‚¬/MWh")}
             </p>
           </div>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <h2 className="text-lg font-semibold text-zinc-950">
+            Cash-flows annuels
+          </h2>
+          <p className="text-sm font-medium text-zinc-500">
+            {cashFlowScenario?.name ?? "-"}
+          </p>
+        </div>
+        <div className="overflow-x-auto rounded-md border border-zinc-200 bg-white">
+          <table className="w-full min-w-[920px] border-collapse text-left text-sm">
+            <thead className="bg-zinc-100 text-zinc-600">
+              <tr>
+                <th className="px-4 py-3 font-medium">Annee</th>
+                <th className="px-4 py-3 font-medium">Production MWh</th>
+                <th className="px-4 py-3 font-medium">CA kEUR</th>
+                <th className="px-4 py-3 font-medium">OPEX kEUR</th>
+                <th className="px-4 py-3 font-medium">Cash-flow kEUR</th>
+                <th className="px-4 py-3 font-medium">CF actualise kEUR</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-200">
+              {annualCashFlows.map((row) => (
+                <tr key={row.year}>
+                  <td className="px-4 py-3 font-medium text-zinc-950">
+                    {row.year}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.productionMwh)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.revenueKeuro)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.opexKeuro)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.cashFlowKeuro)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.discountedCashFlowKeuro)}
+                  </td>
+                </tr>
+              ))}
+              {annualCashFlows.length === 0 ? (
+                <tr>
+                  <td className="px-4 py-8 text-center text-zinc-500" colSpan={6}>
+                    -
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
       </section>
 

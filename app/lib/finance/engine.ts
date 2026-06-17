@@ -18,6 +18,15 @@ export type FinanceEngineResult = {
   lcoe: number;
 };
 
+export type AnnualCashFlow = {
+  year: number;
+  productionMwh: number;
+  revenueKeuro: number;
+  opexKeuro: number;
+  cashFlowKeuro: number;
+  discountedCashFlowKeuro: number;
+};
+
 function round(value: number, decimals = 2) {
   const factor = 10 ** decimals;
   return Math.round(value * factor) / factor;
@@ -69,39 +78,61 @@ function calculateIrr(initialInvestment: number, cashFlows: number[]) {
   return (low + high) / 2;
 }
 
-export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngineResult {
-  const initialInvestment = input.capex * input.capacityMw;
+export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashFlow[] {
   const annualOpex = input.opex * input.capacityMw;
-  const cashFlows: number[] = [];
-  let discountedCashFlows = 0;
-  let discountedOpex = 0;
-  let discountedProduction = 0;
+  const rows: AnnualCashFlow[] = [];
 
   for (let year = 1; year <= PROJECT_YEARS; year += 1) {
     const degradationFactor = (1 - ANNUAL_DEGRADATION_RATE) ** (year - 1);
 
-    // Production N = productible MWh/MW/an * MW * degradation annuelle.
+    // Production year N = yield MWh/MW/year * MW * annual degradation.
     const production = input.yieldMwh * input.capacityMw * degradationFactor;
 
-    // Chiffre d'affaires k€ = production MWh * tarif €/MWh / 1000.
+    // Revenue kEUR = production MWh * tariff EUR/MWh / 1000.
     const revenue = (production * input.tariff) / 1000;
 
-    // Cash-flow k€ = chiffre d'affaires k€ - OPEX k€/MW/an * MW.
+    // Annual OPEX kEUR = opex kEUR/MW/year * MW.
+    // Cash-flow kEUR = revenue kEUR - annual OPEX kEUR.
     const cashFlow = revenue - annualOpex;
 
-    cashFlows.push(cashFlow);
-    discountedCashFlows += discounted(cashFlow, year, DISCOUNT_RATE);
-    discountedOpex += discounted(annualOpex, year, DISCOUNT_RATE);
-    discountedProduction += discounted(production, year, DISCOUNT_RATE);
+    rows.push({
+      year,
+      productionMwh: production,
+      revenueKeuro: revenue,
+      opexKeuro: annualOpex,
+      cashFlowKeuro: cashFlow,
+      discountedCashFlowKeuro: discounted(cashFlow, year, DISCOUNT_RATE),
+    });
   }
 
-  // VAN k€ = somme des cash-flows actualises - investissement initial.
+  return rows;
+}
+
+export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngineResult {
+  // Initial investment kEUR = capex kEUR/MW * project capacity MW.
+  const initialInvestment = input.capex * input.capacityMw;
+  const annualCashFlows = calculateAnnualCashFlows(input);
+  const cashFlows = annualCashFlows.map((row) => row.cashFlowKeuro);
+  const discountedCashFlows = annualCashFlows.reduce(
+    (total, row) => total + row.discountedCashFlowKeuro,
+    0,
+  );
+  const discountedOpex = annualCashFlows.reduce(
+    (total, row) => total + discounted(row.opexKeuro, row.year, DISCOUNT_RATE),
+    0,
+  );
+  const discountedProduction = annualCashFlows.reduce(
+    (total, row) => total + discounted(row.productionMwh, row.year, DISCOUNT_RATE),
+    0,
+  );
+
+  // NPV kEUR = sum of discounted cash-flows - initial investment.
   const npv = discountedCashFlows - initialInvestment;
 
-  // TRI % = taux qui annule la VAN sur le flux initial puis les flux annuels.
+  // IRR % = rate that sets NPV to zero for the initial investment and annual flows.
   const irr = calculateIrr(initialInvestment, cashFlows) * 100;
 
-  // LCOE €/MWh = cout total actualise k€ / production actualisee MWh * 1000.
+  // LCOE EUR/MWh = discounted total cost kEUR / discounted production MWh * 1000.
   const lcoe =
     discountedProduction > 0
       ? ((initialInvestment + discountedOpex) / discountedProduction) * 1000
