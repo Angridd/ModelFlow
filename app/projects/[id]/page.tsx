@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { cloneScenario, importScenarios } from "@/app/actions";
 import { DeleteScenarioButton } from "@/app/projects/[id]/delete-scenario-button";
+import { generateSensitivityRows } from "@/app/lib/sensitivity";
 import { prisma } from "@/app/lib/prisma";
 
 function maxValue(values: number[]) {
@@ -33,14 +34,23 @@ function formatMillionEuros(value: number | null) {
   })} M€`;
 }
 
+function formatPercent(value: number) {
+  return `${value > 0 ? "+" : ""}${(value * 100).toLocaleString("fr-FR", {
+    maximumFractionDigits: 2,
+  })} %`;
+}
+
 export default async function ProjectDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ scenarioId?: string | string[] | undefined }>;
 }) {
   await connection();
 
   const { id } = await params;
+  const { scenarioId } = await searchParams;
   const project = await prisma.project.findUnique({
     where: { id },
     include: {
@@ -55,6 +65,16 @@ export default async function ProjectDetailPage({
   }
 
   const scenarios = project.scenarios;
+  const selectedScenarioId =
+    typeof scenarioId === "string" ? scenarioId : scenarios[0]?.id;
+  const referenceScenario =
+    scenarios.find((scenario) => scenario.id === selectedScenarioId) ?? scenarios[0];
+  const tariffSensitivityRows = referenceScenario
+    ? generateSensitivityRows(referenceScenario, "tariff")
+    : [];
+  const capexSensitivityRows = referenceScenario
+    ? generateSensitivityRows(referenceScenario, "capex")
+    : [];
   const bestNpv = maxValue(scenarios.map((scenario) => scenario.npv));
   const bestIrr = maxValue(scenarios.map((scenario) => scenario.irr));
   const minDscr = minValue(scenarios.map((scenario) => scenario.dscr));
@@ -155,6 +175,51 @@ export default async function ProjectDetailPage({
         </div>
       </section>
 
+      <section className="flex flex-col gap-4 rounded-md border border-zinc-200 bg-white p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-950">Analyses</h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Sensibilités sur scénario de référence
+            </p>
+          </div>
+          <form className="flex gap-2">
+            <select
+              name="scenarioId"
+              defaultValue={referenceScenario?.id}
+              className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
+            >
+              {scenarios.map((scenario) => (
+                <option key={scenario.id} value={scenario.id}>
+                  {scenario.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="submit"
+              className="inline-flex h-10 items-center justify-center rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
+            >
+              Analyser
+            </button>
+          </form>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          <SensitivityTable
+            title="Sensibilité Tarif"
+            valueLabel="Tarif"
+            valueSuffix=" €/MWh"
+            rows={tariffSensitivityRows}
+          />
+          <SensitivityTable
+            title="Sensibilité CAPEX"
+            valueLabel="CAPEX"
+            valueSuffix=" k€/MW"
+            rows={capexSensitivityRows}
+          />
+        </div>
+      </section>
+
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold text-zinc-950">
           Comparaison des scénarios
@@ -223,11 +288,11 @@ export default async function ProjectDetailPage({
                           Dupliquer
                         </button>
                       </form>
-                    <DeleteScenarioButton
-                      projectId={project.id}
-                      scenarioId={scenario.id}
-                      scenarioName={scenario.name}
-                    />
+                      <DeleteScenarioButton
+                        projectId={project.id}
+                        scenarioId={scenario.id}
+                        scenarioName={scenario.name}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -244,5 +309,59 @@ export default async function ProjectDetailPage({
         </div>
       </section>
     </main>
+  );
+}
+
+function SensitivityTable({
+  title,
+  valueLabel,
+  valueSuffix,
+  rows,
+}: {
+  title: string;
+  valueLabel: string;
+  valueSuffix: string;
+  rows: ReturnType<typeof generateSensitivityRows>;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-md border border-zinc-200">
+      <table className="w-full min-w-[520px] border-collapse text-left text-sm">
+        <thead className="bg-zinc-100 text-zinc-600">
+          <tr>
+            <th className="px-4 py-3 font-medium">{title}</th>
+            <th className="px-4 py-3 font-medium">Variation</th>
+            <th className="px-4 py-3 font-medium">{valueLabel}</th>
+            <th className="px-4 py-3 font-medium">VAN</th>
+            <th className="px-4 py-3 font-medium">TRI</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-zinc-200">
+          {rows.map((row) => (
+            <tr key={row.label}>
+              <td className="px-4 py-3 font-medium text-zinc-950">{row.label}</td>
+              <td className="px-4 py-3 text-zinc-700">
+                {formatPercent(row.variation)}
+              </td>
+              <td className="px-4 py-3 text-zinc-700">
+                {formatNumber(row.value, valueSuffix)}
+              </td>
+              <td className="px-4 py-3 text-zinc-700">
+                {formatMillionEuros(row.npv)}
+              </td>
+              <td className="px-4 py-3 text-zinc-700">
+                {formatNumber(row.irr, " %")}
+              </td>
+            </tr>
+          ))}
+          {rows.length === 0 ? (
+            <tr>
+              <td className="px-4 py-8 text-center text-zinc-500" colSpan={5}>
+                -
+              </td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
+    </div>
   );
 }

@@ -139,6 +139,45 @@ export async function createProject(formData: FormData) {
   redirect("/projects");
 }
 
+export async function updateProject(projectId: string, formData: FormData) {
+  await prisma.project.update({
+    where: {
+      id: projectId,
+    },
+    data: {
+      name: readText(formData, "name"),
+      technology: readText(formData, "technology"),
+      country: readText(formData, "country"),
+      capacityMw: readNumber(formData, "capacityMw"),
+      status: readText(formData, "status"),
+    },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/projects");
+  revalidatePath(`/projects/${projectId}`);
+  redirect("/projects");
+}
+
+export async function deleteProject(projectId: string) {
+  await prisma.$transaction([
+    prisma.scenario.deleteMany({
+      where: {
+        projectId,
+      },
+    }),
+    prisma.project.deleteMany({
+      where: {
+        id: projectId,
+      },
+    }),
+  ]);
+
+  revalidatePath("/");
+  revalidatePath("/projects");
+  redirect("/projects");
+}
+
 export async function createScenario(projectId: string, formData: FormData) {
   await prisma.scenario.create({
     data: {

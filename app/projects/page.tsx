@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import { DeleteProjectButton } from "@/app/projects/delete-project-button";
 import { prisma } from "@/app/lib/prisma";
 
 export default async function ProjectsPage() {
@@ -36,6 +37,7 @@ export default async function ProjectsPage() {
               <th className="px-4 py-3 font-medium">Technologie</th>
               <th className="px-4 py-3 font-medium">Capacite</th>
               <th className="px-4 py-3 font-medium">Statut</th>
+              <th className="px-4 py-3 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-200">
@@ -52,11 +54,25 @@ export default async function ProjectsPage() {
                 <td className="px-4 py-3 text-zinc-700">{project.technology}</td>
                 <td className="px-4 py-3 text-zinc-700">{project.capacityMw} MW</td>
                 <td className="px-4 py-3 text-zinc-700">{project.status}</td>
+                <td className="px-4 py-3 text-zinc-700">
+                  <div className="flex gap-2">
+                    <Link
+                      href={`/projects/${project.id}/edit`}
+                      className="inline-flex h-8 items-center justify-center rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
+                    >
+                      Modifier
+                    </Link>
+                    <DeleteProjectButton
+                      projectId={project.id}
+                      projectName={project.name}
+                    />
+                  </div>
+                </td>
               </tr>
             ))}
             {projects.length === 0 ? (
               <tr>
-                <td className="px-4 py-8 text-center text-zinc-500" colSpan={4}>
+                <td className="px-4 py-8 text-center text-zinc-500" colSpan={5}>
                   Aucun projet pour le moment.
                 </td>
               </tr>
