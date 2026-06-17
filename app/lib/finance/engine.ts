@@ -1,6 +1,8 @@
 const PROJECT_YEARS = 30;
 const ANNUAL_DEGRADATION_RATE = 0.003;
 const DISCOUNT_RATE = 0.06;
+const DEBT_INTEREST_RATE = 0.04;
+const DEBT_MATURITY_YEARS = 20;
 const IRR_MIN_RATE = -0.9999;
 const IRR_MAX_RATE = 10;
 
@@ -10,12 +12,14 @@ export type FinanceEngineInput = {
   opex: number;
   yieldMwh: number;
   tariff: number;
+  debtRate: number;
 };
 
 export type FinanceEngineResult = {
   npv: number;
   irr: number;
   lcoe: number;
+  dscr: number;
 };
 
 export type AnnualCashFlow = {
@@ -25,6 +29,8 @@ export type AnnualCashFlow = {
   opexKeuro: number;
   cashFlowKeuro: number;
   discountedCashFlowKeuro: number;
+  debtServiceKeuro: number;
+  dscr: number | null;
 };
 
 function round(value: number, decimals = 2) {
@@ -78,7 +84,22 @@ function calculateIrr(initialInvestment: number, cashFlows: number[]) {
   return (low + high) / 2;
 }
 
+function calculateAnnualDebtService(initialDebt: number) {
+  if (initialDebt <= 0) {
+    return 0;
+  }
+
+  // Debt is modeled as a constant annuity: same total debt service every year.
+  return (
+    (initialDebt * DEBT_INTEREST_RATE) /
+    (1 - (1 + DEBT_INTEREST_RATE) ** -DEBT_MATURITY_YEARS)
+  );
+}
+
 export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashFlow[] {
+  const initialInvestment = input.capex * input.capacityMw;
+  const initialDebt = initialInvestment * (input.debtRate / 100);
+  const annualDebtService = calculateAnnualDebtService(initialDebt);
   const annualOpex = input.opex * input.capacityMw;
   const rows: AnnualCashFlow[] = [];
 
@@ -92,16 +113,19 @@ export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashF
     const revenue = (production * input.tariff) / 1000;
 
     // Annual OPEX kEUR = opex kEUR/MW/year * MW.
-    // Cash-flow kEUR = revenue kEUR - annual OPEX kEUR.
-    const cashFlow = revenue - annualOpex;
+    // CFADS kEUR = revenue kEUR - annual OPEX kEUR.
+    const cfads = revenue - annualOpex;
+    const debtService = year <= DEBT_MATURITY_YEARS ? annualDebtService : 0;
 
     rows.push({
       year,
       productionMwh: production,
       revenueKeuro: revenue,
       opexKeuro: annualOpex,
-      cashFlowKeuro: cashFlow,
-      discountedCashFlowKeuro: discounted(cashFlow, year, DISCOUNT_RATE),
+      cashFlowKeuro: cfads,
+      discountedCashFlowKeuro: discounted(cfads, year, DISCOUNT_RATE),
+      debtServiceKeuro: debtService,
+      dscr: debtService > 0 ? cfads / debtService : null,
     });
   }
 
@@ -125,6 +149,9 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
     (total, row) => total + discounted(row.productionMwh, row.year, DISCOUNT_RATE),
     0,
   );
+  const dscrValues = annualCashFlows
+    .map((row) => row.dscr)
+    .filter((value): value is number => value !== null);
 
   // NPV kEUR = sum of discounted cash-flows - initial investment.
   const npv = discountedCashFlows - initialInvestment;
@@ -138,9 +165,13 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
       ? ((initialInvestment + discountedOpex) / discountedProduction) * 1000
       : 0;
 
+  // Minimum DSCR over the debt maturity. If there is no debt, DSCR is stored as 0.
+  const dscr = dscrValues.length > 0 ? Math.min(...dscrValues) : 0;
+
   return {
     npv: round(npv),
     irr: round(irr),
     lcoe: round(lcoe),
+    dscr: round(dscr),
   };
 }

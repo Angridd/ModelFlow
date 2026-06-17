@@ -10,7 +10,6 @@ const numericFields = [
   "yieldMwh",
   "tariff",
   "debtRate",
-  "dscr",
 ] as const;
 
 export default async function NewScenarioPage({

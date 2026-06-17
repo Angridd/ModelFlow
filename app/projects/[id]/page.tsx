@@ -7,7 +7,10 @@ import {
   setReferenceScenario,
 } from "@/app/actions";
 import { DeleteScenarioButton } from "@/app/projects/[id]/delete-scenario-button";
-import { calculateAnnualCashFlows } from "@/app/lib/finance/engine";
+import {
+  calculateAnnualCashFlows,
+  calculateScenarioMetrics,
+} from "@/app/lib/finance/engine";
 import { generateSensitivityRows } from "@/app/lib/sensitivity";
 import { prisma } from "@/app/lib/prisma";
 
@@ -89,12 +92,22 @@ export default async function ProjectDetailPage({
   const capexSensitivityRows = analysisScenario
     ? generateSensitivityRows(analysisScenario, "capex")
     : [];
+  const referenceMetrics = projectReferenceScenario
+    ? calculateScenarioMetrics({
+        capacityMw: project.capacityMw,
+        capex: projectReferenceScenario.capex,
+        opex: projectReferenceScenario.opex,
+        yieldMwh: projectReferenceScenario.yieldMwh,
+        tariff: projectReferenceScenario.tariff,
+        debtRate: projectReferenceScenario.debtRate,
+      })
+    : null;
   const kpiNpv =
     projectReferenceScenario?.npv ?? maxValue(scenarios.map((scenario) => scenario.npv));
   const kpiIrr =
     projectReferenceScenario?.irr ?? maxValue(scenarios.map((scenario) => scenario.irr));
   const kpiDscr =
-    projectReferenceScenario?.dscr ?? minValue(scenarios.map((scenario) => scenario.dscr));
+    referenceMetrics?.dscr ?? minValue(scenarios.map((scenario) => scenario.dscr));
   const kpiLcoe =
     projectReferenceScenario?.lcoe ?? minValue(scenarios.map((scenario) => scenario.lcoe));
   const importScenariosForProject = importScenarios.bind(null, project.id);
@@ -106,6 +119,7 @@ export default async function ProjectDetailPage({
         opex: cashFlowScenario.opex,
         yieldMwh: cashFlowScenario.yieldMwh,
         tariff: cashFlowScenario.tariff,
+        debtRate: cashFlowScenario.debtRate,
       })
     : [];
 
@@ -280,7 +294,7 @@ export default async function ProjectDetailPage({
           </p>
         </div>
         <div className="overflow-x-auto rounded-md border border-zinc-200 bg-white">
-          <table className="w-full min-w-[920px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[1120px] border-collapse text-left text-sm">
             <thead className="bg-zinc-100 text-zinc-600">
               <tr>
                 <th className="px-4 py-3 font-medium">Annee</th>
@@ -288,6 +302,8 @@ export default async function ProjectDetailPage({
                 <th className="px-4 py-3 font-medium">CA kEUR</th>
                 <th className="px-4 py-3 font-medium">OPEX kEUR</th>
                 <th className="px-4 py-3 font-medium">Cash-flow kEUR</th>
+                <th className="px-4 py-3 font-medium">Service dette kEUR</th>
+                <th className="px-4 py-3 font-medium">DSCR</th>
                 <th className="px-4 py-3 font-medium">CF actualise kEUR</th>
               </tr>
             </thead>
@@ -310,13 +326,19 @@ export default async function ProjectDetailPage({
                     {formatNumber(row.cashFlowKeuro)}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.debtServiceKeuro)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.dscr)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
                     {formatNumber(row.discountedCashFlowKeuro)}
                   </td>
                 </tr>
               ))}
               {annualCashFlows.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-center text-zinc-500" colSpan={6}>
+                  <td className="px-4 py-8 text-center text-zinc-500" colSpan={8}>
                     -
                   </td>
                 </tr>

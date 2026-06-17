@@ -140,6 +140,7 @@ function readScenarioAssumptions(formData: FormData) {
     opex: readNumber(formData, "opex"),
     yieldMwh: readNumber(formData, "yieldMwh"),
     tariff: readNumber(formData, "tariff"),
+    debtRate: readNumber(formData, "debtRate"),
   };
 }
 
@@ -234,8 +235,7 @@ export async function createScenario(projectId: string, formData: FormData) {
     data: {
       name: readText(formData, "name"),
       ...assumptions,
-      debtRate: readNumber(formData, "debtRate"),
-      dscr: readNumber(formData, "dscr"),
+      dscr: calculatedMetrics.dscr,
       npv: calculatedMetrics.npv,
       irr: calculatedMetrics.irr,
       lcoe: calculatedMetrics.lcoe,
@@ -280,8 +280,7 @@ export async function updateScenario(
     data: {
       name: readText(formData, "name"),
       ...assumptions,
-      debtRate: readNumber(formData, "debtRate"),
-      dscr: readNumber(formData, "dscr"),
+      dscr: calculatedMetrics.dscr,
       npv: calculatedMetrics.npv,
       irr: calculatedMetrics.irr,
       lcoe: calculatedMetrics.lcoe,
