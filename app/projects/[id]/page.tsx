@@ -278,7 +278,7 @@ export default async function ProjectDetailPage({
           <div>
             <p className="text-sm font-medium text-zinc-500">LCOE</p>
             <p className="mt-1 text-xl font-semibold text-zinc-950">
-              {formatNumber(analysisScenario?.lcoe ?? null, " â‚¬/MWh")}
+              {formatNumber(analysisScenario?.lcoe ?? null, " €/MWh")}
             </p>
           </div>
         </div>
