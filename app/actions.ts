@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { calculateScenarioMetrics } from "@/app/lib/finance/engine";
 import { prisma } from "@/app/lib/prisma";
 
 const scenarioImportColumns = {
@@ -133,6 +134,15 @@ function parseImportedNumber(value: string, key: string) {
   return number;
 }
 
+function readScenarioAssumptions(formData: FormData) {
+  return {
+    capex: readNumber(formData, "capex"),
+    opex: readNumber(formData, "opex"),
+    yieldMwh: readNumber(formData, "yieldMwh"),
+    tariff: readNumber(formData, "tariff"),
+  };
+}
+
 export async function createProject(formData: FormData) {
   await prisma.project.create({
     data: {
@@ -201,18 +211,34 @@ export async function deleteProject(projectId: string) {
 }
 
 export async function createScenario(projectId: string, formData: FormData) {
+  const project = await prisma.project.findUnique({
+    where: {
+      id: projectId,
+    },
+    select: {
+      capacityMw: true,
+    },
+  });
+
+  if (!project) {
+    redirect("/projects");
+  }
+
+  const assumptions = readScenarioAssumptions(formData);
+  const calculatedMetrics = calculateScenarioMetrics({
+    capacityMw: project.capacityMw,
+    ...assumptions,
+  });
+
   await prisma.scenario.create({
     data: {
       name: readText(formData, "name"),
-      capex: readNumber(formData, "capex"),
-      opex: readNumber(formData, "opex"),
-      yieldMwh: readNumber(formData, "yieldMwh"),
-      tariff: readNumber(formData, "tariff"),
+      ...assumptions,
       debtRate: readNumber(formData, "debtRate"),
       dscr: readNumber(formData, "dscr"),
-      npv: readNumber(formData, "npv"),
-      irr: readNumber(formData, "irr"),
-      lcoe: readNumber(formData, "lcoe"),
+      npv: calculatedMetrics.npv,
+      irr: calculatedMetrics.irr,
+      lcoe: calculatedMetrics.lcoe,
       projectId,
     },
   });
@@ -227,6 +253,25 @@ export async function updateScenario(
   scenarioId: string,
   formData: FormData,
 ) {
+  const project = await prisma.project.findUnique({
+    where: {
+      id: projectId,
+    },
+    select: {
+      capacityMw: true,
+    },
+  });
+
+  if (!project) {
+    redirect("/projects");
+  }
+
+  const assumptions = readScenarioAssumptions(formData);
+  const calculatedMetrics = calculateScenarioMetrics({
+    capacityMw: project.capacityMw,
+    ...assumptions,
+  });
+
   await prisma.scenario.updateMany({
     where: {
       id: scenarioId,
@@ -234,15 +279,12 @@ export async function updateScenario(
     },
     data: {
       name: readText(formData, "name"),
-      capex: readNumber(formData, "capex"),
-      opex: readNumber(formData, "opex"),
-      yieldMwh: readNumber(formData, "yieldMwh"),
-      tariff: readNumber(formData, "tariff"),
+      ...assumptions,
       debtRate: readNumber(formData, "debtRate"),
       dscr: readNumber(formData, "dscr"),
-      npv: readNumber(formData, "npv"),
-      irr: readNumber(formData, "irr"),
-      lcoe: readNumber(formData, "lcoe"),
+      npv: calculatedMetrics.npv,
+      irr: calculatedMetrics.irr,
+      lcoe: calculatedMetrics.lcoe,
     },
   });
 

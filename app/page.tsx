@@ -18,7 +18,7 @@ function formatMillionEuros(value: number | null) {
     return "-";
   }
 
-  return `${(value / 1_000_000).toLocaleString("fr-FR", {
+  return `${(value / 1_000).toLocaleString("fr-FR", {
     maximumFractionDigits: 2,
   })} M€`;
 }

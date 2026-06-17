@@ -37,7 +37,7 @@ function formatMillionEuros(value: number | null) {
     return "-";
   }
 
-  return `${(value / 1_000_000).toLocaleString("fr-FR", {
+  return `${(value / 1_000).toLocaleString("fr-FR", {
     maximumFractionDigits: 2,
   })} M€`;
 }
@@ -225,6 +225,37 @@ export default async function ProjectDetailPage({
           <p className="mt-3 text-2xl font-semibold text-zinc-950">
             {formatNumber(kpiLcoe, " €/MWh")}
           </p>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-white p-5">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <h2 className="text-lg font-semibold text-zinc-950">
+            Resultats calcules
+          </h2>
+          <p className="text-sm font-medium text-zinc-500">
+            {analysisScenario?.name ?? "-"}
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <p className="text-sm font-medium text-zinc-500">VAN</p>
+            <p className="mt-1 text-xl font-semibold text-zinc-950">
+              {formatMillionEuros(analysisScenario?.npv ?? null)}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-zinc-500">TRI</p>
+            <p className="mt-1 text-xl font-semibold text-zinc-950">
+              {formatNumber(analysisScenario?.irr ?? null, " %")}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-zinc-500">LCOE</p>
+            <p className="mt-1 text-xl font-semibold text-zinc-950">
+              {formatNumber(analysisScenario?.lcoe ?? null, " â‚¬/MWh")}
+            </p>
+          </div>
         </div>
       </section>
 
