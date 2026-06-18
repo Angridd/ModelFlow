@@ -124,6 +124,14 @@ export default async function ProjectDetailPage({
         dscrSchedule: parseDscrSchedule(projectReferenceScenario.dscrSchedule),
         gearingMax: projectReferenceScenario.gearingMax,
         structuringFeeRate: projectReferenceScenario.structuringFeeRate,
+        tauxIS: projectReferenceScenario.tauxIS,
+        amortDuree: projectReferenceScenario.amortDuree,
+        ccaApportKeuro: projectReferenceScenario.ccaApportKeuro,
+        ccaRemunRate: projectReferenceScenario.ccaRemunRate,
+        dsraMonths: projectReferenceScenario.dsraMonths,
+        ccaBloque: projectReferenceScenario.ccaBloque,
+        devFeesKEuroPerMW: projectReferenceScenario.devFeesKEuroPerMW,
+        tauxISEntreprise: projectReferenceScenario.tauxISEntreprise,
       })
     : null;
   const kpiNpv =
@@ -157,6 +165,14 @@ export default async function ProjectDetailPage({
         dscrSchedule: parseDscrSchedule(cashFlowScenario.dscrSchedule),
         gearingMax: cashFlowScenario.gearingMax,
         structuringFeeRate: cashFlowScenario.structuringFeeRate,
+        tauxIS: cashFlowScenario.tauxIS,
+        amortDuree: cashFlowScenario.amortDuree,
+        ccaApportKeuro: cashFlowScenario.ccaApportKeuro,
+        ccaRemunRate: cashFlowScenario.ccaRemunRate,
+        dsraMonths: cashFlowScenario.dsraMonths,
+        ccaBloque: cashFlowScenario.ccaBloque,
+        devFeesKEuroPerMW: cashFlowScenario.devFeesKEuroPerMW,
+        tauxISEntreprise: cashFlowScenario.tauxISEntreprise,
       })
     : [];
   const cashFlowMetrics = cashFlowScenario
@@ -180,6 +196,14 @@ export default async function ProjectDetailPage({
         dscrSchedule: parseDscrSchedule(cashFlowScenario.dscrSchedule),
         gearingMax: cashFlowScenario.gearingMax,
         structuringFeeRate: cashFlowScenario.structuringFeeRate,
+        tauxIS: cashFlowScenario.tauxIS,
+        amortDuree: cashFlowScenario.amortDuree,
+        ccaApportKeuro: cashFlowScenario.ccaApportKeuro,
+        ccaRemunRate: cashFlowScenario.ccaRemunRate,
+        dsraMonths: cashFlowScenario.dsraMonths,
+        ccaBloque: cashFlowScenario.ccaBloque,
+        devFeesKEuroPerMW: cashFlowScenario.devFeesKEuroPerMW,
+        tauxISEntreprise: cashFlowScenario.tauxISEntreprise,
       })
     : null;
   const sizing = cashFlowMetrics?.sizing ?? null;
@@ -502,6 +526,49 @@ export default async function ProjectDetailPage({
         </div>
       </section>
 
+      {cashFlowMetrics?.doubleIRR !== null && cashFlowMetrics?.doubleIRR !== undefined ? (
+        <section className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-white p-5">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <h2 className="text-lg font-semibold text-zinc-950">Double TRI</h2>
+            <p className="text-sm font-medium text-zinc-500">
+              {cashFlowScenario?.name ?? "-"}
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div>
+              <p className="text-sm font-medium text-zinc-500">TRI Invest</p>
+              <p className="mt-1 text-zinc-950">
+                {formatNumber(cashFlowMetrics.doubleIRR.irrInvest, " %")}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-zinc-500">TRI entreprise</p>
+              <p className="mt-1 text-zinc-950">
+                {formatNumber(cashFlowMetrics.doubleIRR.irrEntreprise, " %")}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-zinc-500">VAN SPV</p>
+              <p className="mt-1 text-zinc-950">
+                {formatMillionEuros(cashFlowMetrics.doubleIRR.npvSPV)}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-zinc-500">VAN entreprise</p>
+              <p className="mt-1 text-zinc-950">
+                {formatMillionEuros(cashFlowMetrics.doubleIRR.npvEntreprise)}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-zinc-500">Mise nette</p>
+              <p className="mt-1 text-zinc-950">
+                {formatMillionEuros(cashFlowMetrics.doubleIRR.miseNette)}
+              </p>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <section className="flex flex-col gap-3">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <h2 className="text-lg font-semibold text-zinc-950">
@@ -512,7 +579,7 @@ export default async function ProjectDetailPage({
           </p>
         </div>
         <div className="overflow-x-auto rounded-md border border-zinc-200 bg-white">
-          <table className="w-full min-w-[2350px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[3450px] border-collapse text-left text-sm">
             <thead className="bg-zinc-100 text-zinc-600">
               <tr>
                 <th className="px-4 py-3 font-medium">Annee</th>
@@ -527,6 +594,14 @@ export default async function ProjectDetailPage({
                 <th className="px-4 py-3 font-medium">Service dette kEUR</th>
                 <th className="px-4 py-3 font-medium">Service sculpté kEUR</th>
                 <th className="px-4 py-3 font-medium">CFADS P90 kEUR</th>
+                <th className="px-4 py-3 font-medium">IS</th>
+                <th className="px-4 py-3 font-medium">Déficit cumulé</th>
+                <th className="px-4 py-3 font-medium">Résultat net</th>
+                <th className="px-4 py-3 font-medium">CFADS après IS</th>
+                <th className="px-4 py-3 font-medium">DSRA solde</th>
+                <th className="px-4 py-3 font-medium">Cash bloqué</th>
+                <th className="px-4 py-3 font-medium">Dividende</th>
+                <th className="px-4 py-3 font-medium">Flux actionnaire</th>
                 <th className="px-4 py-3 font-medium">DSCR (P90)</th>
                 <th className="px-4 py-3 font-medium">DSCR cible</th>
                 <th className="px-4 py-3 font-medium">DSCR réalisé</th>
@@ -538,6 +613,14 @@ export default async function ProjectDetailPage({
               {sizing !== null ? (
                 <tr className="bg-zinc-50 italic text-zinc-500">
                   <td className="px-4 py-3 font-medium text-zinc-700">0</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
                   <td className="px-4 py-3">-</td>
                   <td className="px-4 py-3">-</td>
                   <td className="px-4 py-3">-</td>
@@ -601,6 +684,30 @@ export default async function ProjectDetailPage({
                     {formatNumber(row.cfadsP90Keuro)}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.is)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.deficitCumuleKeuro)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.resultatNet)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.cfadsAfterTax)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.dsraSoldeKeuro)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.cashBloqueKeuro)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.dividende)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.fluxActionnaire)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
                     {formatNumber(row.dscr)}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
@@ -615,7 +722,7 @@ export default async function ProjectDetailPage({
               ))}
               {annualCashFlows.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-center text-zinc-500" colSpan={17}>
+                  <td className="px-4 py-8 text-center text-zinc-500" colSpan={25}>
                     -
                   </td>
                 </tr>

@@ -40,3 +40,36 @@ export type SizingResult = {
   structuringFeeKeuro: number;
   structuringFeeRate: number;
 };
+
+export type T0Flows = {
+  projectInvestmentKeuro: number;
+  equityInvestmentKeuro: number;
+  dsraInitialKeuro: number;
+  devFeesKeuro: number;
+  miseNetteInvest: number;
+  miseNetteEntrep: number;
+};
+
+export type DoubleIRR = {
+  irrInvest: number;
+  irrEntreprise: number;
+  npvSPV: number;
+  npvEntreprise: number;
+  miseNette: number;
+};
+
+export type AnnualCashFlowWaterfallFields = {
+  deficitCumuleKeuro: number;
+  resultatCumuleKeuro: number;
+  dsraSoldeKeuro: number;
+  dsraDepotKeuro: number;
+  dsraRetraitKeuro: number;
+  cashBloqueKeuro: number;
+};
+
+export type FinanceEngineInputDsraDevFees = {
+  dsraMonths?: number | null;
+  ccaBloque?: boolean | null;
+  devFeesKEuroPerMW?: number | null;
+  tauxISEntreprise?: number | null;
+};

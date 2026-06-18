@@ -186,6 +186,16 @@ function readOptionalInteger(formData: FormData, key: string): number | null {
   return number;
 }
 
+function readOptionalBoolean(formData: FormData, key: string): boolean | null {
+  const value = formData.get(key);
+
+  if (value === null) {
+    return null;
+  }
+
+  return value === "true" || value === "on";
+}
+
 function readDscrSchedule(formData: FormData): DscrTranche[] | null {
   const value = formData.get("dscrSchedule");
 
@@ -265,6 +275,14 @@ function readScenarioAssumptions(formData: FormData) {
     dscrSchedule: readDscrSchedule(formData),
     gearingMax: readOptionalNumber(formData, "gearingMax"),
     structuringFeeRate: readOptionalNumber(formData, "structuringFeeRate"),
+    tauxIS: readOptionalNumber(formData, "tauxIS"),
+    amortDuree: readOptionalInteger(formData, "amortDuree"),
+    ccaApportKeuro: readOptionalNumber(formData, "ccaApportKeuro"),
+    ccaRemunRate: readOptionalNumber(formData, "ccaRemunRate"),
+    dsraMonths: readOptionalInteger(formData, "dsraMonths"),
+    ccaBloque: readOptionalBoolean(formData, "ccaBloque"),
+    devFeesKEuroPerMW: readOptionalNumber(formData, "devFeesKEuroPerMW"),
+    tauxISEntreprise: readOptionalNumber(formData, "tauxISEntreprise"),
   };
 }
 
@@ -455,6 +473,14 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
       dscrSchedule: scenario.dscrSchedule,
       gearingMax: scenario.gearingMax,
       structuringFeeRate: scenario.structuringFeeRate,
+      tauxIS: scenario.tauxIS,
+      amortDuree: scenario.amortDuree,
+      ccaApportKeuro: scenario.ccaApportKeuro,
+      ccaRemunRate: scenario.ccaRemunRate,
+      dsraMonths: scenario.dsraMonths,
+      ccaBloque: scenario.ccaBloque,
+      devFeesKEuroPerMW: scenario.devFeesKEuroPerMW,
+      tauxISEntreprise: scenario.tauxISEntreprise,
       dscr: scenario.dscr,
       npv: scenario.npv,
       irr: scenario.irr,

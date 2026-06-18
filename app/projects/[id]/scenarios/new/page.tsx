@@ -96,6 +96,58 @@ const assumptionFields = [
   },
 ] as const;
 
+const fiscalFields = [
+  {
+    name: "tauxIS" as const,
+    label: "Taux IS (%)",
+    step: "0.01",
+    placeholder: "ex. 25",
+    title: "Taux d'impot sur les societes applique au resultat fiscal.",
+  },
+  {
+    name: "amortDuree" as const,
+    label: "Duree amortissement (ans)",
+    step: "1",
+    placeholder: "ex. 20",
+    title: "Duree d'amortissement comptable utilisee pour le calcul fiscal.",
+  },
+  {
+    name: "ccaApportKeuro" as const,
+    label: "Apport CCA (kEUR)",
+    step: "0.01",
+    placeholder: "ex. 500",
+    title: "Montant apporte en compte courant d'associe, en kEUR.",
+  },
+  {
+    name: "ccaRemunRate" as const,
+    label: "Remuneration CCA (%)",
+    step: "0.01",
+    placeholder: "ex. 3",
+    title: "Taux annuel de remuneration du compte courant d'associe.",
+  },
+  {
+    name: "dsraMonths" as const,
+    label: "DSRA (mois)",
+    step: "1",
+    placeholder: "ex. 6",
+    title: "Nombre de mois de service dette a couvrir en reserve DSRA.",
+  },
+  {
+    name: "devFeesKEuroPerMW" as const,
+    label: "Dev fees (kEUR/MW)",
+    step: "0.01",
+    placeholder: "ex. 110",
+    title: "Frais de developpement factures au closing, en kEUR par MW.",
+  },
+  {
+    name: "tauxISEntreprise" as const,
+    label: "Taux IS entreprise (%)",
+    step: "0.01",
+    placeholder: "ex. 25",
+    title: "Taux IS applique aux revenus de l'entreprise pour le double TRI.",
+  },
+] as const;
+
 export default async function NewScenarioPage({
   params,
 }: {
@@ -251,6 +303,38 @@ export default async function NewScenarioPage({
             />
           </label>
         </div>
+
+        <section className="grid gap-4 rounded-md border border-zinc-200 bg-zinc-50 p-4">
+          <h2 className="text-sm font-semibold text-zinc-950">Fiscalité & CCA</h2>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {fiscalFields.map((field) => (
+              <label
+                key={field.name}
+                className="grid gap-2 text-sm font-medium text-zinc-700"
+              >
+                {field.label}
+                <input
+                  name={field.name}
+                  type="number"
+                  min="0"
+                  step={field.step}
+                  placeholder={field.placeholder}
+                  title={field.title}
+                  className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+                />
+              </label>
+            ))}
+            <label className="flex items-center gap-3 text-sm font-medium text-zinc-700">
+              <input
+                name="ccaBloque"
+                type="checkbox"
+                value="true"
+                className="h-4 w-4 rounded border-zinc-300 text-zinc-900"
+              />
+              CCA bloque par la banque
+            </label>
+          </div>
+        </section>
 
         <div className="grid gap-2">
           <p className="text-sm font-medium text-zinc-700">Profil DSCR cible</p>

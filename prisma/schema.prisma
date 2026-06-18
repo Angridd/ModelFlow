@@ -49,6 +49,14 @@ model Scenario {
   dscrSchedule        String?
   gearingMax          Float?
   structuringFeeRate  Float?
+  tauxIS              Float?
+  amortDuree          Int?
+  ccaApportKeuro      Float?
+  ccaRemunRate        Float?
+  dsraMonths          Int?
+  ccaBloque           Boolean?
+  devFeesKEuroPerMW   Float?
+  tauxISEntreprise    Float?
   dscr                Float
   npv                 Float
   irr                 Float

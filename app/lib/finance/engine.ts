@@ -1,8 +1,10 @@
 import type {
   DebtScheduleItem,
+  DoubleIRR,
   DscrTranche,
   FinancialAssumptions,
   SizingResult,
+  T0Flows,
 } from "@/app/lib/finance/types";
 
 const IRR_MIN_RATE = -0.9999;
@@ -22,6 +24,15 @@ export type FinanceEngineInput = FinancialAssumptions & {
   dscrSchedule?: DscrTranche[] | null;
   gearingMax?: number | null;
   structuringFeeRate?: number | null;
+  tauxIS?: number | null;
+  amortDuree?: number | null;
+  ccaApportKeuro?: number | null;
+  ccaRemunRate?: number | null;
+  margeDevKeuro?: number | null;
+  dsraMonths?: number | null;
+  ccaBloque?: boolean | null;
+  devFeesKEuroPerMW?: number | null;
+  tauxISEntreprise?: number | null;
 };
 
 export type FinanceEngineResult = {
@@ -31,6 +42,8 @@ export type FinanceEngineResult = {
   dscr: number;
   debtAmountKeuro: number | null;
   sizing: SizingResult | null;
+  doubleIRR: DoubleIRR | null;
+  sizingIterations: number;
 };
 
 export type AnnualCashFlow = {
@@ -46,9 +59,50 @@ export type AnnualCashFlow = {
   debtServiceKeuro: number;
   debtServiceSculptedKeuro: number | null;
   cfadsP90Keuro: number;
+  amort: number;
+  ebit: number;
+  interets: number;
+  ebt: number;
+  is: number;
+  resultatNet: number;
+  cfadsAfterTax: number;
+  dividende: number;
+  fluxActionnaire: number;
+  ccaRemboursementKeuro: number;
+  ccaInteretsKeuro: number;
+  ccaOutstandingKeuro: number;
+  deficitCumuleKeuro: number;
+  resultatCumuleKeuro: number;
+  dsraSoldeKeuro: number;
+  dsraDepotKeuro: number;
+  dsraRetraitKeuro: number;
+  cashBloqueKeuro: number;
   dscr: number | null;
   dscrRealized: number | null;
   dscrTargetAtYear: number | null;
+};
+
+type PreRow = {
+  year: number;
+  annualTariff: number;
+  productionP50Mwh: number;
+  productionP90Mwh: number;
+  revenueP50Keuro: number;
+  revenueP90Keuro: number;
+  opexKeuro: number;
+  cashFlowKeuro: number;
+  cfadsP90Keuro: number;
+  debtServiceKeuro: number;
+  standardDebtInterestKeuro: number;
+  amort: number;
+};
+
+type RetainedDebtScheduleItem = Pick<DebtScheduleItem, "principal" | "interest">;
+
+type SizingComputation = {
+  sizing: SizingResult | null;
+  scheduleByYear: Map<number, RetainedDebtScheduleItem>;
+  iterations: number;
 };
 
 function round(value: number, decimals = 2) {
@@ -102,6 +156,34 @@ function calculateIrr(initialInvestment: number, cashFlows: number[]) {
   return (low + high) / 2;
 }
 
+export function calculateDoubleIRR(
+  t0Flows: T0Flows,
+  projectCashFlows: number[],
+  equityCashFlows: number[],
+): DoubleIRR {
+  const projectInvestment = t0Flows.miseNetteInvest;
+  const equityInvestment = t0Flows.miseNetteEntrep;
+  const projectIrr = calculateIrr(projectInvestment, projectCashFlows) * 100;
+  const equityIrr = calculateIrr(equityInvestment, equityCashFlows) * 100;
+  const npvRate = asRate(6);
+  const npvSPV = projectCashFlows.reduce(
+    (total, cashFlow, index) => total + discounted(cashFlow, index + 1, npvRate),
+    -projectInvestment,
+  );
+  const npvEntreprise = equityCashFlows.reduce(
+    (total, cashFlow, index) => total + discounted(cashFlow, index + 1, npvRate),
+    -equityInvestment,
+  );
+
+  return {
+    irrInvest: round(projectIrr),
+    irrEntreprise: round(equityIrr),
+    npvSPV: round(npvSPV),
+    npvEntreprise: round(npvEntreprise),
+    miseNette: round(equityInvestment),
+  };
+}
+
 function asRate(percent: number) {
   return percent / 100;
 }
@@ -124,6 +206,25 @@ function calculateAnnualDebtService(
     (initialDebt * debtInterestRate) /
     (1 - (1 + debtInterestRate) ** -debtMaturityYears)
   );
+}
+
+function buildStandardDebtSchedule(
+  initialDebt: number,
+  annualDebtService: number,
+  debtInterestRate: number,
+  debtMaturityYears: number,
+) {
+  const schedule = new Map<number, RetainedDebtScheduleItem>();
+  let outstanding = initialDebt;
+
+  for (let year = 1; year <= debtMaturityYears; year += 1) {
+    const interest = outstanding * debtInterestRate;
+    const principal = Math.min(Math.max(0, annualDebtService - interest), outstanding);
+    outstanding -= principal;
+    schedule.set(year, { principal, interest });
+  }
+
+  return schedule;
 }
 
 // Returns the DSCR target for a given year from the schedule.
@@ -258,11 +359,10 @@ export function sculptDebt(
   return { debtAmountKeuro, schedule };
 }
 
-export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashFlow[] {
+function buildPreRows(input: FinanceEngineInput): PreRow[] {
   const initialInvestment = input.capex * input.capacityMw;
   const initialDebt = initialInvestment * (input.debtRate / 100);
   const degradationRate = asRate(input.degradationRate);
-  const discountRate = asRate(input.discountRate);
   const debtInterestRate = asRate(input.debtInterestRate);
   const tariffInflationRate = asRate(input.tariffInflationRate);
   const opexInflationRate = asRate(input.opexInflationRate);
@@ -271,22 +371,18 @@ export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashF
     debtInterestRate,
     input.debtMaturityYears,
   );
+  const standardDebtSchedule = buildStandardDebtSchedule(
+    initialDebt,
+    annualDebtService,
+    debtInterestRate,
+    input.debtMaturityYears,
+  );
+  const amortDuree = input.amortDuree ?? input.projectLifeYears;
+  const annualAmort = amortDuree > 0
+    ? initialInvestment / amortDuree
+    : 0;
   // P90 yield: use provided value or fall back to P50 * 0.9.
   const effectiveYieldP90 = input.yieldP90Mwh ?? input.yieldMwh * 0.9;
-
-  // Pass 1: compute all cash-flow fields (no sculpted debt yet).
-  type PreRow = {
-    year: number;
-    annualTariff: number;
-    productionP50Mwh: number;
-    productionP90Mwh: number;
-    revenueP50Keuro: number;
-    revenueP90Keuro: number;
-    opexKeuro: number;
-    cashFlowKeuro: number;
-    cfadsP90Keuro: number;
-    debtServiceKeuro: number;
-  };
 
   const preRows: PreRow[] = [];
 
@@ -319,6 +415,8 @@ export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashF
     const cfadsP90 = revenueP90 - annualOpex;
 
     const debtService = year <= input.debtMaturityYears ? annualDebtService : 0;
+    const standardDebtInterest =
+      standardDebtSchedule.get(year)?.interest ?? 0;
 
     preRows.push({
       year,
@@ -331,54 +429,99 @@ export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashF
       cashFlowKeuro: cfadsP50,
       cfadsP90Keuro: cfadsP90,
       debtServiceKeuro: debtService,
+      standardDebtInterestKeuro: standardDebtInterest,
+      amort: annualAmort,
     });
   }
 
-  // Pass 2 (optional): sculpted debt schedule.
-  const effectiveSchedule = resolveSchedule(input);
-  const effectiveTenor =
-    input.debtTenorYears ??
-    (effectiveSchedule !== null
-      ? Math.max(...effectiveSchedule.map((t) => t.yearTo))
-      : 0);
+  return preRows;
+}
 
-  const hasSculpting = effectiveSchedule !== null && effectiveTenor > 0;
+function taxAmount(ebt: number, tauxIS: number | null | undefined) {
+  return tauxIS != null ? Math.max(0, ebt * asRate(tauxIS)) : 0;
+}
 
-  const sculptedResult = hasSculpting
-    ? sculptDebt(preRows, effectiveSchedule!, input.debtInterestRate, effectiveTenor)
-    : null;
+function applyWaterfall(
+  preRows: PreRow[],
+  scheduleByYear: Map<number, RetainedDebtScheduleItem>,
+  input: Pick<
+    FinanceEngineInput,
+    "tauxIS" | "ccaApportKeuro" | "ccaRemunRate" | "dsraMonths" | "ccaBloque"
+  >,
+  discountRate: number,
+  effectiveSchedule: DscrTranche[] | null,
+  effectiveTenor: number,
+): Array<AnnualCashFlow & { cfadsP90AfterTaxKeuro: number }> {
+  let ccaOutstanding = input.ccaApportKeuro ?? 0;
+  let deficitCumule = 0;
+  let deficitCumuleP90 = 0;
+  let resultatCumule = 0;
+  let dsraSolde = 0;
 
-  // Apply gearing cap: scale the schedule down to the retained debt amount.
-  const sizing_ =
-    sculptedResult !== null
-      ? sizingResult(
-          sculptedResult.debtAmountKeuro,
-          initialInvestment,
-          input.gearingMax ?? null,
-          input.structuringFeeRate ?? 0,
-        )
-      : null;
-
-  const scaleFactor =
-    sizing_ !== null && sizing_.debtSculptedKeuro > 0
-      ? sizing_.debtRetenuKeuro / sizing_.debtSculptedKeuro
-      : 1;
-
-  const sculptedScheduleByYear = new Map(
-    sculptedResult?.schedule.map((s) => [
-      s.year,
-      {
-        principal: s.principal * scaleFactor,
-        interest: s.interest * scaleFactor,
-      },
-    ]) ?? [],
-  );
-
-  // Pass 3: assemble final AnnualCashFlow rows.
   return preRows.map((pre) => {
-    const scheduleItem = sculptedScheduleByYear.get(pre.year) ?? null;
+    const scheduleItem = scheduleByYear.get(pre.year) ?? null;
     const sculptedService =
       scheduleItem !== null ? scheduleItem.principal + scheduleItem.interest : null;
+    const nextScheduleItem = scheduleByYear.get(pre.year + 1) ?? null;
+    const nextSculptedService =
+      nextScheduleItem !== null
+        ? nextScheduleItem.principal + nextScheduleItem.interest
+        : null;
+    const debtInterest = scheduleItem?.interest ?? pre.standardDebtInterestKeuro;
+    const ccaInterets = ccaOutstanding * asRate(input.ccaRemunRate ?? 0);
+    const interets = debtInterest + ccaInterets;
+    const ebit = pre.cashFlowKeuro - pre.amort;
+    const ebt = ebit - interets;
+    const baseImposable = ebt - deficitCumule;
+    const is = taxAmount(baseImposable, input.tauxIS);
+    deficitCumule =
+      ebt < 0 ? deficitCumule + Math.abs(ebt) : Math.max(0, deficitCumule - ebt);
+    const resultatNet = ebt - is;
+    resultatCumule += resultatNet;
+    const cfadsAfterTax = pre.cashFlowKeuro - is;
+    const ebitP90 = pre.cfadsP90Keuro - pre.amort;
+    const ebtP90 = ebitP90 - interets;
+    const baseImposableP90 = ebtP90 - deficitCumuleP90;
+    const isP90 = taxAmount(baseImposableP90, input.tauxIS);
+    deficitCumuleP90 =
+      ebtP90 < 0
+        ? deficitCumuleP90 + Math.abs(ebtP90)
+        : Math.max(0, deficitCumuleP90 - ebtP90);
+    const debtService = sculptedService ?? pre.debtServiceKeuro;
+    const nextDebtService =
+      nextSculptedService ??
+      (pre.year + 1 <= preRows.length
+        ? (preRows[pre.year]?.debtServiceKeuro ?? 0)
+        : 0);
+    const dsraTarget =
+      pre.year < effectiveTenor ? nextDebtService * (input.dsraMonths ?? 0) / 12 : 0;
+    let cashAvailable = Math.max(0, cfadsAfterTax - debtService);
+    let dsraRetrait = 0;
+
+    if (pre.year === effectiveTenor && dsraSolde > 0) {
+      dsraRetrait = dsraSolde;
+      dsraSolde = 0;
+      cashAvailable += dsraRetrait;
+    } else if (dsraSolde > dsraTarget) {
+      dsraRetrait = dsraSolde - dsraTarget;
+      dsraSolde = dsraTarget;
+      cashAvailable += dsraRetrait;
+    }
+
+    const dsraDepot = Math.min(cashAvailable, Math.max(0, dsraTarget - dsraSolde));
+    dsraSolde += dsraDepot;
+    cashAvailable -= dsraDepot;
+
+    const cashAfterCcaInterest = Math.max(0, cashAvailable - ccaInterets);
+    const canRepayCca = input.ccaBloque === true ? pre.year > effectiveTenor : true;
+    const ccaRemboursement = canRepayCca
+      ? Math.min(ccaOutstanding, cashAfterCcaInterest)
+      : 0;
+    ccaOutstanding -= ccaRemboursement;
+    const residualAfterCca = Math.max(0, cashAfterCcaInterest - ccaRemboursement);
+    const dividende = resultatCumule > 0 ? residualAfterCca : 0;
+    const cashBloque = dsraSolde + (resultatCumule > 0 ? 0 : residualAfterCca);
+    const fluxActionnaire = dividende + ccaRemboursement + ccaInterets;
 
     return {
       year: pre.year,
@@ -389,17 +532,38 @@ export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashF
       revenueP90Keuro: pre.revenueP90Keuro,
       opexKeuro: pre.opexKeuro,
       cashFlowKeuro: pre.cashFlowKeuro,
-      discountedCashFlowKeuro: discounted(pre.cashFlowKeuro, pre.year, discountRate),
+      discountedCashFlowKeuro: discounted(cfadsAfterTax, pre.year, discountRate),
       debtServiceKeuro: pre.debtServiceKeuro,
       debtServiceSculptedKeuro: sculptedService,
       cfadsP90Keuro: pre.cfadsP90Keuro,
-      // Standard DSCR: cfadsP90 / constant-annuity service.
+      amort: pre.amort,
+      ebit,
+      interets,
+      ebt,
+      is,
+      resultatNet,
+      cfadsAfterTax,
+      dividende,
+      fluxActionnaire,
+      ccaRemboursementKeuro: ccaRemboursement,
+      ccaInteretsKeuro: ccaInterets,
+      ccaOutstandingKeuro: ccaOutstanding,
+      deficitCumuleKeuro: deficitCumule,
+      resultatCumuleKeuro: resultatCumule,
+      dsraSoldeKeuro: dsraSolde,
+      dsraDepotKeuro: dsraDepot,
+      dsraRetraitKeuro: dsraRetrait,
+      cashBloqueKeuro: cashBloque,
+      cfadsP90AfterTaxKeuro: pre.cfadsP90Keuro - isP90,
+      // Standard DSCR: after-tax P90 CFADS / constant-annuity service.
       dscr:
-        pre.debtServiceKeuro > 0 ? pre.cfadsP90Keuro / pre.debtServiceKeuro : null,
-      // Realized DSCR: cfadsP90 / retained sculpted service.
+        pre.debtServiceKeuro > 0
+          ? (pre.cfadsP90Keuro - isP90) / pre.debtServiceKeuro
+          : null,
+      // Realized DSCR: after-tax P90 CFADS / retained sculpted service.
       dscrRealized:
         sculptedService !== null && sculptedService > 0
-          ? pre.cfadsP90Keuro / sculptedService
+          ? (pre.cfadsP90Keuro - isP90) / sculptedService
           : null,
       // Target DSCR for this year from the schedule (null when no sculpting or beyond tenor).
       dscrTargetAtYear:
@@ -410,13 +574,121 @@ export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashF
   });
 }
 
+function scaledScheduleByYear(
+  sculptedResult: { schedule: DebtScheduleItem[] } | null,
+  scaleFactor: number,
+) {
+  return new Map(
+    sculptedResult?.schedule.map((s) => [
+      s.year,
+      {
+        principal: s.principal * scaleFactor,
+        interest: s.interest * scaleFactor,
+      },
+    ]) ?? [],
+  );
+}
+
+function calculateSculpting(
+  input: FinanceEngineInput,
+  preRows: PreRow[],
+  initialInvestment: number,
+): SizingComputation {
+  const discountRate = asRate(input.discountRate);
+  const effectiveSchedule = resolveSchedule(input);
+  const effectiveTenor =
+    input.debtTenorYears ??
+    (effectiveSchedule !== null
+      ? Math.max(...effectiveSchedule.map((t) => t.yearTo))
+      : 0);
+
+  const hasSculpting = effectiveSchedule !== null && effectiveTenor > 0;
+
+  if (!hasSculpting) {
+    return { sizing: null, scheduleByYear: new Map(), iterations: 0 };
+  }
+
+  let scheduleByYear = new Map<number, RetainedDebtScheduleItem>();
+  let sizing: SizingResult | null = null;
+
+  for (let iteration = 0; iteration < 50; iteration += 1) {
+    const taxRows = applyWaterfall(
+      preRows,
+      scheduleByYear,
+      input,
+      discountRate,
+      effectiveSchedule,
+      effectiveTenor,
+    );
+    const debtSizingFlows = taxRows.map((row) => ({
+      year: row.year,
+      cfadsP90Keuro: row.cfadsP90AfterTaxKeuro,
+    }));
+    const sculptedResult = sculptDebt(
+      debtSizingFlows,
+      effectiveSchedule!,
+      input.debtInterestRate,
+      effectiveTenor,
+    );
+    const nextSizing =
+      sculptedResult !== null
+        ? sizingResult(
+            sculptedResult.debtAmountKeuro,
+            initialInvestment,
+            input.gearingMax ?? null,
+            input.structuringFeeRate ?? 0,
+          )
+        : null;
+    const scaleFactor =
+      nextSizing !== null && nextSizing.debtSculptedKeuro > 0
+        ? nextSizing.debtRetenuKeuro / nextSizing.debtSculptedKeuro
+        : 1;
+    const nextScheduleByYear = scaledScheduleByYear(sculptedResult, scaleFactor);
+    const previousDebt = sizing?.debtRetenuKeuro ?? 0;
+    const nextDebt = nextSizing?.debtRetenuKeuro ?? 0;
+
+    sizing = nextSizing;
+    scheduleByYear = nextScheduleByYear;
+
+    if (Math.abs(nextDebt - previousDebt) < 0.01) {
+      return { sizing, scheduleByYear, iterations: iteration + 1 };
+    }
+  }
+
+  return { sizing, scheduleByYear, iterations: 50 };
+}
+
+export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashFlow[] {
+  const initialInvestment = input.capex * input.capacityMw;
+  const discountRate = asRate(input.discountRate);
+  const preRows = buildPreRows(input);
+  const effectiveSchedule = resolveSchedule(input);
+  const effectiveTenor =
+    input.debtTenorYears ??
+    (effectiveSchedule !== null
+      ? Math.max(...effectiveSchedule.map((t) => t.yearTo))
+      : input.debtMaturityYears);
+  const { scheduleByYear } = calculateSculpting(input, preRows, initialInvestment);
+
+  return applyWaterfall(
+    preRows,
+    scheduleByYear,
+    input,
+    discountRate,
+    effectiveSchedule,
+    effectiveTenor,
+  ).map(({ cfadsP90AfterTaxKeuro: _cfadsP90AfterTaxKeuro, ...row }) => row);
+}
+
 export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngineResult {
   // Initial investment kEUR = capex kEUR/MW * project capacity MW.
   const initialInvestment = input.capex * input.capacityMw;
+  const preRows = buildPreRows(input);
+  const sculpting = calculateSculpting(input, preRows, initialInvestment);
   const annualCashFlows = calculateAnnualCashFlows(input);
 
-  // VAN and TRI use P50 equity cash-flows (actionnaire view).
-  const cashFlows = annualCashFlows.map((row) => row.cashFlowKeuro);
+  // VAN and TRI use after-tax P50 operating cash-flows.
+  const cashFlows = annualCashFlows.map((row) => row.cfadsAfterTax);
   const discountedCashFlows = annualCashFlows.reduce(
     (total, row) => total + row.discountedCashFlowKeuro,
     0,
@@ -439,27 +711,7 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
   // Minimum standard DSCR. If no debt, stored as 0.
   const dscr = dscrValues.length > 0 ? Math.min(...dscrValues) : 0;
 
-  // Sculpted debt and two-constraint sizing.
-  const effectiveSchedule = resolveSchedule(input);
-  const effectiveTenor =
-    input.debtTenorYears ??
-    (effectiveSchedule !== null
-      ? Math.max(...effectiveSchedule.map((t) => t.yearTo))
-      : 0);
-  const hasSculpting = effectiveSchedule !== null && effectiveTenor > 0;
-  const sculptedResult = hasSculpting
-    ? sculptDebt(annualCashFlows, effectiveSchedule!, input.debtInterestRate, effectiveTenor)
-    : null;
-
-  const sizing =
-    sculptedResult !== null
-      ? sizingResult(
-          sculptedResult.debtAmountKeuro,
-          initialInvestment,
-          input.gearingMax ?? null,
-          input.structuringFeeRate ?? 0,
-        )
-      : null;
+  const sizing = sculpting.sizing;
 
   // Structuring fee is an upfront SPV cost — added to effective CAPEX.
   const structuringFee = sizing?.structuringFeeKeuro ?? 0;
@@ -476,6 +728,49 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
     discountedProduction > 0
       ? ((capexEffectif + discountedOpex) / discountedProduction) * 1000
       : 0;
+  const retainedDebt = sizing?.debtRetenuKeuro ?? initialInvestment * input.debtRate / 100;
+  const ccaApport = input.ccaApportKeuro ?? 0;
+  const equity = Math.max(0, capexEffectif - retainedDebt);
+  const margeDev = input.margeDevKeuro ?? structuringFee;
+  const devFeesKeuro = (input.devFeesKEuroPerMW ?? 0) * input.capacityMw;
+  const tauxISEntreprise = input.tauxISEntreprise ?? input.tauxIS ?? 0;
+  const netEntrepriseFactor = 1 - asRate(tauxISEntreprise);
+  const dsraInitialKeuro =
+    annualCashFlows.length > 0
+      ? (annualCashFlows[0].debtServiceSculptedKeuro ??
+          annualCashFlows[0].debtServiceKeuro) *
+        (input.dsraMonths ?? 0) / 12
+      : 0;
+  const miseNetteInvest = Math.max(0.01, equity + ccaApport + dsraInitialKeuro);
+  const miseNetteEntrep = Math.max(
+    0.01,
+    equity +
+      ccaApport +
+      dsraInitialKeuro -
+      margeDev * netEntrepriseFactor -
+      devFeesKeuro * netEntrepriseFactor,
+  );
+  const shareholderFlows = annualCashFlows.map((row) => row.fluxActionnaire);
+  const shouldCalculateDoubleIrr =
+    retainedDebt > 0 ||
+    ccaApport > 0 ||
+    margeDev > 0 ||
+    devFeesKeuro > 0 ||
+    input.tauxIS != null;
+  const doubleIRR = shouldCalculateDoubleIrr
+    ? calculateDoubleIRR(
+        {
+          projectInvestmentKeuro: capexEffectif,
+          equityInvestmentKeuro: miseNetteEntrep,
+          dsraInitialKeuro,
+          devFeesKeuro,
+          miseNetteInvest,
+          miseNetteEntrep,
+        },
+        cashFlows,
+        shareholderFlows,
+      )
+    : null;
 
   return {
     npv: round(npv),
@@ -483,6 +778,8 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
     lcoe: round(lcoe),
     dscr: round(dscr),
     debtAmountKeuro: sizing !== null ? round(sizing.debtRetenuKeuro) : null,
+    doubleIRR,
+    sizingIterations: sculpting.iterations,
     sizing: sizing !== null
       ? {
           ...sizing,
