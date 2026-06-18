@@ -99,31 +99,26 @@ describe("waterfall fiscal, DSRA, CCA et double TRI", () => {
     expect(rows[2].dsraSoldeKeuro).toBe(0);
   });
 
-  it("CCA bloque ne se rembourse pas pendant le tenor de dette", () => {
+  it("CCA est calcule depuis capexEffectif - detteRetenue", () => {
     const rows = calculateAnnualCashFlows(
       baseInput({
         debtMaturityYears: 3,
+        debtRate: 0,
         tauxIS: 25,
-        ccaApportKeuro: 100,
-        ccaRemunRate: 3,
-        ccaBloque: true,
       }),
     );
+    const ccaInitial = 700 * 10;
+    const firstYearRepaid = rows[0].ccaRemboursementKeuro;
 
-    expect(rows[0].ccaRemboursementKeuro).toBe(0);
-    expect(rows[1].ccaRemboursementKeuro).toBe(0);
-    expect(rows[2].ccaRemboursementKeuro).toBe(0);
-    expect(rows[3].ccaRemboursementKeuro).toBeGreaterThan(0);
+    expect(firstYearRepaid).toBeGreaterThan(0);
+    expect(rows[0].ccaOutstandingKeuro).toBeCloseTo(ccaInitial - firstYearRepaid);
   });
 
-  it("CCA non bloque peut se rembourser pendant la dette si le cash le permet", () => {
+  it("CCA jamais bloque peut se rembourser pendant la dette si le cash le permet", () => {
     const rows = calculateAnnualCashFlows(
       baseInput({
         debtMaturityYears: 8,
         tauxIS: 25,
-        ccaApportKeuro: 100,
-        ccaRemunRate: 3,
-        ccaBloque: false,
       }),
     );
 
@@ -151,7 +146,7 @@ describe("waterfall fiscal, DSRA, CCA et double TRI", () => {
         dsraMonths: 6,
         debtTenorYears: 12,
         dscrSchedule: [{ yearFrom: 1, yearTo: 12, dscrValue: 1.25 }],
-        gearingMax: 70,
+        gearingMaxPct: 70,
       }),
     );
 

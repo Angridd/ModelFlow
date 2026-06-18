@@ -42,8 +42,14 @@ debtSculpted   = sculptDebt(cfadsP90, dscrSchedule)    ← contrainte DSCR
 debtGearingMax = capex × capacityMw × gearingMax / 100 ← contrainte gearing
 debtRetenu     = min(debtSculpted, debtGearingMax)
 headroom       = debtGearingMax - debtRetenu
-margeDev       = headroom × structuringFeeRate / 100    ← revenu développeur upfront
+margeDev       = headroom                              ← 100% hardcodé du headroom
+capexEffectif  = capex × capacityMw + margeDev
+CCA            = capexEffectif - debtRetenu            ← calculé, jamais saisi
+gearingRéalisé = debtRetenu / capexEffectif × 100      ← calculé
 ```
+
+`structuringFeeRate = 100%` hardcodé.
+`ccaBloque = false` hardcodé.
 
 ## Waterfall de distribution
 ```
@@ -57,11 +63,11 @@ Priorité 4 : Dividende(t)                → résiduel
 ## Double TRI
 | Indicateur | Base t=0 | Flux annuels |
 |------------|----------|--------------|
-| TRI Invest | -(equity + CCA) | CFADS après IS (avant distribution) |
-| TRI Entreprise | -(equity + CCA - margeFact × 0.75 - devFees × 0.75) | IS remonté + remb. CCA + dividende |
+| TRI Invest | -CCA | remb. CCA + intérêts + cashBloqué + dividendes |
+| TRI Entreprise | -CCA + margeFact × (1 - tauxISEntrep / 100) + devFees × (1 - tauxISEntrep / 100) | mêmes flux que TRI Invest, pas d'IS sur flux annuels |
 
 `capexEffectif = capex × capacityMw + margeDev` (la SPV paie la marge)
-`miseNette = equity + ccaApport - margeFact × 0.75 - devFees × 0.75` (l'entreprise reçoit les revenus nets IS)
+`CCA = capexEffectif - debtRetenu` (tout l'apport actionnaire est en CCA)
 
 ## Types clés (app/lib/finance/types.ts)
 - `DscrTranche` — { yearFrom, yearTo, dscrValue }

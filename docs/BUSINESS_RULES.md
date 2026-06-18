@@ -37,6 +37,9 @@ Perspective double : SPV (société de projet) et Développeur/Investisseur.
 ### Gearing et dette retenue
 - Le gearing max est un plafond absolu : `debtGearingMax = gearing% × CAPEX`
   Exemple : 70% × 7 000 k€ = 4 900 k€ maximum quelle que soit la capacité DSCR
+- L'utilisateur saisit uniquement le gearing maximum autorisé
+- Le gearing réalisé est calculé automatiquement :
+  `gearingRealise = debtRetenu / capexEffectif × 100`
 - La dette effectivement tirée = la contrainte la plus restrictive des deux :
   `debtRetenu = min(debtSculpted, debtGearingMax)`
   Exemple concret :
@@ -49,6 +52,7 @@ Perspective double : SPV (société de projet) et Développeur/Investisseur.
   la différence est de la **marge facturable** :
   `margefacturable = debtSculpted - debtRetenu`
   Exemple : 5 200 - 4 900 = 300 k€ facturés à la SPV par le développeur
+- Marge facturable = 100% du headroom, hardcodé
 - Cette marge est un revenu upfront pour le développeur (t=0)
 - Elle s'ajoute au CAPEX effectif de la SPV (flux sortant SPV)
 - Elle N'apparaît PAS dans les cash-flows annuels du projet
@@ -60,10 +64,8 @@ Perspective double : SPV (société de projet) et Développeur/Investisseur.
 - L'IS est traité comme remontant immédiatement à l'actionnaire (prêt fille-mère simplifié)
 
 ## Règles CCA
-- Le CCA est apporté à t=0 par l'actionnaire
+- CCA = capexEffectif - debtRetenu — tout l'apport actionnaire est en CCA
 - Il est remboursé après le service de la dette senior et l'alimentation DSRA dans le waterfall
-- Si `ccaBloque = true` → remboursement seulement après `t > debtTenorYears`
-- Si `ccaBloque = false` → remboursement dès que le cash disponible le permet
 - Priorité : service dette senior > alimentation DSRA > remboursement CCA + intérêts > dividendes
 - Le CCA peut être rémunéré (taux optionnel)
 

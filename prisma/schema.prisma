@@ -47,14 +47,12 @@ model Scenario {
   dscrTarget          Float?
   debtTenorYears      Int?
   dscrSchedule        String?
-  gearingMax          Float?
-  structuringFeeRate  Float?
+  gearingMaxPct       Float?  @map("gearingMax")
   tauxIS              Float?
   amortDuree          Int?
   ccaApportKeuro      Float?
   ccaRemunRate        Float?
   dsraMonths          Int?
-  ccaBloque           Boolean?
   devFeesKEuroPerMW   Float?
   tauxISEntreprise    Float?
   dscr                Float

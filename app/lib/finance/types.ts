@@ -68,8 +68,8 @@ export type AnnualCashFlowWaterfallFields = {
 };
 
 export type FinanceEngineInputDsraDevFees = {
+  gearingMaxPct?: number | null;
   dsraMonths?: number | null;
-  ccaBloque?: boolean | null;
   devFeesKEuroPerMW?: number | null;
   tauxISEntreprise?: number | null;
 };

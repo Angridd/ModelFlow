@@ -30,7 +30,7 @@ const primaryFields = [
   },
   {
     name: "debtRate" as const,
-    label: "Gearing (%)",
+    label: "Dette cible (%)",
     step: "0.01",
     placeholder: "ex. 70",
     title: "Part du CAPEX financée par la dette en % (ex. 70 % pour un financement de projet solaire)",
@@ -103,20 +103,6 @@ const fiscalFields = [
     step: "1",
     placeholder: "ex. 20",
     title: "Duree d'amortissement comptable utilisee pour le calcul fiscal.",
-  },
-  {
-    name: "ccaApportKeuro" as const,
-    label: "Apport CCA (kEUR)",
-    step: "0.01",
-    placeholder: "ex. 500",
-    title: "Montant apporte en compte courant d'associe, en kEUR.",
-  },
-  {
-    name: "ccaRemunRate" as const,
-    label: "Remuneration CCA (%)",
-    step: "0.01",
-    placeholder: "ex. 3",
-    title: "Taux annuel de remuneration du compte courant d'associe.",
   },
   {
     name: "dsraMonths" as const,
@@ -312,33 +298,17 @@ export default async function EditScenarioPage({
             />
           </label>
           <label className="grid gap-2 text-sm font-medium text-zinc-700">
-            Gearing maximum (%)
+            Gearing maximum autorisé (%)
             <input
-              name="gearingMax"
+              name="gearingMaxPct"
               type="number"
               step="0.01"
               min="0"
               max="100"
-              defaultValue={scenario.gearingMax ?? ""}
-              placeholder="ex. 70"
-              title="Part maximale du CAPEX financée par dette senior (ex. 70 %)"
+              defaultValue={scenario.gearingMaxPct ?? ""}
+              placeholder="ex. 90"
+              title="Plafond de dette en % du CAPEX effectif"
               className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
-            />
-          </label>
-        </div>
-
-        <div className="grid gap-2">
-          <label className="grid gap-2 text-sm font-medium text-zinc-700">
-            Taux marge structuration (%)
-            <input
-              name="structuringFeeRate"
-              type="number"
-              step="0.01"
-              min="0"
-              defaultValue={scenario.structuringFeeRate ?? ""}
-              placeholder="ex. 1.5"
-              title="Taux appliqué au headroom DSCR pour calculer la marge facturée à la SPV (ex. 1,5 % du headroom)"
-              className="h-10 w-full max-w-xs rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
             />
           </label>
         </div>
@@ -364,16 +334,6 @@ export default async function EditScenarioPage({
                 />
               </label>
             ))}
-            <label className="flex items-center gap-3 text-sm font-medium text-zinc-700">
-              <input
-                name="ccaBloque"
-                type="checkbox"
-                value="true"
-                defaultChecked={scenario.ccaBloque ?? false}
-                className="h-4 w-4 rounded border-zinc-300 text-zinc-900"
-              />
-              CCA bloque par la banque
-            </label>
           </div>
         </section>
 

@@ -13,6 +13,7 @@
 - Vérifier `npm run build` à la fin de chaque tâche
 - TypeScript strict — zéro `any`
 - Rétrocompat totale : si un champ Prisma est null → comportement actuel inchangé
+- CCA toujours calculé (pas saisi), `ccaBloque` toujours false, `structuringFeeRate` toujours 100%
 
 ## Commandes utiles
 ```bash

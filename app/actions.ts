@@ -186,16 +186,6 @@ function readOptionalInteger(formData: FormData, key: string): number | null {
   return number;
 }
 
-function readOptionalBoolean(formData: FormData, key: string): boolean | null {
-  const value = formData.get(key);
-
-  if (value === null) {
-    return null;
-  }
-
-  return value === "true" || value === "on";
-}
-
 function readDscrSchedule(formData: FormData): DscrTranche[] | null {
   const value = formData.get("dscrSchedule");
 
@@ -273,14 +263,12 @@ function readScenarioAssumptions(formData: FormData) {
     opexInflationRate: readNumber(formData, "opexInflationRate"),
     debtTenorYears: readOptionalInteger(formData, "debtTenorYears"),
     dscrSchedule: readDscrSchedule(formData),
-    gearingMax: readOptionalNumber(formData, "gearingMax"),
-    structuringFeeRate: readOptionalNumber(formData, "structuringFeeRate"),
+    gearingMaxPct:
+      readOptionalNumber(formData, "gearingMaxPct") ??
+      readOptionalNumber(formData, "gearingMax"),
     tauxIS: readOptionalNumber(formData, "tauxIS"),
     amortDuree: readOptionalInteger(formData, "amortDuree"),
-    ccaApportKeuro: readOptionalNumber(formData, "ccaApportKeuro"),
-    ccaRemunRate: readOptionalNumber(formData, "ccaRemunRate"),
     dsraMonths: readOptionalInteger(formData, "dsraMonths"),
-    ccaBloque: readOptionalBoolean(formData, "ccaBloque"),
     devFeesKEuroPerMW: readOptionalNumber(formData, "devFeesKEuroPerMW"),
     tauxISEntreprise: readOptionalNumber(formData, "tauxISEntreprise"),
   };
@@ -471,14 +459,10 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
       dscrTarget: scenario.dscrTarget,
       debtTenorYears: scenario.debtTenorYears,
       dscrSchedule: scenario.dscrSchedule,
-      gearingMax: scenario.gearingMax,
-      structuringFeeRate: scenario.structuringFeeRate,
+      gearingMaxPct: scenario.gearingMaxPct,
       tauxIS: scenario.tauxIS,
       amortDuree: scenario.amortDuree,
-      ccaApportKeuro: scenario.ccaApportKeuro,
-      ccaRemunRate: scenario.ccaRemunRate,
       dsraMonths: scenario.dsraMonths,
-      ccaBloque: scenario.ccaBloque,
       devFeesKEuroPerMW: scenario.devFeesKEuroPerMW,
       tauxISEntreprise: scenario.tauxISEntreprise,
       dscr: scenario.dscr,

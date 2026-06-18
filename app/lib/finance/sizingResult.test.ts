@@ -5,14 +5,14 @@ describe("sizingResult", () => {
   it("DSCR contraint — debtSculpted < debtGearingMax", () => {
     // debtSculpted = 5 000, capex = 10 000, gearingMax = 70 % → gearingMax = 7 000
     // headroom = 7 000 - 5 000 = 2 000
-    // structuringFee = 2 000 × 1,5 % = 30
+    // structuringFee = 2 000 × 1,5 = 3 000
     const result = sizingResult(5000, 10000, 70, 1.5);
 
     expect(result.bindingConstraint).toBe("dscr");
     expect(result.debtGearingMaxKeuro).toBeCloseTo(7000);
     expect(result.debtRetenuKeuro).toBeCloseTo(5000);
     expect(result.headroomKeuro).toBeCloseTo(2000);
-    expect(result.structuringFeeKeuro).toBeCloseTo(30);
+    expect(result.structuringFeeKeuro).toBeCloseTo(3000);
     expect(result.structuringFeeRate).toBe(1.5);
   });
 

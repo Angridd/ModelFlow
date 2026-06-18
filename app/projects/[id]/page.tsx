@@ -122,14 +122,10 @@ export default async function ProjectDetailPage({
         dscrTarget: projectReferenceScenario.dscrTarget,
         debtTenorYears: projectReferenceScenario.debtTenorYears,
         dscrSchedule: parseDscrSchedule(projectReferenceScenario.dscrSchedule),
-        gearingMax: projectReferenceScenario.gearingMax,
-        structuringFeeRate: projectReferenceScenario.structuringFeeRate,
+        gearingMaxPct: projectReferenceScenario.gearingMaxPct,
         tauxIS: projectReferenceScenario.tauxIS,
         amortDuree: projectReferenceScenario.amortDuree,
-        ccaApportKeuro: projectReferenceScenario.ccaApportKeuro,
-        ccaRemunRate: projectReferenceScenario.ccaRemunRate,
         dsraMonths: projectReferenceScenario.dsraMonths,
-        ccaBloque: projectReferenceScenario.ccaBloque,
         devFeesKEuroPerMW: projectReferenceScenario.devFeesKEuroPerMW,
         tauxISEntreprise: projectReferenceScenario.tauxISEntreprise,
       })
@@ -163,14 +159,10 @@ export default async function ProjectDetailPage({
         dscrTarget: cashFlowScenario.dscrTarget,
         debtTenorYears: cashFlowScenario.debtTenorYears,
         dscrSchedule: parseDscrSchedule(cashFlowScenario.dscrSchedule),
-        gearingMax: cashFlowScenario.gearingMax,
-        structuringFeeRate: cashFlowScenario.structuringFeeRate,
+        gearingMaxPct: cashFlowScenario.gearingMaxPct,
         tauxIS: cashFlowScenario.tauxIS,
         amortDuree: cashFlowScenario.amortDuree,
-        ccaApportKeuro: cashFlowScenario.ccaApportKeuro,
-        ccaRemunRate: cashFlowScenario.ccaRemunRate,
         dsraMonths: cashFlowScenario.dsraMonths,
-        ccaBloque: cashFlowScenario.ccaBloque,
         devFeesKEuroPerMW: cashFlowScenario.devFeesKEuroPerMW,
         tauxISEntreprise: cashFlowScenario.tauxISEntreprise,
       })
@@ -194,19 +186,29 @@ export default async function ProjectDetailPage({
         dscrTarget: cashFlowScenario.dscrTarget,
         debtTenorYears: cashFlowScenario.debtTenorYears,
         dscrSchedule: parseDscrSchedule(cashFlowScenario.dscrSchedule),
-        gearingMax: cashFlowScenario.gearingMax,
-        structuringFeeRate: cashFlowScenario.structuringFeeRate,
+        gearingMaxPct: cashFlowScenario.gearingMaxPct,
         tauxIS: cashFlowScenario.tauxIS,
         amortDuree: cashFlowScenario.amortDuree,
-        ccaApportKeuro: cashFlowScenario.ccaApportKeuro,
-        ccaRemunRate: cashFlowScenario.ccaRemunRate,
         dsraMonths: cashFlowScenario.dsraMonths,
-        ccaBloque: cashFlowScenario.ccaBloque,
         devFeesKEuroPerMW: cashFlowScenario.devFeesKEuroPerMW,
         tauxISEntreprise: cashFlowScenario.tauxISEntreprise,
       })
     : null;
   const sizing = cashFlowMetrics?.sizing ?? null;
+  const capexInitialKeuro = cashFlowScenario
+    ? cashFlowScenario.capex * project.capacityMw
+    : 0;
+  const capexEffectifKeuro = sizing !== null
+    ? capexInitialKeuro + sizing.structuringFeeKeuro
+    : null;
+  const ccaKeuro =
+    sizing !== null && capexEffectifKeuro !== null
+      ? Math.max(0, capexEffectifKeuro - sizing.debtRetenuKeuro)
+      : null;
+  const gearingRealisePct =
+    sizing !== null && capexEffectifKeuro !== null && capexEffectifKeuro > 0
+      ? sizing.debtRetenuKeuro / capexEffectifKeuro * 100
+      : null;
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-10">
@@ -447,7 +449,7 @@ export default async function ProjectDetailPage({
             {sizing.debtGearingMaxKeuro !== null ? (
               <div>
                 <p className="text-sm font-medium text-zinc-500">
-                  Gearing max ({cashFlowScenario?.gearingMax ?? ""}%)
+                  Gearing max ({cashFlowScenario?.gearingMaxPct ?? ""}%)
                 </p>
                 <p className="mt-1 text-zinc-950">
                   {formatNumber(sizing.debtGearingMaxKeuro, " k€")}
@@ -481,11 +483,21 @@ export default async function ProjectDetailPage({
                 {formatNumber(sizing.headroomKeuro, " k€")}
               </p>
             </div>
+            <div>
+              <p className="text-sm font-medium text-zinc-500">CCA</p>
+              <p className="mt-1 text-zinc-950">
+                {formatNumber(ccaKeuro, " k€")}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-zinc-500">Gearing réalisé</p>
+              <p className="mt-1 text-zinc-950">
+                {formatNumber(gearingRealisePct, " %")}
+              </p>
+            </div>
             {sizing.structuringFeeKeuro > 0 ? (
               <div>
-                <p className="text-sm font-medium text-zinc-500">
-                  Marge structuration ({sizing.structuringFeeRate}%)
-                </p>
+                <p className="text-sm font-medium text-zinc-500">Marge structuration</p>
                 <p className="mt-1 font-semibold text-green-700">
                   +{formatNumber(sizing.structuringFeeKeuro, " k€")}
                 </p>
@@ -534,7 +546,7 @@ export default async function ProjectDetailPage({
               {cashFlowScenario?.name ?? "-"}
             </p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <p className="text-sm font-medium text-zinc-500">TRI Invest</p>
               <p className="mt-1 text-zinc-950">
@@ -545,24 +557,6 @@ export default async function ProjectDetailPage({
               <p className="text-sm font-medium text-zinc-500">TRI entreprise</p>
               <p className="mt-1 text-zinc-950">
                 {formatNumber(cashFlowMetrics.doubleIRR.irrEntreprise, " %")}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-zinc-500">VAN SPV</p>
-              <p className="mt-1 text-zinc-950">
-                {formatMillionEuros(cashFlowMetrics.doubleIRR.npvSPV)}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-zinc-500">VAN entreprise</p>
-              <p className="mt-1 text-zinc-950">
-                {formatMillionEuros(cashFlowMetrics.doubleIRR.npvEntreprise)}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-zinc-500">Mise nette</p>
-              <p className="mt-1 text-zinc-950">
-                {formatMillionEuros(cashFlowMetrics.doubleIRR.miseNette)}
               </p>
             </div>
           </div>
