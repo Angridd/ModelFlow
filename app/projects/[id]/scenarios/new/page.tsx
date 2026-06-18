@@ -28,13 +28,6 @@ const primaryFields = [
     placeholder: "ex. 75",
     title: "Prix de vente de l'électricité en €/MWh (tarif CRE ou contrat de marché)",
   },
-  {
-    name: "debtRate" as const,
-    label: "Dette cible (%)",
-    step: "0.01",
-    placeholder: "ex. 70",
-    title: "Part du CAPEX financée par la dette en % (ex. 70 % pour un financement de projet solaire)",
-  },
 ] as const;
 
 const assumptionFields = [
@@ -181,6 +174,7 @@ export default async function NewScenarioPage({
             className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
           />
         </label>
+        <input type="hidden" name="debtRate" value="0" />
 
         <div className="grid gap-5 sm:grid-cols-2">
           {primaryFields.map((field) => (
