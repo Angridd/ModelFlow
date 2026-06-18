@@ -3,7 +3,10 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { updateScenario } from "@/app/actions";
 import { DscrSchedule } from "@/app/components/DscrSchedule";
-import type { DscrTranche } from "@/app/lib/finance/types";
+import {
+  DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS,
+  type DscrTranche,
+} from "@/app/lib/finance/types";
 import { prisma } from "@/app/lib/prisma";
 
 const primaryFields = [
@@ -89,6 +92,7 @@ const fiscalFields = [
     step: "0.01",
     placeholder: "ex. 25",
     title: "Taux d'impot sur les societes applique au resultat fiscal.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.tauxIS,
   },
   {
     name: "amortDuree" as const,
@@ -103,6 +107,7 @@ const fiscalFields = [
     step: "1",
     placeholder: "ex. 6",
     title: "Nombre de mois de service dette a couvrir en reserve DSRA.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.dsraMonths,
   },
   {
     name: "devFeesKEuroPerMW" as const,
@@ -110,6 +115,7 @@ const fiscalFields = [
     step: "0.01",
     placeholder: "ex. 110",
     title: "Frais de developpement factures au closing, en kEUR par MW.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.devFeesKEuroPerMW,
   },
   {
     name: "tauxISEntreprise" as const,
@@ -117,6 +123,61 @@ const fiscalFields = [
     step: "0.01",
     placeholder: "ex. 25",
     title: "Taux IS applique aux revenus de l'entreprise pour le double TRI.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.tauxISEntreprise,
+  },
+] as const;
+
+const revenueFields = [
+  {
+    name: "contractDuration" as const,
+    label: "Duree contrat tarifaire (ans)",
+    step: "1",
+    placeholder: "ex. 20",
+    title: "Duree du tarif contractuel. Prix marche applique ensuite",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.contractDuration,
+  },
+  {
+    name: "prixMarcheP50" as const,
+    label: "Prix marche post-contrat P50 (EUR/MWh)",
+    step: "0.01",
+    placeholder: "ex. 60",
+    title: "Prix marche applique au scenario P50 apres la periode contractuelle.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.prixMarcheP50,
+  },
+  {
+    name: "prixMarcheP90" as const,
+    label: "Prix marche post-contrat P90 (EUR/MWh)",
+    step: "0.01",
+    placeholder: "ex. 55",
+    title: "Prix marche applique au scenario P90 apres la periode contractuelle.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.prixMarcheP90,
+  },
+] as const;
+
+const opexExtraFields = [
+  {
+    name: "assuranceRate" as const,
+    label: "Assurance (% du CA P50)",
+    step: "0.01",
+    placeholder: "ex. 2.5",
+    title: "Assurance annuelle calculee en pourcentage du chiffre d'affaires P50.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.assuranceRate,
+  },
+  {
+    name: "inflationAssurance" as const,
+    label: "Inflation assurance (%/an)",
+    step: "0.01",
+    placeholder: "ex. 2",
+    title: "Inflation annuelle appliquee au cout d'assurance.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationAssurance,
+  },
+  {
+    name: "balancingCost" as const,
+    label: "Balancing cost (EUR/MWh)",
+    step: "0.01",
+    placeholder: "ex. 2",
+    title: "Cout de balancing applique a la production P50.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.balancingCost,
   },
 ] as const;
 
@@ -248,12 +309,60 @@ export default async function EditScenarioPage({
               type="number"
               step="0.01"
               defaultValue={scenario.yieldP90Mwh ?? ""}
-              placeholder="Défaut : P50 × 0,9"
-              title="Production annuelle au niveau de confiance P90 — solaire : environ P50 × 0,9. Utilisé pour le dimensionnement bancaire (DSCR)."
+              placeholder="Défaut : P50 × 0,93"
+              title="Production annuelle au niveau de confiance P90 — solaire : environ P50 × 0,93. Utilisé pour le dimensionnement bancaire (DSCR)."
               className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
             />
           </label>
         </div>
+
+        <section className="grid gap-4 rounded-md border border-zinc-200 bg-zinc-50 p-4">
+          <h2 className="text-sm font-semibold text-zinc-950">Revenus</h2>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {revenueFields.map((field) => (
+              <label
+                key={field.name}
+                className="grid gap-2 text-sm font-medium text-zinc-700"
+              >
+                {field.label}
+                <input
+                  name={field.name}
+                  type="number"
+                  min="0"
+                  step={field.step}
+                  defaultValue={scenario[field.name] ?? field.defaultValue}
+                  placeholder={field.placeholder}
+                  title={field.title}
+                  className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+                />
+              </label>
+            ))}
+          </div>
+        </section>
+
+        <section className="grid gap-4 rounded-md border border-zinc-200 bg-zinc-50 p-4">
+          <h2 className="text-sm font-semibold text-zinc-950">OPEX</h2>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {opexExtraFields.map((field) => (
+              <label
+                key={field.name}
+                className="grid gap-2 text-sm font-medium text-zinc-700"
+              >
+                {field.label}
+                <input
+                  name={field.name}
+                  type="number"
+                  min="0"
+                  step={field.step}
+                  defaultValue={scenario[field.name] ?? field.defaultValue}
+                  placeholder={field.placeholder}
+                  title={field.title}
+                  className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+                />
+              </label>
+            ))}
+          </div>
+        </section>
 
         <div className="grid gap-5 sm:grid-cols-2">
           {assumptionFields.map((field) => (
@@ -286,7 +395,9 @@ export default async function EditScenarioPage({
               step="0.01"
               min="0"
               max="100"
-              defaultValue={scenario.gearingMaxPct ?? ""}
+              defaultValue={
+                scenario.gearingMaxPct ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.gearingMax
+              }
               placeholder="ex. 90"
               title="Plafond de dette en % du CAPEX effectif"
               className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
@@ -308,7 +419,11 @@ export default async function EditScenarioPage({
                   type="number"
                   min="0"
                   step={field.step}
-                  defaultValue={scenario[field.name] ?? ""}
+                  defaultValue={
+                    "defaultValue" in field
+                      ? (scenario[field.name] ?? field.defaultValue)
+                      : (scenario[field.name] ?? "")
+                  }
                   placeholder={field.placeholder}
                   title={field.title}
                   className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
@@ -320,7 +435,11 @@ export default async function EditScenarioPage({
 
         <div className="grid gap-2">
           <p className="text-sm font-medium text-zinc-700">Profil DSCR cible</p>
-          <DscrSchedule initialValue={initialDscrSchedule} />
+          <DscrSchedule
+            initialValue={
+              initialDscrSchedule ?? [...DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.dscrSchedule]
+            }
+          />
         </div>
 
         <div className="flex justify-end gap-3 pt-2">

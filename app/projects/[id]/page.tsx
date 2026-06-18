@@ -119,6 +119,12 @@ export default async function ProjectDetailPage({
         debtMaturityYears: projectReferenceScenario.debtMaturityYears,
         tariffInflationRate: projectReferenceScenario.tariffInflationRate,
         opexInflationRate: projectReferenceScenario.opexInflationRate,
+        contractDuration: projectReferenceScenario.contractDuration,
+        prixMarcheP50: projectReferenceScenario.prixMarcheP50,
+        prixMarcheP90: projectReferenceScenario.prixMarcheP90,
+        assuranceRate: projectReferenceScenario.assuranceRate,
+        inflationAssurance: projectReferenceScenario.inflationAssurance,
+        balancingCost: projectReferenceScenario.balancingCost,
         dscrTarget: projectReferenceScenario.dscrTarget,
         debtTenorYears: projectReferenceScenario.debtTenorYears,
         dscrSchedule: parseDscrSchedule(projectReferenceScenario.dscrSchedule),
@@ -156,6 +162,12 @@ export default async function ProjectDetailPage({
         debtMaturityYears: cashFlowScenario.debtMaturityYears,
         tariffInflationRate: cashFlowScenario.tariffInflationRate,
         opexInflationRate: cashFlowScenario.opexInflationRate,
+        contractDuration: cashFlowScenario.contractDuration,
+        prixMarcheP50: cashFlowScenario.prixMarcheP50,
+        prixMarcheP90: cashFlowScenario.prixMarcheP90,
+        assuranceRate: cashFlowScenario.assuranceRate,
+        inflationAssurance: cashFlowScenario.inflationAssurance,
+        balancingCost: cashFlowScenario.balancingCost,
         dscrTarget: cashFlowScenario.dscrTarget,
         debtTenorYears: cashFlowScenario.debtTenorYears,
         dscrSchedule: parseDscrSchedule(cashFlowScenario.dscrSchedule),
@@ -183,6 +195,12 @@ export default async function ProjectDetailPage({
         debtMaturityYears: cashFlowScenario.debtMaturityYears,
         tariffInflationRate: cashFlowScenario.tariffInflationRate,
         opexInflationRate: cashFlowScenario.opexInflationRate,
+        contractDuration: cashFlowScenario.contractDuration,
+        prixMarcheP50: cashFlowScenario.prixMarcheP50,
+        prixMarcheP90: cashFlowScenario.prixMarcheP90,
+        assuranceRate: cashFlowScenario.assuranceRate,
+        inflationAssurance: cashFlowScenario.inflationAssurance,
+        balancingCost: cashFlowScenario.balancingCost,
         dscrTarget: cashFlowScenario.dscrTarget,
         debtTenorYears: cashFlowScenario.debtTenorYears,
         dscrSchedule: parseDscrSchedule(cashFlowScenario.dscrSchedule),
@@ -317,7 +335,7 @@ export default async function ProjectDetailPage({
             <p className="mt-1 text-zinc-950">
               {cashFlowScenario.yieldP90Mwh !== null
                 ? formatNumber(cashFlowScenario.yieldP90Mwh, " MWh/MW/an")
-                : formatNumber(cashFlowScenario.yieldMwh * 0.9, " MWh/MW/an (défaut)")}
+                : formatNumber(cashFlowScenario.yieldMwh * 0.93, " MWh/MW/an (défaut)")}
             </p>
           </div>
         ) : null}

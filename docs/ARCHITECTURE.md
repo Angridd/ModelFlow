@@ -57,7 +57,7 @@ docs/
 
 ### Scenario (champs financiers)
 **Production**
-`yieldMwh` (P50), `yieldP90Mwh` (P90 optionnel — fallback P50 × 0.9)
+`yieldMwh` (P50), `yieldP90Mwh` (P90 optionnel — fallback P50 × 0.93)
 
 **Hypothèses de base**
 `capex, opex, tariff, debtRate, projectLifeYears, degradationRate, discountRate, debtInterestRate, debtMaturityYears, tariffInflationRate, opexInflationRate`

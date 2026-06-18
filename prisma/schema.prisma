@@ -44,15 +44,23 @@ model Scenario {
   debtMaturityYears   Int     @default(20)
   tariffInflationRate Float   @default(0)
   opexInflationRate   Float   @default(2)
+  contractDuration    Int?
+  prixMarcheP50       Float?
+  prixMarcheP90       Float?
+  assuranceRate       Float?
+  inflationAssurance  Float?
+  balancingCost       Float?
   dscrTarget          Float?
   debtTenorYears      Int?
   dscrSchedule        String?
   gearingMaxPct       Float?  @map("gearingMax")
+  structuringFeeRate  Float?
   tauxIS              Float?
   amortDuree          Int?
   ccaApportKeuro      Float?
   ccaRemunRate        Float?
   dsraMonths          Int?
+  ccaBloque           Boolean?
   devFeesKEuroPerMW   Float?
   tauxISEntreprise    Float?
   dscr                Float

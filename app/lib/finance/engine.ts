@@ -12,6 +12,12 @@ const IRR_MAX_RATE = 10;
 const DSCR_FALLBACK = 1.3;
 const STRUCTURING_FEE_RATE = 1;
 const CCA_REMUN_RATE = 0;
+const CONTRACT_DURATION_FALLBACK = 20;
+const PRIX_MARCHE_P50_FALLBACK = 60;
+const PRIX_MARCHE_P90_FALLBACK = 55;
+const ASSURANCE_RATE_FALLBACK = 2.5;
+const INFLATION_ASSURANCE_FALLBACK = 2;
+const BALANCING_COST_FALLBACK = 2;
 
 export type FinanceEngineInput = FinancialAssumptions & {
   capacityMw: number;
@@ -32,6 +38,12 @@ export type FinanceEngineInput = FinancialAssumptions & {
   dsraMonths?: number | null;
   devFeesKEuroPerMW?: number | null;
   tauxISEntreprise?: number | null;
+  contractDuration?: number | null;
+  prixMarcheP50?: number | null;
+  prixMarcheP90?: number | null;
+  assuranceRate?: number | null;
+  inflationAssurance?: number | null;
+  balancingCost?: number | null;
 };
 
 export type FinanceEngineResult = {
@@ -388,8 +400,16 @@ function buildPreRows(input: FinanceEngineInput): PreRow[] {
   const annualAmort = amortDuree > 0
     ? initialInvestment / amortDuree
     : 0;
-  // P90 yield: use provided value or fall back to P50 * 0.9.
-  const effectiveYieldP90 = input.yieldP90Mwh ?? input.yieldMwh * 0.9;
+  const contractDuration = input.contractDuration ?? CONTRACT_DURATION_FALLBACK;
+  const prixMarcheP50 = input.prixMarcheP50 ?? PRIX_MARCHE_P50_FALLBACK;
+  const prixMarcheP90 = input.prixMarcheP90 ?? PRIX_MARCHE_P90_FALLBACK;
+  const assuranceRate = asRate(input.assuranceRate ?? ASSURANCE_RATE_FALLBACK);
+  const inflationAssurance = asRate(
+    input.inflationAssurance ?? INFLATION_ASSURANCE_FALLBACK,
+  );
+  const balancingCost = input.balancingCost ?? BALANCING_COST_FALLBACK;
+  // P90 yield: use provided value or fall back to P50 * 0.93.
+  const effectiveYieldP90 = input.yieldP90Mwh ?? input.yieldMwh * 0.93;
 
   const preRows: PreRow[] = [];
 
@@ -402,18 +422,23 @@ function buildPreRows(input: FinanceEngineInput): PreRow[] {
     // P90 production year N = yield P90 MWh/MW/year * MW * annual degradation.
     const productionP90 = effectiveYieldP90 * input.capacityMw * degradationFactor;
 
-    // Tariff year N = base tariff EUR/MWh * tariff inflation factor.
-    const annualTariff = input.tariff * (1 + tariffInflationRate) ** year;
+    // Tariff year N applies during the contract period, then merchant prices take over.
+    const annualTariff =
+      year <= contractDuration
+        ? input.tariff * (1 + tariffInflationRate) ** year
+        : prixMarcheP50;
 
-    // Revenue P50 kEUR = production P50 MWh * annual tariff EUR/MWh / 1000.
+    const annualTariffP90 = year <= contractDuration ? annualTariff : prixMarcheP90;
+
+    // Revenue kEUR = production MWh * price EUR/MWh / 1000.
     const revenueP50 = (productionP50 * annualTariff) / 1000;
+    const revenueP90 = (productionP90 * annualTariffP90) / 1000;
 
-    // Revenue P90 kEUR = production P90 MWh * annual tariff EUR/MWh / 1000.
-    const revenueP90 = (productionP90 * annualTariff) / 1000;
-
-    // Annual OPEX kEUR = opex kEUR/MW/year * MW * OPEX inflation factor.
-    const annualOpex =
+    const opexBase =
       input.opex * input.capacityMw * (1 + opexInflationRate) ** year;
+    const assurance = assuranceRate * revenueP50 * (1 + inflationAssurance) ** year;
+    const balancing = (balancingCost * productionP50) / 1000;
+    const annualOpex = opexBase + assurance + balancing;
 
     // Equity cash-flow (P50) kEUR = revenue P50 - OPEX (project NPV/IRR base).
     const cfadsP50 = revenueP50 - annualOpex;

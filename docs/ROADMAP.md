@@ -6,7 +6,7 @@
 - Export/import CSV
 
 ## ✅ Priorité 2 — Structuration dette (fait)
-- Séparation P50 / P90 (yieldP90Mwh, fallback × 0.9)
+- Séparation P50 / P90 (yieldP90Mwh, fallback × 0.93)
 - Sculptage de dette (sculptDebt) sur CFADS P90
 - Profil DSCR multi-tranches (DscrSchedule UI + JSON)
 - Gearing max + headroom

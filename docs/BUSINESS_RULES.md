@@ -11,7 +11,7 @@ Perspective double : SPV (société de projet) et Développeur/Investisseur.
 | OPEX | k€/MW/an | 12 k€/MW/an |
 | Tarif | €/MWh | 95 €/MWh |
 | Productible P50 | MWh/MW/an | 1 350 MWh/MW/an |
-| Productible P90 | MWh/MW/an | P50 × 0.9 par défaut |
+| Productible P90 | MWh/MW/an | P50 × 0.93 par défaut |
 | Dégradation | %/an | 0.4 %/an |
 | Taux IS France | % | 25 % |
 | Amortissement | ans | 20 ans linéaire |
@@ -23,7 +23,7 @@ Perspective double : SPV (société de projet) et Développeur/Investisseur.
 ## Règles P50 / P90
 - **P50** = production médiane → base des calculs actionnaire (VAN, TRI, LCOE)
 - **P90** = production avec 90% de probabilité d'être atteinte → base bancaire (DSCR)
-- Si P90 non saisi → P90 = P50 × 0.9 (fallback automatique)
+- Si P90 non saisi → P90 = P50 × 0.93 (fallback automatique)
 
 ## Règles de structuration
 

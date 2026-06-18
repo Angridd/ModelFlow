@@ -8,8 +8,9 @@ Le moteur calcule deux perspectives simultanées :
 ## Waterfall annuel (ordre strict)
 
 ```
-Revenue P50/P90 = production × tariff × (1 + tariffInflation)^t
-OPEX            = opex × capacityMw × (1 + opexInflation)^t
+Revenue contrat = production × tariff × (1 + tariffInflation)^t
+Revenue marché  = production × prixMarché post-contrat
+OPEX            = opexBase + assurance + balancing
 EBITDA          = Revenue - OPEX
 Amortissement   = capex × capacityMw / (amortDuree ?? projectLifeYears)
 EBIT            = EBITDA - Amortissement
@@ -24,6 +25,13 @@ CFADS           = Résultat net + Amortissement
 
 DSCR P90        = CFADS_P90 / (Intérêts + Principal)
 ```
+
+Paramètres revenus/OPEX :
+- `contractDuration ?? 20` ans : durée du tarif contractuel.
+- Après contrat : `prixMarcheP50 ?? 60` €/MWh et `prixMarcheP90 ?? 55` €/MWh.
+- `assurance = (assuranceRate ?? 2.5) / 100 × revenueP50 × (1 + (inflationAssurance ?? 2) / 100)^t`.
+- `balancing = (balancingCost ?? 2) × productionP50 / 1000`.
+- Si P90 non saisi : `yieldP90Mwh = yieldMwh × 0.93`.
 
 ## Circularité IS ↔ Dette
 Plus de dette → plus d'intérêts déductibles → IS plus faible → CFADS plus élevé
