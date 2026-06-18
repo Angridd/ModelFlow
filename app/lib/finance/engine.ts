@@ -599,11 +599,7 @@ function calculateSculpting(
 ): SizingComputation {
   const discountRate = asRate(input.discountRate);
   const effectiveSchedule = resolveSchedule(input);
-  const effectiveTenor =
-    input.debtTenorYears ??
-    (effectiveSchedule !== null
-      ? Math.max(...effectiveSchedule.map((t) => t.yearTo))
-      : 0);
+  const effectiveTenor = input.debtTenorYears ?? input.debtMaturityYears;
 
   const hasSculpting = effectiveSchedule !== null && effectiveTenor > 0;
 
@@ -667,11 +663,7 @@ export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashF
   const discountRate = asRate(input.discountRate);
   const preRows = buildPreRows(input);
   const effectiveSchedule = resolveSchedule(input);
-  const effectiveTenor =
-    input.debtTenorYears ??
-    (effectiveSchedule !== null
-      ? Math.max(...effectiveSchedule.map((t) => t.yearTo))
-      : input.debtMaturityYears);
+  const effectiveTenor = input.debtTenorYears ?? input.debtMaturityYears;
   const { sizing, scheduleByYear } = calculateSculpting(input, preRows, initialInvestment);
   const capexEffectif = initialInvestment + (sizing?.structuringFeeKeuro ?? 0);
   const retainedDebt = sizing?.debtRetenuKeuro ?? initialInvestment * input.debtRate / 100;

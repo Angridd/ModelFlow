@@ -65,9 +65,9 @@ const assumptionFields = [
   },
   {
     name: "debtMaturityYears" as const,
-    label: "Maturité dette (ans)",
+    label: "Durée de la dette (ans)",
     step: "1",
-    placeholder: "ex. 20",
+    placeholder: "ex. 18",
     title: "Durée d'amortissement de la dette pour le service annualisé (ex. 15–20 ans)",
     defaultValue: DEFAULT_FINANCIAL_ASSUMPTIONS.debtMaturityYears,
   },
@@ -242,18 +242,6 @@ export default async function NewScenarioPage({
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <label className="grid gap-2 text-sm font-medium text-zinc-700">
-            Ténor dette sculptée (ans)
-            <input
-              name="debtTenorYears"
-              type="number"
-              step="1"
-              min="0"
-              placeholder="ex. 15"
-              title="Durée de remboursement de la dette sculptée. Si omis, le ténor est déduit de l'année fin de la dernière tranche du profil DSCR."
-              className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
-            />
-          </label>
           <label className="grid gap-2 text-sm font-medium text-zinc-700">
             Gearing maximum autorisé (%)
             <input
