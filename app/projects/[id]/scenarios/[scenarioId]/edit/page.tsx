@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { updateScenario } from "@/app/actions";
+import { CapexDetailFields } from "@/app/components/CapexDetailFields";
 import { DscrSchedule } from "@/app/components/DscrSchedule";
 import {
   DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS,
@@ -218,6 +219,7 @@ export default async function EditScenarioPage({
         select: {
           id: true,
           name: true,
+          capacityMw: true,
         },
       },
     },
@@ -270,8 +272,26 @@ export default async function EditScenarioPage({
         </label>
         <input type="hidden" name="debtRate" value={scenario.debtRate} />
 
+        <CapexDetailFields
+          capacityMw={scenario.project.capacityMw}
+          initialValue={{
+            capex: scenario.capex,
+            surfaceHa: scenario.surfaceHa,
+            prixModuleUSDWc: scenario.prixModuleUSDWc,
+            tauxEURUSD: scenario.tauxEURUSD ?? 1.08,
+            boSCtWc: scenario.boSCtWc,
+            raccordementOuvrageKEuro: scenario.raccordementOuvrageKEuro,
+            tarifQPKEuroPerMW: scenario.tarifQPKEuroPerMW,
+            apportAffaireMode: scenario.apportAffaireMode,
+            apportAffaireValeur: scenario.apportAffaireValeur,
+            devFeesKEuroPerMW:
+              scenario.devFeesKEuroPerMW ??
+              DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.devFeesKEuroPerMW,
+          }}
+        />
+
         <div className="grid gap-5 sm:grid-cols-2">
-          {primaryFields.map((field) => (
+          {primaryFields.filter((field) => field.name !== "capex").map((field) => (
             <label key={field.name} className="grid gap-2 text-sm font-medium text-zinc-700">
               {field.label}
               <input

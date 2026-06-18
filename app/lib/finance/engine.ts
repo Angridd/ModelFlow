@@ -18,6 +18,7 @@ const PRIX_MARCHE_P90_FALLBACK = 55;
 const ASSURANCE_RATE_FALLBACK = 2.5;
 const INFLATION_ASSURANCE_FALLBACK = 2;
 const BALANCING_COST_FALLBACK = 2;
+const TAUX_EUR_USD_FALLBACK = 1.08;
 
 export type FinanceEngineInput = FinancialAssumptions & {
   capacityMw: number;
@@ -44,6 +45,14 @@ export type FinanceEngineInput = FinancialAssumptions & {
   assuranceRate?: number | null;
   inflationAssurance?: number | null;
   balancingCost?: number | null;
+  surfaceHa?: number | null;
+  prixModuleUSDWc?: number | null;
+  tauxEURUSD?: number | null;
+  boSCtWc?: number | null;
+  raccordementOuvrageKEuro?: number | null;
+  tarifQPKEuroPerMW?: number | null;
+  apportAffaireMode?: string | null;
+  apportAffaireValeur?: number | null;
 };
 
 export type FinanceEngineResult = {
@@ -91,6 +100,19 @@ export type AnnualCashFlow = {
   dscr: number | null;
   dscrRealized: number | null;
   dscrTargetAtYear: number | null;
+};
+
+export type CapexDetails = {
+  hasDetailedCapex: boolean;
+  modulesKeuro: number;
+  modulesCtWc: number;
+  boSKeuro: number;
+  boSCtWc: number;
+  raccordementKeuro: number;
+  apportAffaireKeuro: number;
+  devFeesKeuro: number;
+  capexTotalKeuro: number;
+  capexPerMwKeuro: number;
 };
 
 type PreRow = {
@@ -273,6 +295,75 @@ function resolveGearingMaxPct(input: FinanceEngineInput) {
   return input.gearingMaxPct ?? input.gearingMax ?? null;
 }
 
+function hasDetailedCapexInput(input: FinanceEngineInput) {
+  return (
+    input.surfaceHa != null ||
+    input.prixModuleUSDWc != null ||
+    input.boSCtWc != null ||
+    input.raccordementOuvrageKEuro != null ||
+    input.tarifQPKEuroPerMW != null ||
+    input.apportAffaireMode != null ||
+    input.apportAffaireValeur != null
+  );
+}
+
+export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
+  const hasDetailedCapex = hasDetailedCapexInput(input);
+  const legacyCapexTotal = input.capex * input.capacityMw;
+
+  if (!hasDetailedCapex) {
+    return {
+      hasDetailedCapex,
+      modulesKeuro: 0,
+      modulesCtWc: 0,
+      boSKeuro: 0,
+      boSCtWc: 0,
+      raccordementKeuro: 0,
+      apportAffaireKeuro: 0,
+      devFeesKeuro: 0,
+      capexTotalKeuro: legacyCapexTotal,
+      capexPerMwKeuro: input.capacityMw > 0 ? legacyCapexTotal / input.capacityMw : 0,
+    };
+  }
+
+  const tauxEURUSD = input.tauxEURUSD ?? TAUX_EUR_USD_FALLBACK;
+  const modulePriceEurWc =
+    input.prixModuleUSDWc != null && tauxEURUSD > 0
+      ? input.prixModuleUSDWc / tauxEURUSD
+      : 0;
+  const modulesKeuro = modulePriceEurWc * input.capacityMw * 1000;
+  const modulesCtWc =
+    input.capacityMw > 0 ? modulesKeuro / (input.capacityMw * 1000) * 100 : 0;
+  const boSKeuro = ((input.boSCtWc ?? 0) / 100) * input.capacityMw * 1000;
+  const raccordQpKeuro = (input.capacityMw / 1.35) * (input.tarifQPKEuroPerMW ?? 0);
+  const raccordementKeuro = (input.raccordementOuvrageKEuro ?? 0) + raccordQpKeuro;
+  const apportAffaireValeur = input.apportAffaireValeur ?? 0;
+  const apportAffaireKeuro =
+    input.apportAffaireMode === "fixe"
+      ? apportAffaireValeur
+      : input.apportAffaireMode === "euroParMWc"
+        ? apportAffaireValeur * input.capacityMw
+        : input.apportAffaireMode === "euroParHa"
+          ? apportAffaireValeur * (input.surfaceHa ?? 0)
+          : 0;
+  const devFeesKeuro = (input.devFeesKEuroPerMW ?? 0) * input.capacityMw;
+  const capexTotalKeuro =
+    modulesKeuro + boSKeuro + raccordementKeuro + apportAffaireKeuro + devFeesKeuro;
+
+  return {
+    hasDetailedCapex,
+    modulesKeuro,
+    modulesCtWc,
+    boSKeuro,
+    boSCtWc: input.boSCtWc ?? 0,
+    raccordementKeuro,
+    apportAffaireKeuro,
+    devFeesKeuro,
+    capexTotalKeuro,
+    capexPerMwKeuro: input.capacityMw > 0 ? capexTotalKeuro / input.capacityMw : 0,
+  };
+}
+
 /**
  * Computes the two-constraint sizing result from sculpted debt and a gearing cap.
  *
@@ -379,7 +470,7 @@ export function sculptDebt(
 }
 
 function buildPreRows(input: FinanceEngineInput): PreRow[] {
-  const initialInvestment = input.capex * input.capacityMw;
+  const initialInvestment = calculateCapexDetails(input).capexTotalKeuro;
   const initialDebt = initialInvestment * (input.debtRate / 100);
   const degradationRate = asRate(input.degradationRate);
   const debtInterestRate = asRate(input.debtInterestRate);
@@ -684,7 +775,7 @@ function calculateSculpting(
 }
 
 export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashFlow[] {
-  const initialInvestment = input.capex * input.capacityMw;
+  const initialInvestment = calculateCapexDetails(input).capexTotalKeuro;
   const discountRate = asRate(input.discountRate);
   const preRows = buildPreRows(input);
   const effectiveSchedule = resolveSchedule(input);
@@ -706,8 +797,8 @@ export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashF
 }
 
 export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngineResult {
-  // Initial investment kEUR = capex kEUR/MW * project capacity MW.
-  const initialInvestment = input.capex * input.capacityMw;
+  // Initial investment kEUR comes from detailed CAPEX when configured, else legacy capex kEUR/MW.
+  const initialInvestment = calculateCapexDetails(input).capexTotalKeuro;
   const preRows = buildPreRows(input);
   const sculpting = calculateSculpting(input, preRows, initialInvestment);
   const annualCashFlows = calculateAnnualCashFlows(input);

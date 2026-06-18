@@ -32,6 +32,14 @@ model Scenario {
   id                  String  @id @default(cuid())
   name                String
   capex               Float
+  surfaceHa           Float?
+  prixModuleUSDWc     Float?
+  tauxEURUSD          Float?
+  boSCtWc             Float?
+  raccordementOuvrageKEuro Float? @map("raccordementOuvrageK€")
+  tarifQPKEuroPerMW   Float?  @map("tarifQPk€PerMW")
+  apportAffaireMode   String?
+  apportAffaireValeur Float?
   opex                Float
   yieldMwh            Float
   yieldP90Mwh         Float?

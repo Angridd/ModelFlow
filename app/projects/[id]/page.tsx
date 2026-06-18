@@ -9,6 +9,7 @@ import {
 import { DeleteScenarioButton } from "@/app/projects/[id]/delete-scenario-button";
 import {
   calculateAnnualCashFlows,
+  calculateCapexDetails,
   calculateScenarioMetrics,
 } from "@/app/lib/finance/engine";
 import type { DscrTranche } from "@/app/lib/finance/types";
@@ -107,6 +108,14 @@ export default async function ProjectDetailPage({
     ? calculateScenarioMetrics({
         capacityMw: project.capacityMw,
         capex: projectReferenceScenario.capex,
+        surfaceHa: projectReferenceScenario.surfaceHa,
+        prixModuleUSDWc: projectReferenceScenario.prixModuleUSDWc,
+        tauxEURUSD: projectReferenceScenario.tauxEURUSD,
+        boSCtWc: projectReferenceScenario.boSCtWc,
+        raccordementOuvrageKEuro: projectReferenceScenario.raccordementOuvrageKEuro,
+        tarifQPKEuroPerMW: projectReferenceScenario.tarifQPKEuroPerMW,
+        apportAffaireMode: projectReferenceScenario.apportAffaireMode,
+        apportAffaireValeur: projectReferenceScenario.apportAffaireValeur,
         opex: projectReferenceScenario.opex,
         yieldMwh: projectReferenceScenario.yieldMwh,
         yieldP90Mwh: projectReferenceScenario.yieldP90Mwh,
@@ -150,6 +159,14 @@ export default async function ProjectDetailPage({
     ? calculateAnnualCashFlows({
         capacityMw: project.capacityMw,
         capex: cashFlowScenario.capex,
+        surfaceHa: cashFlowScenario.surfaceHa,
+        prixModuleUSDWc: cashFlowScenario.prixModuleUSDWc,
+        tauxEURUSD: cashFlowScenario.tauxEURUSD,
+        boSCtWc: cashFlowScenario.boSCtWc,
+        raccordementOuvrageKEuro: cashFlowScenario.raccordementOuvrageKEuro,
+        tarifQPKEuroPerMW: cashFlowScenario.tarifQPKEuroPerMW,
+        apportAffaireMode: cashFlowScenario.apportAffaireMode,
+        apportAffaireValeur: cashFlowScenario.apportAffaireValeur,
         opex: cashFlowScenario.opex,
         yieldMwh: cashFlowScenario.yieldMwh,
         yieldP90Mwh: cashFlowScenario.yieldP90Mwh,
@@ -183,6 +200,14 @@ export default async function ProjectDetailPage({
     ? calculateScenarioMetrics({
         capacityMw: project.capacityMw,
         capex: cashFlowScenario.capex,
+        surfaceHa: cashFlowScenario.surfaceHa,
+        prixModuleUSDWc: cashFlowScenario.prixModuleUSDWc,
+        tauxEURUSD: cashFlowScenario.tauxEURUSD,
+        boSCtWc: cashFlowScenario.boSCtWc,
+        raccordementOuvrageKEuro: cashFlowScenario.raccordementOuvrageKEuro,
+        tarifQPKEuroPerMW: cashFlowScenario.tarifQPKEuroPerMW,
+        apportAffaireMode: cashFlowScenario.apportAffaireMode,
+        apportAffaireValeur: cashFlowScenario.apportAffaireValeur,
         opex: cashFlowScenario.opex,
         yieldMwh: cashFlowScenario.yieldMwh,
         yieldP90Mwh: cashFlowScenario.yieldP90Mwh,
@@ -212,9 +237,36 @@ export default async function ProjectDetailPage({
         tauxISEntreprise: cashFlowScenario.tauxISEntreprise,
       })
     : null;
+  const cashFlowCapexDetails = cashFlowScenario
+    ? calculateCapexDetails({
+        capacityMw: project.capacityMw,
+        capex: cashFlowScenario.capex,
+        surfaceHa: cashFlowScenario.surfaceHa,
+        prixModuleUSDWc: cashFlowScenario.prixModuleUSDWc,
+        tauxEURUSD: cashFlowScenario.tauxEURUSD,
+        boSCtWc: cashFlowScenario.boSCtWc,
+        raccordementOuvrageKEuro: cashFlowScenario.raccordementOuvrageKEuro,
+        tarifQPKEuroPerMW: cashFlowScenario.tarifQPKEuroPerMW,
+        apportAffaireMode: cashFlowScenario.apportAffaireMode,
+        apportAffaireValeur: cashFlowScenario.apportAffaireValeur,
+        opex: cashFlowScenario.opex,
+        yieldMwh: cashFlowScenario.yieldMwh,
+        yieldP90Mwh: cashFlowScenario.yieldP90Mwh,
+        tariff: cashFlowScenario.tariff,
+        debtRate: cashFlowScenario.debtRate,
+        projectLifeYears: cashFlowScenario.projectLifeYears,
+        degradationRate: cashFlowScenario.degradationRate,
+        discountRate: cashFlowScenario.discountRate,
+        debtInterestRate: cashFlowScenario.debtInterestRate,
+        debtMaturityYears: cashFlowScenario.debtMaturityYears,
+        tariffInflationRate: cashFlowScenario.tariffInflationRate,
+        opexInflationRate: cashFlowScenario.opexInflationRate,
+        devFeesKEuroPerMW: cashFlowScenario.devFeesKEuroPerMW,
+      })
+    : null;
   const sizing = cashFlowMetrics?.sizing ?? null;
   const capexInitialKeuro = cashFlowScenario
-    ? cashFlowScenario.capex * project.capacityMw
+    ? (cashFlowCapexDetails?.capexTotalKeuro ?? cashFlowScenario.capex * project.capacityMw)
     : 0;
   const capexEffectifKeuro = sizing !== null
     ? capexInitialKeuro + sizing.structuringFeeKeuro
@@ -226,6 +278,14 @@ export default async function ProjectDetailPage({
   const gearingRealisePct =
     sizing !== null && capexEffectifKeuro !== null && capexEffectifKeuro > 0
       ? sizing.debtRetenuKeuro / capexEffectifKeuro * 100
+      : null;
+  const analysisDevFeesKeuro =
+    analysisScenario !== undefined
+      ? (analysisScenario.devFeesKEuroPerMW ?? 0) * project.capacityMw
+      : null;
+  const analysisNpvNetKeuro =
+    analysisScenario !== undefined && analysisDevFeesKeuro !== null
+      ? analysisScenario.npv - analysisDevFeesKeuro
       : null;
 
   return (
@@ -345,6 +405,58 @@ export default async function ProjectDetailPage({
             <p className="mt-1 text-zinc-950">
               {formatMillionEuros(sizing.debtRetenuKeuro)}
             </p>
+          </div>
+        ) : null}
+        {cashFlowCapexDetails !== null ? (
+          <div className="sm:col-span-2 lg:col-span-3">
+            <p className="text-sm font-medium text-zinc-500">Detail CAPEX</p>
+            <div className="mt-2 grid gap-2 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <span className="text-zinc-500">Modules</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowCapexDetails.modulesKeuro, " kEUR")}{" "}
+                  <span className="text-zinc-500">
+                    {formatNumber(cashFlowCapexDetails.modulesCtWc, " ct/Wc equiv.")}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">BoS</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowCapexDetails.boSKeuro, " kEUR")}{" "}
+                  <span className="text-zinc-500">
+                    {formatNumber(cashFlowCapexDetails.boSCtWc, " ct/Wc")}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Raccord.</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowCapexDetails.raccordementKeuro, " kEUR")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Apport</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowCapexDetails.apportAffaireKeuro, " kEUR")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Dev fees</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowCapexDetails.devFeesKeuro, " kEUR")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Total</span>
+                <p className="font-semibold text-zinc-950">
+                  {formatNumber(cashFlowCapexDetails.capexTotalKeuro, " kEUR")}{" "}
+                  <span className="text-zinc-500">
+                    {formatNumber(cashFlowCapexDetails.capexPerMwKeuro, " kEUR/MWc")}
+                  </span>
+                </p>
+              </div>
+            </div>
           </div>
         ) : null}
         {cashFlowScenario?.dscrSchedule ? (
@@ -536,15 +648,15 @@ export default async function ProjectDetailPage({
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
-            <p className="text-sm font-medium text-zinc-500">VAN</p>
+            <p className="text-sm font-medium text-zinc-500">VAN Brute</p>
             <p className="mt-1 text-xl font-semibold text-zinc-950">
               {formatMillionEuros(analysisScenario?.npv ?? null)}
             </p>
           </div>
           <div>
-            <p className="text-sm font-medium text-zinc-500">TRI</p>
+            <p className="text-sm font-medium text-zinc-500">VAN Nette</p>
             <p className="mt-1 text-xl font-semibold text-zinc-950">
-              {formatNumber(analysisScenario?.irr ?? null, " %")}
+              {formatMillionEuros(analysisNpvNetKeuro)}
             </p>
           </div>
           <div>

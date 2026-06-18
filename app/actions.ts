@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { calculateScenarioMetrics } from "@/app/lib/finance/engine";
+import {
+  calculateCapexDetails,
+  calculateScenarioMetrics,
+} from "@/app/lib/finance/engine";
 import { DEFAULT_FINANCIAL_ASSUMPTIONS } from "@/app/lib/finance/types";
 import type { DscrTranche } from "@/app/lib/finance/types";
 import { prisma } from "@/app/lib/prisma";
@@ -248,7 +251,15 @@ function readDscrSchedule(formData: FormData): DscrTranche[] | null {
 
 function readScenarioAssumptions(formData: FormData) {
   return {
-    capex: readNumber(formData, "capex"),
+    capex: readOptionalNumber(formData, "capex") ?? 0,
+    surfaceHa: readOptionalNumber(formData, "surfaceHa"),
+    prixModuleUSDWc: readOptionalNumber(formData, "prixModuleUSDWc"),
+    tauxEURUSD: readOptionalNumber(formData, "tauxEURUSD"),
+    boSCtWc: readOptionalNumber(formData, "boSCtWc"),
+    raccordementOuvrageKEuro: readOptionalNumber(formData, "raccordementOuvrageK€"),
+    tarifQPKEuroPerMW: readOptionalNumber(formData, "tarifQPk€PerMW"),
+    apportAffaireMode: readOptionalText(formData, "apportAffaireMode"),
+    apportAffaireValeur: readOptionalNumber(formData, "apportAffaireValeur"),
     opex: readNumber(formData, "opex"),
     yieldMwh: readNumber(formData, "yieldMwh"),
     yieldP90Mwh: readOptionalNumber(formData, "yieldP90Mwh"),
@@ -277,6 +288,31 @@ function readScenarioAssumptions(formData: FormData) {
     dsraMonths: readOptionalInteger(formData, "dsraMonths"),
     devFeesKEuroPerMW: readOptionalNumber(formData, "devFeesKEuroPerMW"),
     tauxISEntreprise: readOptionalNumber(formData, "tauxISEntreprise"),
+  };
+}
+
+function readOptionalText(formData: FormData, key: string): string | null {
+  const value = formData.get(key);
+
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+
+  return value.trim();
+}
+
+function withCalculatedCapex<T extends ReturnType<typeof readScenarioAssumptions>>(
+  assumptions: T,
+  capacityMw: number,
+) {
+  const capexDetails = calculateCapexDetails({
+    capacityMw,
+    ...assumptions,
+  });
+
+  return {
+    ...assumptions,
+    capex: capexDetails.capexPerMwKeuro,
   };
 }
 
@@ -361,7 +397,10 @@ export async function createScenario(projectId: string, formData: FormData) {
     redirect("/projects");
   }
 
-  const assumptions = readScenarioAssumptions(formData);
+  const assumptions = withCalculatedCapex(
+    readScenarioAssumptions(formData),
+    project.capacityMw,
+  );
   const { dscrSchedule, ...assumptionsWithoutSchedule } = assumptions;
   const calculatedMetrics = calculateScenarioMetrics({
     capacityMw: project.capacityMw,
@@ -405,7 +444,10 @@ export async function updateScenario(
     redirect("/projects");
   }
 
-  const assumptions = readScenarioAssumptions(formData);
+  const assumptions = withCalculatedCapex(
+    readScenarioAssumptions(formData),
+    project.capacityMw,
+  );
   const { dscrSchedule, ...assumptionsWithoutSchedule } = assumptions;
   const calculatedMetrics = calculateScenarioMetrics({
     capacityMw: project.capacityMw,
@@ -450,6 +492,14 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
     data: {
       name: `${scenario.name} - Copy`,
       capex: scenario.capex,
+      surfaceHa: scenario.surfaceHa,
+      prixModuleUSDWc: scenario.prixModuleUSDWc,
+      tauxEURUSD: scenario.tauxEURUSD,
+      boSCtWc: scenario.boSCtWc,
+      raccordementOuvrageKEuro: scenario.raccordementOuvrageKEuro,
+      tarifQPKEuroPerMW: scenario.tarifQPKEuroPerMW,
+      apportAffaireMode: scenario.apportAffaireMode,
+      apportAffaireValeur: scenario.apportAffaireValeur,
       opex: scenario.opex,
       yieldMwh: scenario.yieldMwh,
       yieldP90Mwh: scenario.yieldP90Mwh,

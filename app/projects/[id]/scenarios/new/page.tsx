@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { createScenario } from "@/app/actions";
+import { CapexDetailFields } from "@/app/components/CapexDetailFields";
 import { DscrSchedule } from "@/app/components/DscrSchedule";
 import {
   DEFAULT_FINANCIAL_ASSUMPTIONS,
@@ -198,7 +199,7 @@ export default async function NewScenarioPage({
   const { id } = await params;
   const project = await prisma.project.findUnique({
     where: { id },
-    select: { id: true, name: true },
+    select: { id: true, name: true, capacityMw: true },
   });
 
   if (!project) {
@@ -237,8 +238,17 @@ export default async function NewScenarioPage({
         </label>
         <input type="hidden" name="debtRate" value="0" />
 
+        <CapexDetailFields
+          capacityMw={project.capacityMw}
+          initialValue={{
+            capex: 0,
+            tauxEURUSD: 1.08,
+            devFeesKEuroPerMW: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.devFeesKEuroPerMW,
+          }}
+        />
+
         <div className="grid gap-5 sm:grid-cols-2">
-          {primaryFields.map((field) => (
+          {primaryFields.filter((field) => field.name !== "capex").map((field) => (
             <label key={field.name} className="grid gap-2 text-sm font-medium text-zinc-700">
               {field.label}
               <input
