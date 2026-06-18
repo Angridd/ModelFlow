@@ -10,6 +10,7 @@ import { DeleteScenarioButton } from "@/app/projects/[id]/delete-scenario-button
 import {
   calculateAnnualCashFlows,
   calculateCapexDetails,
+  calculateOpexDetails,
   calculateScenarioMetrics,
 } from "@/app/lib/finance/engine";
 import type { DscrTranche } from "@/app/lib/finance/types";
@@ -89,6 +90,56 @@ export default async function ProjectDetailPage({
   }
 
   const scenarios = project.scenarios;
+  const buildFinanceInput = (scenario: (typeof scenarios)[number]) => ({
+    capacityMw: project.capacityMw,
+    capex: scenario.capex,
+    surfaceHa: scenario.surfaceHa,
+    prixModuleUSDWc: scenario.prixModuleUSDWc,
+    tauxEURUSD: scenario.tauxEURUSD,
+    boSCtWc: scenario.boSCtWc,
+    raccordementOuvrageKEuro: scenario.raccordementOuvrageKEuro,
+    tarifQPKEuroPerMW: scenario.tarifQPKEuroPerMW,
+    apportAffaireMode: scenario.apportAffaireMode,
+    apportAffaireValeur: scenario.apportAffaireValeur,
+    opex: scenario.opex,
+    omFixedEuroKwc: scenario.omFixedEuroKwc,
+    mraEuroKwc: scenario.mraEuroKwc,
+    backOfficeKeuro: scenario.backOfficeKeuro,
+    diversOpexKeuro: scenario.diversOpexKeuro,
+    loyerMode: scenario.loyerMode,
+    loyerValeur: scenario.loyerValeur,
+    loyerInflation: scenario.loyerInflation,
+    inflationOM: scenario.inflationOM,
+    inflationMRA: scenario.inflationMRA,
+    inflationBackOffice: scenario.inflationBackOffice,
+    inflationDivers: scenario.inflationDivers,
+    yieldMwh: scenario.yieldMwh,
+    yieldP90Mwh: scenario.yieldP90Mwh,
+    tariff: scenario.tariff,
+    debtRate: scenario.debtRate,
+    projectLifeYears: scenario.projectLifeYears,
+    degradationRate: scenario.degradationRate,
+    discountRate: scenario.discountRate,
+    debtInterestRate: scenario.debtInterestRate,
+    debtMaturityYears: scenario.debtMaturityYears,
+    tariffInflationRate: scenario.tariffInflationRate,
+    opexInflationRate: scenario.opexInflationRate,
+    contractDuration: scenario.contractDuration,
+    prixMarcheP50: scenario.prixMarcheP50,
+    prixMarcheP90: scenario.prixMarcheP90,
+    assuranceRate: scenario.assuranceRate,
+    inflationAssurance: scenario.inflationAssurance,
+    balancingCost: scenario.balancingCost,
+    dscrTarget: scenario.dscrTarget,
+    debtTenorYears: scenario.debtTenorYears,
+    dscrSchedule: parseDscrSchedule(scenario.dscrSchedule),
+    gearingMaxPct: scenario.gearingMaxPct,
+    tauxIS: scenario.tauxIS,
+    amortDuree: scenario.amortDuree,
+    dsraMonths: scenario.dsraMonths,
+    devFeesKEuroPerMW: scenario.devFeesKEuroPerMW,
+    tauxISEntreprise: scenario.tauxISEntreprise,
+  });
   const projectReferenceScenario = scenarios.find((scenario) => scenario.isReference);
   const selectedScenarioId =
     typeof scenarioId === "string"
@@ -105,45 +156,7 @@ export default async function ProjectDetailPage({
     ? generateSensitivityRows(analysisScenario, "capex")
     : [];
   const referenceMetrics = projectReferenceScenario
-    ? calculateScenarioMetrics({
-        capacityMw: project.capacityMw,
-        capex: projectReferenceScenario.capex,
-        surfaceHa: projectReferenceScenario.surfaceHa,
-        prixModuleUSDWc: projectReferenceScenario.prixModuleUSDWc,
-        tauxEURUSD: projectReferenceScenario.tauxEURUSD,
-        boSCtWc: projectReferenceScenario.boSCtWc,
-        raccordementOuvrageKEuro: projectReferenceScenario.raccordementOuvrageKEuro,
-        tarifQPKEuroPerMW: projectReferenceScenario.tarifQPKEuroPerMW,
-        apportAffaireMode: projectReferenceScenario.apportAffaireMode,
-        apportAffaireValeur: projectReferenceScenario.apportAffaireValeur,
-        opex: projectReferenceScenario.opex,
-        yieldMwh: projectReferenceScenario.yieldMwh,
-        yieldP90Mwh: projectReferenceScenario.yieldP90Mwh,
-        tariff: projectReferenceScenario.tariff,
-        debtRate: projectReferenceScenario.debtRate,
-        projectLifeYears: projectReferenceScenario.projectLifeYears,
-        degradationRate: projectReferenceScenario.degradationRate,
-        discountRate: projectReferenceScenario.discountRate,
-        debtInterestRate: projectReferenceScenario.debtInterestRate,
-        debtMaturityYears: projectReferenceScenario.debtMaturityYears,
-        tariffInflationRate: projectReferenceScenario.tariffInflationRate,
-        opexInflationRate: projectReferenceScenario.opexInflationRate,
-        contractDuration: projectReferenceScenario.contractDuration,
-        prixMarcheP50: projectReferenceScenario.prixMarcheP50,
-        prixMarcheP90: projectReferenceScenario.prixMarcheP90,
-        assuranceRate: projectReferenceScenario.assuranceRate,
-        inflationAssurance: projectReferenceScenario.inflationAssurance,
-        balancingCost: projectReferenceScenario.balancingCost,
-        dscrTarget: projectReferenceScenario.dscrTarget,
-        debtTenorYears: projectReferenceScenario.debtTenorYears,
-        dscrSchedule: parseDscrSchedule(projectReferenceScenario.dscrSchedule),
-        gearingMaxPct: projectReferenceScenario.gearingMaxPct,
-        tauxIS: projectReferenceScenario.tauxIS,
-        amortDuree: projectReferenceScenario.amortDuree,
-        dsraMonths: projectReferenceScenario.dsraMonths,
-        devFeesKEuroPerMW: projectReferenceScenario.devFeesKEuroPerMW,
-        tauxISEntreprise: projectReferenceScenario.tauxISEntreprise,
-      })
+    ? calculateScenarioMetrics(buildFinanceInput(projectReferenceScenario))
     : null;
   const kpiNpv =
     projectReferenceScenario?.npv ?? maxValue(scenarios.map((scenario) => scenario.npv));
@@ -157,114 +170,23 @@ export default async function ProjectDetailPage({
   const importScenariosForProject = importScenarios.bind(null, project.id);
   const cashFlowScenario = projectReferenceScenario ?? analysisScenario;
   const annualCashFlows = cashFlowScenario
-    ? calculateAnnualCashFlows({
-        capacityMw: project.capacityMw,
-        capex: cashFlowScenario.capex,
-        surfaceHa: cashFlowScenario.surfaceHa,
-        prixModuleUSDWc: cashFlowScenario.prixModuleUSDWc,
-        tauxEURUSD: cashFlowScenario.tauxEURUSD,
-        boSCtWc: cashFlowScenario.boSCtWc,
-        raccordementOuvrageKEuro: cashFlowScenario.raccordementOuvrageKEuro,
-        tarifQPKEuroPerMW: cashFlowScenario.tarifQPKEuroPerMW,
-        apportAffaireMode: cashFlowScenario.apportAffaireMode,
-        apportAffaireValeur: cashFlowScenario.apportAffaireValeur,
-        opex: cashFlowScenario.opex,
-        yieldMwh: cashFlowScenario.yieldMwh,
-        yieldP90Mwh: cashFlowScenario.yieldP90Mwh,
-        tariff: cashFlowScenario.tariff,
-        debtRate: cashFlowScenario.debtRate,
-        projectLifeYears: cashFlowScenario.projectLifeYears,
-        degradationRate: cashFlowScenario.degradationRate,
-        discountRate: cashFlowScenario.discountRate,
-        debtInterestRate: cashFlowScenario.debtInterestRate,
-        debtMaturityYears: cashFlowScenario.debtMaturityYears,
-        tariffInflationRate: cashFlowScenario.tariffInflationRate,
-        opexInflationRate: cashFlowScenario.opexInflationRate,
-        contractDuration: cashFlowScenario.contractDuration,
-        prixMarcheP50: cashFlowScenario.prixMarcheP50,
-        prixMarcheP90: cashFlowScenario.prixMarcheP90,
-        assuranceRate: cashFlowScenario.assuranceRate,
-        inflationAssurance: cashFlowScenario.inflationAssurance,
-        balancingCost: cashFlowScenario.balancingCost,
-        dscrTarget: cashFlowScenario.dscrTarget,
-        debtTenorYears: cashFlowScenario.debtTenorYears,
-        dscrSchedule: parseDscrSchedule(cashFlowScenario.dscrSchedule),
-        gearingMaxPct: cashFlowScenario.gearingMaxPct,
-        tauxIS: cashFlowScenario.tauxIS,
-        amortDuree: cashFlowScenario.amortDuree,
-        dsraMonths: cashFlowScenario.dsraMonths,
-        devFeesKEuroPerMW: cashFlowScenario.devFeesKEuroPerMW,
-        tauxISEntreprise: cashFlowScenario.tauxISEntreprise,
-      })
+    ? calculateAnnualCashFlows(buildFinanceInput(cashFlowScenario))
     : [];
   const cashFlowMetrics = cashFlowScenario
-    ? calculateScenarioMetrics({
-        capacityMw: project.capacityMw,
-        capex: cashFlowScenario.capex,
-        surfaceHa: cashFlowScenario.surfaceHa,
-        prixModuleUSDWc: cashFlowScenario.prixModuleUSDWc,
-        tauxEURUSD: cashFlowScenario.tauxEURUSD,
-        boSCtWc: cashFlowScenario.boSCtWc,
-        raccordementOuvrageKEuro: cashFlowScenario.raccordementOuvrageKEuro,
-        tarifQPKEuroPerMW: cashFlowScenario.tarifQPKEuroPerMW,
-        apportAffaireMode: cashFlowScenario.apportAffaireMode,
-        apportAffaireValeur: cashFlowScenario.apportAffaireValeur,
-        opex: cashFlowScenario.opex,
-        yieldMwh: cashFlowScenario.yieldMwh,
-        yieldP90Mwh: cashFlowScenario.yieldP90Mwh,
-        tariff: cashFlowScenario.tariff,
-        debtRate: cashFlowScenario.debtRate,
-        projectLifeYears: cashFlowScenario.projectLifeYears,
-        degradationRate: cashFlowScenario.degradationRate,
-        discountRate: cashFlowScenario.discountRate,
-        debtInterestRate: cashFlowScenario.debtInterestRate,
-        debtMaturityYears: cashFlowScenario.debtMaturityYears,
-        tariffInflationRate: cashFlowScenario.tariffInflationRate,
-        opexInflationRate: cashFlowScenario.opexInflationRate,
-        contractDuration: cashFlowScenario.contractDuration,
-        prixMarcheP50: cashFlowScenario.prixMarcheP50,
-        prixMarcheP90: cashFlowScenario.prixMarcheP90,
-        assuranceRate: cashFlowScenario.assuranceRate,
-        inflationAssurance: cashFlowScenario.inflationAssurance,
-        balancingCost: cashFlowScenario.balancingCost,
-        dscrTarget: cashFlowScenario.dscrTarget,
-        debtTenorYears: cashFlowScenario.debtTenorYears,
-        dscrSchedule: parseDscrSchedule(cashFlowScenario.dscrSchedule),
-        gearingMaxPct: cashFlowScenario.gearingMaxPct,
-        tauxIS: cashFlowScenario.tauxIS,
-        amortDuree: cashFlowScenario.amortDuree,
-        dsraMonths: cashFlowScenario.dsraMonths,
-        devFeesKEuroPerMW: cashFlowScenario.devFeesKEuroPerMW,
-        tauxISEntreprise: cashFlowScenario.tauxISEntreprise,
-      })
+    ? calculateScenarioMetrics(buildFinanceInput(cashFlowScenario))
     : null;
   const cashFlowCapexDetails = cashFlowScenario
-    ? calculateCapexDetails({
-        capacityMw: project.capacityMw,
-        capex: cashFlowScenario.capex,
-        surfaceHa: cashFlowScenario.surfaceHa,
-        prixModuleUSDWc: cashFlowScenario.prixModuleUSDWc,
-        tauxEURUSD: cashFlowScenario.tauxEURUSD,
-        boSCtWc: cashFlowScenario.boSCtWc,
-        raccordementOuvrageKEuro: cashFlowScenario.raccordementOuvrageKEuro,
-        tarifQPKEuroPerMW: cashFlowScenario.tarifQPKEuroPerMW,
-        apportAffaireMode: cashFlowScenario.apportAffaireMode,
-        apportAffaireValeur: cashFlowScenario.apportAffaireValeur,
-        opex: cashFlowScenario.opex,
-        yieldMwh: cashFlowScenario.yieldMwh,
-        yieldP90Mwh: cashFlowScenario.yieldP90Mwh,
-        tariff: cashFlowScenario.tariff,
-        debtRate: cashFlowScenario.debtRate,
-        projectLifeYears: cashFlowScenario.projectLifeYears,
-        degradationRate: cashFlowScenario.degradationRate,
-        discountRate: cashFlowScenario.discountRate,
-        debtInterestRate: cashFlowScenario.debtInterestRate,
-        debtMaturityYears: cashFlowScenario.debtMaturityYears,
-        tariffInflationRate: cashFlowScenario.tariffInflationRate,
-        opexInflationRate: cashFlowScenario.opexInflationRate,
-        devFeesKEuroPerMW: cashFlowScenario.devFeesKEuroPerMW,
-      })
+    ? calculateCapexDetails(buildFinanceInput(cashFlowScenario))
     : null;
+  const cashFlowOpexDetails =
+    cashFlowScenario && annualCashFlows[0]
+      ? calculateOpexDetails(
+          buildFinanceInput(cashFlowScenario),
+          1,
+          annualCashFlows[0].revenueP50Keuro,
+          annualCashFlows[0].productionP50Mwh,
+        )
+      : null;
   const sizing = cashFlowMetrics?.sizing ?? null;
   const capexInitialKeuro = cashFlowScenario
     ? (cashFlowCapexDetails?.capexTotalKeuro ?? cashFlowScenario.capex * project.capacityMw)
@@ -454,6 +376,64 @@ export default async function ProjectDetailPage({
                   {formatNumber(cashFlowCapexDetails.capexTotalKeuro, " kEUR")}{" "}
                   <span className="text-zinc-500">
                     {formatNumber(cashFlowCapexDetails.capexPerMwKeuro, " kEUR/MWc")}
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {cashFlowOpexDetails !== null ? (
+          <div className="sm:col-span-2 lg:col-span-3">
+            <p className="text-sm font-medium text-zinc-500">Detail OPEX an 1</p>
+            <div className="mt-2 grid gap-2 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <span className="text-zinc-500">O&M</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowOpexDetails.omKeuro, " kEUR/an")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">MRA</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowOpexDetails.mraKeuro, " kEUR/an")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Back-off</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowOpexDetails.backOfficeKeuro, " kEUR/an")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Divers</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowOpexDetails.diversKeuro, " kEUR/an")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Loyer</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowOpexDetails.loyerKeuro, " kEUR/an")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Assurance</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowOpexDetails.assuranceKeuro, " kEUR/an")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Balancing</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowOpexDetails.balancingKeuro, " kEUR/an")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Total</span>
+                <p className="font-semibold text-zinc-950">
+                  {formatNumber(cashFlowOpexDetails.opexTotalKeuro, " kEUR/an")}{" "}
+                  <span className="text-zinc-500">
+                    {formatNumber(cashFlowOpexDetails.opexPerMwKeuro, " kEUR/MWc")}
                   </span>
                 </p>
               </div>

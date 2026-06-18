@@ -58,6 +58,17 @@ model Scenario {
   assuranceRate       Float?
   inflationAssurance  Float?
   balancingCost       Float?
+  omFixedEuroKwc      Float?
+  mraEuroKwc          Float?
+  backOfficeKeuro     Float?
+  diversOpexKeuro     Float?
+  loyerMode           String?
+  loyerValeur         Float?
+  loyerInflation      Float?
+  inflationOM         Float?
+  inflationMRA        Float?
+  inflationBackOffice Float?
+  inflationDivers     Float?
   dscrTarget          Float?
   debtTenorYears      Int?
   dscrSchedule        String?

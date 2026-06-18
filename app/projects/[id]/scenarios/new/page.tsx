@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { createScenario } from "@/app/actions";
 import { CapexDetailFields } from "@/app/components/CapexDetailFields";
 import { DscrSchedule } from "@/app/components/DscrSchedule";
+import { OpexDetailFields } from "@/app/components/OpexDetailFields";
 import {
   DEFAULT_FINANCIAL_ASSUMPTIONS,
   DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS,
@@ -248,7 +249,7 @@ export default async function NewScenarioPage({
         />
 
         <div className="grid gap-5 sm:grid-cols-2">
-          {primaryFields.filter((field) => field.name !== "capex").map((field) => (
+          {primaryFields.filter((field) => field.name !== "capex" && field.name !== "opex").map((field) => (
             <label key={field.name} className="grid gap-2 text-sm font-medium text-zinc-700">
               {field.label}
               <input
@@ -337,6 +338,31 @@ export default async function NewScenarioPage({
             ))}
           </div>
         </section>
+
+        <OpexDetailFields
+          capacityMw={project.capacityMw}
+          initialValue={{
+            opex: 0,
+            surfaceHa: 0,
+            yieldMwh: 0,
+            tariff: 0,
+            tariffInflationRate: DEFAULT_FINANCIAL_ASSUMPTIONS.tariffInflationRate,
+            contractDuration: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.contractDuration,
+            prixMarcheP50: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.prixMarcheP50,
+            assuranceRate: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.assuranceRate,
+            inflationAssurance: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationAssurance,
+            balancingCost: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.balancingCost,
+            omFixedEuroKwc: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.omFixedEuroKwc,
+            mraEuroKwc: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.mraEuroKwc,
+            backOfficeKeuro: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.backOfficeKeuro,
+            diversOpexKeuro: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.diversOpexKeuro,
+            loyerInflation: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.loyerInflation,
+            inflationOM: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationOM,
+            inflationMRA: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationMRA,
+            inflationBackOffice: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationBackOffice,
+            inflationDivers: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationDivers,
+          }}
+        />
 
         <div className="grid gap-5 sm:grid-cols-2">
           {assumptionFields.map((field) => (

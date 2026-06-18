@@ -19,6 +19,15 @@ const ASSURANCE_RATE_FALLBACK = 2.5;
 const INFLATION_ASSURANCE_FALLBACK = 2;
 const BALANCING_COST_FALLBACK = 2;
 const TAUX_EUR_USD_FALLBACK = 1.08;
+const OM_FIXED_EURO_KWC_FALLBACK = 5.1;
+const MRA_EURO_KWC_FALLBACK = 1.1;
+const BACK_OFFICE_KEURO_FALLBACK = 22;
+const DIVERS_OPEX_KEURO_FALLBACK = 35;
+const LOYER_INFLATION_FALLBACK = 0.4;
+const INFLATION_OM_FALLBACK = 2;
+const INFLATION_MRA_FALLBACK = 2;
+const INFLATION_BACK_OFFICE_FALLBACK = 2;
+const INFLATION_DIVERS_FALLBACK = 2;
 
 export type FinanceEngineInput = FinancialAssumptions & {
   capacityMw: number;
@@ -53,6 +62,17 @@ export type FinanceEngineInput = FinancialAssumptions & {
   tarifQPKEuroPerMW?: number | null;
   apportAffaireMode?: string | null;
   apportAffaireValeur?: number | null;
+  omFixedEuroKwc?: number | null;
+  mraEuroKwc?: number | null;
+  backOfficeKeuro?: number | null;
+  diversOpexKeuro?: number | null;
+  loyerMode?: string | null;
+  loyerValeur?: number | null;
+  loyerInflation?: number | null;
+  inflationOM?: number | null;
+  inflationMRA?: number | null;
+  inflationBackOffice?: number | null;
+  inflationDivers?: number | null;
 };
 
 export type FinanceEngineResult = {
@@ -113,6 +133,19 @@ export type CapexDetails = {
   devFeesKeuro: number;
   capexTotalKeuro: number;
   capexPerMwKeuro: number;
+};
+
+export type OpexDetails = {
+  hasDetailedOpex: boolean;
+  omKeuro: number;
+  mraKeuro: number;
+  backOfficeKeuro: number;
+  diversKeuro: number;
+  loyerKeuro: number;
+  assuranceKeuro: number;
+  balancingKeuro: number;
+  opexTotalKeuro: number;
+  opexPerMwKeuro: number;
 };
 
 type PreRow = {
@@ -307,6 +340,22 @@ function hasDetailedCapexInput(input: FinanceEngineInput) {
   );
 }
 
+function hasDetailedOpexInput(input: FinanceEngineInput) {
+  return (
+    input.omFixedEuroKwc != null ||
+    input.mraEuroKwc != null ||
+    input.backOfficeKeuro != null ||
+    input.diversOpexKeuro != null ||
+    input.loyerMode != null ||
+    input.loyerValeur != null ||
+    input.loyerInflation != null ||
+    input.inflationOM != null ||
+    input.inflationMRA != null ||
+    input.inflationBackOffice != null ||
+    input.inflationDivers != null
+  );
+}
+
 export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
   const hasDetailedCapex = hasDetailedCapexInput(input);
   const legacyCapexTotal = input.capex * input.capacityMw;
@@ -361,6 +410,91 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
     devFeesKeuro,
     capexTotalKeuro,
     capexPerMwKeuro: input.capacityMw > 0 ? capexTotalKeuro / input.capacityMw : 0,
+  };
+}
+
+export function calculateOpexDetails(
+  input: FinanceEngineInput,
+  year: number,
+  revenueP50Keuro: number,
+  productionP50Mwh: number,
+): OpexDetails {
+  const assuranceRate = asRate(input.assuranceRate ?? ASSURANCE_RATE_FALLBACK);
+  const inflationAssurance = asRate(
+    input.inflationAssurance ?? INFLATION_ASSURANCE_FALLBACK,
+  );
+  const balancingCost = input.balancingCost ?? BALANCING_COST_FALLBACK;
+  const assuranceKeuro =
+    assuranceRate * revenueP50Keuro * (1 + inflationAssurance) ** year;
+  const balancingKeuro = (balancingCost * productionP50Mwh) / 1000;
+  const hasDetailedOpex = hasDetailedOpexInput(input);
+
+  if (!hasDetailedOpex) {
+    const legacyOpexKeuro =
+      input.opex * input.capacityMw * (1 + asRate(input.opexInflationRate)) ** year;
+    const opexTotalKeuro = legacyOpexKeuro + assuranceKeuro + balancingKeuro;
+
+    return {
+      hasDetailedOpex,
+      omKeuro: 0,
+      mraKeuro: 0,
+      backOfficeKeuro: 0,
+      diversKeuro: legacyOpexKeuro,
+      loyerKeuro: 0,
+      assuranceKeuro,
+      balancingKeuro,
+      opexTotalKeuro,
+      opexPerMwKeuro: input.capacityMw > 0 ? opexTotalKeuro / input.capacityMw : 0,
+    };
+  }
+
+  const omKeuro =
+    (input.omFixedEuroKwc ?? OM_FIXED_EURO_KWC_FALLBACK) *
+    input.capacityMw *
+    (1 + asRate(input.inflationOM ?? INFLATION_OM_FALLBACK)) ** year;
+  const mraKeuro =
+    (input.mraEuroKwc ?? MRA_EURO_KWC_FALLBACK) *
+    input.capacityMw *
+    (1 + asRate(input.inflationMRA ?? INFLATION_MRA_FALLBACK)) ** year;
+  const backOfficeKeuro =
+    (input.backOfficeKeuro ?? BACK_OFFICE_KEURO_FALLBACK) *
+    (1 + asRate(input.inflationBackOffice ?? INFLATION_BACK_OFFICE_FALLBACK)) ** year;
+  const diversKeuro =
+    (input.diversOpexKeuro ?? DIVERS_OPEX_KEURO_FALLBACK) *
+    (1 + asRate(input.inflationDivers ?? INFLATION_DIVERS_FALLBACK)) ** year;
+  const loyerValeur = input.loyerValeur ?? 0;
+  const loyerBaseKeuro =
+    input.loyerMode === "fixe"
+      ? loyerValeur
+      : input.loyerMode === "euroParHa"
+        ? loyerValeur * (input.surfaceHa ?? 0)
+        : input.loyerMode === "euroParMWc"
+          ? loyerValeur * input.capacityMw
+          : input.loyerMode === "pctCA"
+            ? asRate(loyerValeur) * revenueP50Keuro
+            : 0;
+  const loyerKeuro =
+    loyerBaseKeuro * (1 + asRate(input.loyerInflation ?? LOYER_INFLATION_FALLBACK)) ** year;
+  const opexTotalKeuro =
+    omKeuro +
+    mraKeuro +
+    backOfficeKeuro +
+    diversKeuro +
+    loyerKeuro +
+    assuranceKeuro +
+    balancingKeuro;
+
+  return {
+    hasDetailedOpex,
+    omKeuro,
+    mraKeuro,
+    backOfficeKeuro,
+    diversKeuro,
+    loyerKeuro,
+    assuranceKeuro,
+    balancingKeuro,
+    opexTotalKeuro,
+    opexPerMwKeuro: input.capacityMw > 0 ? opexTotalKeuro / input.capacityMw : 0,
   };
 }
 
@@ -475,7 +609,6 @@ function buildPreRows(input: FinanceEngineInput): PreRow[] {
   const degradationRate = asRate(input.degradationRate);
   const debtInterestRate = asRate(input.debtInterestRate);
   const tariffInflationRate = asRate(input.tariffInflationRate);
-  const opexInflationRate = asRate(input.opexInflationRate);
   const annualDebtService = calculateAnnualDebtService(
     initialDebt,
     debtInterestRate,
@@ -494,11 +627,6 @@ function buildPreRows(input: FinanceEngineInput): PreRow[] {
   const contractDuration = input.contractDuration ?? CONTRACT_DURATION_FALLBACK;
   const prixMarcheP50 = input.prixMarcheP50 ?? PRIX_MARCHE_P50_FALLBACK;
   const prixMarcheP90 = input.prixMarcheP90 ?? PRIX_MARCHE_P90_FALLBACK;
-  const assuranceRate = asRate(input.assuranceRate ?? ASSURANCE_RATE_FALLBACK);
-  const inflationAssurance = asRate(
-    input.inflationAssurance ?? INFLATION_ASSURANCE_FALLBACK,
-  );
-  const balancingCost = input.balancingCost ?? BALANCING_COST_FALLBACK;
   // P90 yield: use provided value or fall back to P50 * 0.93.
   const effectiveYieldP90 = input.yieldP90Mwh ?? input.yieldMwh * 0.93;
 
@@ -525,11 +653,8 @@ function buildPreRows(input: FinanceEngineInput): PreRow[] {
     const revenueP50 = (productionP50 * annualTariff) / 1000;
     const revenueP90 = (productionP90 * annualTariffP90) / 1000;
 
-    const opexBase =
-      input.opex * input.capacityMw * (1 + opexInflationRate) ** year;
-    const assurance = assuranceRate * revenueP50 * (1 + inflationAssurance) ** year;
-    const balancing = (balancingCost * productionP50) / 1000;
-    const annualOpex = opexBase + assurance + balancing;
+    const annualOpex =
+      calculateOpexDetails(input, year, revenueP50, productionP50).opexTotalKeuro;
 
     // Equity cash-flow (P50) kEUR = revenue P50 - OPEX (project NPV/IRR base).
     const cfadsP50 = revenueP50 - annualOpex;

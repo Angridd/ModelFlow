@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { updateScenario } from "@/app/actions";
 import { CapexDetailFields } from "@/app/components/CapexDetailFields";
 import { DscrSchedule } from "@/app/components/DscrSchedule";
+import { OpexDetailFields } from "@/app/components/OpexDetailFields";
 import {
   DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS,
   type DscrTranche,
@@ -291,7 +292,7 @@ export default async function EditScenarioPage({
         />
 
         <div className="grid gap-5 sm:grid-cols-2">
-          {primaryFields.filter((field) => field.name !== "capex").map((field) => (
+          {primaryFields.filter((field) => field.name !== "capex" && field.name !== "opex").map((field) => (
             <label key={field.name} className="grid gap-2 text-sm font-medium text-zinc-700">
               {field.label}
               <input
@@ -383,6 +384,48 @@ export default async function EditScenarioPage({
             ))}
           </div>
         </section>
+
+        <OpexDetailFields
+          capacityMw={scenario.project.capacityMw}
+          initialValue={{
+            opex: scenario.opex,
+            surfaceHa: scenario.surfaceHa,
+            yieldMwh: scenario.yieldMwh,
+            tariff: scenario.tariff,
+            tariffInflationRate: scenario.tariffInflationRate,
+            contractDuration:
+              scenario.contractDuration ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.contractDuration,
+            prixMarcheP50:
+              scenario.prixMarcheP50 ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.prixMarcheP50,
+            assuranceRate:
+              scenario.assuranceRate ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.assuranceRate,
+            inflationAssurance:
+              scenario.inflationAssurance ??
+              DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationAssurance,
+            balancingCost:
+              scenario.balancingCost ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.balancingCost,
+            omFixedEuroKwc:
+              scenario.omFixedEuroKwc ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.omFixedEuroKwc,
+            mraEuroKwc: scenario.mraEuroKwc ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.mraEuroKwc,
+            backOfficeKeuro:
+              scenario.backOfficeKeuro ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.backOfficeKeuro,
+            diversOpexKeuro:
+              scenario.diversOpexKeuro ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.diversOpexKeuro,
+            loyerMode: scenario.loyerMode,
+            loyerValeur: scenario.loyerValeur,
+            loyerInflation:
+              scenario.loyerInflation ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.loyerInflation,
+            inflationOM:
+              scenario.inflationOM ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationOM,
+            inflationMRA:
+              scenario.inflationMRA ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationMRA,
+            inflationBackOffice:
+              scenario.inflationBackOffice ??
+              DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationBackOffice,
+            inflationDivers:
+              scenario.inflationDivers ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationDivers,
+          }}
+        />
 
         <div className="grid gap-5 sm:grid-cols-2">
           {assumptionFields.map((field) => (

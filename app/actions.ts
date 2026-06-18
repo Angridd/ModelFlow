@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   calculateCapexDetails,
+  calculateOpexDetails,
   calculateScenarioMetrics,
 } from "@/app/lib/finance/engine";
 import { DEFAULT_FINANCIAL_ASSUMPTIONS } from "@/app/lib/finance/types";
@@ -278,6 +279,17 @@ function readScenarioAssumptions(formData: FormData) {
     assuranceRate: readOptionalNumber(formData, "assuranceRate"),
     inflationAssurance: readOptionalNumber(formData, "inflationAssurance"),
     balancingCost: readOptionalNumber(formData, "balancingCost"),
+    omFixedEuroKwc: readOptionalNumber(formData, "omFixedEuroKwc"),
+    mraEuroKwc: readOptionalNumber(formData, "mraEuroKwc"),
+    backOfficeKeuro: readOptionalNumber(formData, "backOfficeKeuro"),
+    diversOpexKeuro: readOptionalNumber(formData, "diversOpexKeuro"),
+    loyerMode: readOptionalText(formData, "loyerMode"),
+    loyerValeur: readOptionalNumber(formData, "loyerValeur"),
+    loyerInflation: readOptionalNumber(formData, "loyerInflation"),
+    inflationOM: readOptionalNumber(formData, "inflationOM"),
+    inflationMRA: readOptionalNumber(formData, "inflationMRA"),
+    inflationBackOffice: readOptionalNumber(formData, "inflationBackOffice"),
+    inflationDivers: readOptionalNumber(formData, "inflationDivers"),
     debtTenorYears: readOptionalInteger(formData, "debtTenorYears"),
     dscrSchedule: readDscrSchedule(formData),
     gearingMaxPct:
@@ -314,6 +326,41 @@ function withCalculatedCapex<T extends ReturnType<typeof readScenarioAssumptions
     ...assumptions,
     capex: capexDetails.capexPerMwKeuro,
   };
+}
+
+function withCalculatedOpex<T extends ReturnType<typeof readScenarioAssumptions>>(
+  assumptions: T,
+  capacityMw: number,
+) {
+  const productionP50Mwh = assumptions.yieldMwh * capacityMw;
+  const contractDuration = assumptions.contractDuration ?? 20;
+  const tariffInflationRate = assumptions.tariffInflationRate / 100;
+  const annualTariff =
+    contractDuration >= 1
+      ? assumptions.tariff * (1 + tariffInflationRate)
+      : (assumptions.prixMarcheP50 ?? 60);
+  const revenueP50Keuro = productionP50Mwh * annualTariff / 1000;
+  const opexDetails = calculateOpexDetails(
+    {
+      capacityMw,
+      ...assumptions,
+    },
+    1,
+    revenueP50Keuro,
+    productionP50Mwh,
+  );
+
+  return {
+    ...assumptions,
+    opex: opexDetails.opexPerMwKeuro,
+  };
+}
+
+function withCalculatedCapexAndOpex<T extends ReturnType<typeof readScenarioAssumptions>>(
+  assumptions: T,
+  capacityMw: number,
+) {
+  return withCalculatedOpex(withCalculatedCapex(assumptions, capacityMw), capacityMw);
 }
 
 export async function createProject(formData: FormData) {
@@ -397,7 +444,7 @@ export async function createScenario(projectId: string, formData: FormData) {
     redirect("/projects");
   }
 
-  const assumptions = withCalculatedCapex(
+  const assumptions = withCalculatedCapexAndOpex(
     readScenarioAssumptions(formData),
     project.capacityMw,
   );
@@ -444,7 +491,7 @@ export async function updateScenario(
     redirect("/projects");
   }
 
-  const assumptions = withCalculatedCapex(
+  const assumptions = withCalculatedCapexAndOpex(
     readScenarioAssumptions(formData),
     project.capacityMw,
   );
@@ -518,6 +565,17 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
       assuranceRate: scenario.assuranceRate,
       inflationAssurance: scenario.inflationAssurance,
       balancingCost: scenario.balancingCost,
+      omFixedEuroKwc: scenario.omFixedEuroKwc,
+      mraEuroKwc: scenario.mraEuroKwc,
+      backOfficeKeuro: scenario.backOfficeKeuro,
+      diversOpexKeuro: scenario.diversOpexKeuro,
+      loyerMode: scenario.loyerMode,
+      loyerValeur: scenario.loyerValeur,
+      loyerInflation: scenario.loyerInflation,
+      inflationOM: scenario.inflationOM,
+      inflationMRA: scenario.inflationMRA,
+      inflationBackOffice: scenario.inflationBackOffice,
+      inflationDivers: scenario.inflationDivers,
       dscrTarget: scenario.dscrTarget,
       debtTenorYears: scenario.debtTenorYears,
       dscrSchedule: scenario.dscrSchedule,
