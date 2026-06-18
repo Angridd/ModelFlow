@@ -99,6 +99,7 @@ export type AnnualCashFlow = {
   debtServiceKeuro: number;
   debtServiceSculptedKeuro: number | null;
   cfadsP90Keuro: number;
+  cfadsP90AfterTaxKeuro: number;
   amort: number;
   ebit: number;
   interets: number;
@@ -380,7 +381,7 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
     input.prixModuleUSDWc != null && tauxEURUSD > 0
       ? input.prixModuleUSDWc / 100 / tauxEURUSD
       : 0;
-  const modulesKeuro = modulePriceEurWc * input.capacityMw * 1_000_000;
+  const modulesKeuro = modulePriceEurWc * input.capacityMw * 1_000_000 / 1000;
   const modulesCtWc =
     input.capacityMw > 0 ? modulesKeuro / (input.capacityMw * 1000) * 100 : 0;
   const boSKeuro = ((input.boSCtWc ?? 0) / 100) * input.capacityMw * 1000;
@@ -467,9 +468,9 @@ export function calculateOpexDetails(
     input.loyerMode === "fixe"
       ? loyerValeur
       : input.loyerMode === "euroParHa"
-        ? loyerValeur * (input.surfaceHa ?? 0)
+        ? loyerValeur * (input.surfaceHa ?? 0) / 1000
         : input.loyerMode === "euroParMWc"
-          ? loyerValeur * input.capacityMw
+          ? loyerValeur * input.capacityMw / 1000
           : input.loyerMode === "pctCA"
             ? asRate(loyerValeur) * revenueP50Keuro
             : 0;
@@ -553,9 +554,9 @@ export function sizingResult(
  * per-year DSCR schedule, given a P90 CFADS profile over the debt tenor.
  *
  * Method:
- *   - Sculpted annuity for year t = cfadsP90(t) / dscrForYear(t, schedule)
- *   - Debt amount = PV of sculpted annuities at the debt interest rate
- *   - Repayment schedule: each year, interest is charged on the outstanding
+ *   - Bisection on the debt amount between 0 and the effective CAPEX ceiling.
+ *   - Debt service for year t targets cfadsP90(t) / dscrForYear(t, schedule).
+ *   - For each candidate, interest is charged on the outstanding
  *     balance, and principal = annuity − interest (floored at 0, capped at
  *     remaining outstanding).
  *
@@ -567,6 +568,7 @@ export function sculptDebt(
   dscrSchedule: DscrTranche[],
   debtInterestRatePercent: number,
   tenorYears: number,
+  debtMaxKeuro?: number,
 ): { debtAmountKeuro: number; schedule: DebtScheduleItem[] } | null {
   if (dscrSchedule.length === 0 || tenorYears <= 0) {
     return null;
@@ -576,31 +578,70 @@ export function sculptDebt(
   const tenorFlows = cashFlows.filter((r) => r.year <= tenorYears);
 
   // debtAmount = Σ(t=1..tenor) [cfadsP90(t) / dscrTarget(t)] / (1 + r)^t
-  const debtAmountKeuro = tenorFlows.reduce((pv, row) => {
+  const legacyDebtCapacityKeuro = tenorFlows.reduce((pv, row) => {
     return (
       pv +
       row.cfadsP90Keuro / dscrForYear(row.year, dscrSchedule) / (1 + debtRate) ** row.year
     );
   }, 0);
 
-  if (debtAmountKeuro <= 0) {
+  if (legacyDebtCapacityKeuro <= 0) {
     return { debtAmountKeuro: 0, schedule: [] };
   }
 
-  const schedule: DebtScheduleItem[] = [];
-  let outstanding = debtAmountKeuro;
+  const buildSchedule = (debtAmountKeuro: number) => {
+    const schedule: DebtScheduleItem[] = [];
+    let outstanding = debtAmountKeuro;
+    let minDscrDelta = Number.POSITIVE_INFINITY;
+    let maxAbsDscrDelta = 0;
 
-  for (const row of tenorFlows) {
-    const interest = outstanding * debtRate;
-    const annuity = row.cfadsP90Keuro / dscrForYear(row.year, dscrSchedule);
-    // Principal = annuity - interest, clamped to [0, outstanding].
-    const principal = Math.min(Math.max(0, annuity - interest), outstanding);
-    outstanding = outstanding - principal;
+    for (const row of tenorFlows) {
+      const interest = outstanding * debtRate;
+      const targetDscr = dscrForYear(row.year, dscrSchedule);
+      const targetDebtService = row.cfadsP90Keuro / targetDscr;
+      const principal = Math.min(Math.max(0, targetDebtService - interest), outstanding);
+      const debtService = principal + interest;
+      outstanding = Math.max(0, outstanding - principal);
 
-    schedule.push({ year: row.year, principal, interest, outstanding });
+      if (debtService > 0) {
+        const dscrRealized = row.cfadsP90Keuro / debtService;
+        const dscrDelta = dscrRealized - targetDscr;
+        minDscrDelta = Math.min(minDscrDelta, dscrDelta);
+        maxAbsDscrDelta = Math.max(maxAbsDscrDelta, Math.abs(dscrDelta));
+      }
+
+      schedule.push({ year: row.year, principal, interest, outstanding });
+    }
+
+    return { schedule, outstanding, minDscrDelta, maxAbsDscrDelta };
+  };
+
+  let debtMin = 0;
+  let debtMax = Math.max(0, debtMaxKeuro ?? legacyDebtCapacityKeuro);
+  let debtAmountKeuro = debtMin;
+  let result = buildSchedule(debtAmountKeuro);
+
+  for (let index = 0; index < 100; index += 1) {
+    const debtMid = (debtMin + debtMax) / 2;
+    const candidate = buildSchedule(debtMid);
+    debtAmountKeuro = debtMid;
+    result = candidate;
+
+    const hasRemainingDebt = candidate.outstanding > 0.0001;
+    const dscrBelowTarget = candidate.minDscrDelta < -0.0001;
+
+    if (!hasRemainingDebt && candidate.maxAbsDscrDelta < 0.0001) {
+      break;
+    }
+
+    if (hasRemainingDebt || dscrBelowTarget) {
+      debtMax = debtMid;
+    } else {
+      debtMin = debtMid;
+    }
   }
 
-  return { debtAmountKeuro, schedule };
+  return { debtAmountKeuro, schedule: result.schedule };
 }
 
 function buildPreRows(input: FinanceEngineInput): PreRow[] {
@@ -870,6 +911,7 @@ function calculateSculpting(
       effectiveSchedule!,
       input.debtInterestRate,
       effectiveTenor,
+      initialInvestment,
     );
     const nextSizing =
       sculptedResult !== null
@@ -918,7 +960,7 @@ export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashF
     effectiveSchedule,
     effectiveTenor,
     ccaPrincipalKeuro,
-  ).map(({ cfadsP90AfterTaxKeuro: _cfadsP90AfterTaxKeuro, ...row }) => row);
+  );
 }
 
 export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngineResult {
@@ -944,8 +986,9 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
       total + discounted(row.productionP50Mwh, row.year, asRate(input.discountRate)),
     0,
   );
-  // Minimum DSCR uses realized debt service over all years with debt service.
+  // Minimum DSCR uses realized debt service only on years where principal + interest is paid.
   const dscrValues = annualCashFlows
+    .filter((row) => (row.debtServiceSculptedKeuro ?? row.debtServiceKeuro) > 0)
     .map((row) => row.dscrRealized)
     .filter((value): value is number => value !== null);
 

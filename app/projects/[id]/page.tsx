@@ -13,6 +13,7 @@ import {
   calculateOpexDetails,
   calculateScenarioMetrics,
 } from "@/app/lib/finance/engine";
+import { ProjectFinancialCharts } from "@/app/components/ProjectFinancialCharts";
 import type { DscrTranche } from "@/app/lib/finance/types";
 import { generateSensitivityRows } from "@/app/lib/sensitivity";
 import { prisma } from "@/app/lib/prisma";
@@ -210,6 +211,39 @@ export default async function ProjectDetailPage({
     analysisScenario !== undefined && analysisDevFeesKeuro !== null
       ? analysisScenario.npv - analysisDevFeesKeuro
       : null;
+  const financingChartData =
+    sizing !== null && ccaKeuro !== null
+      ? [
+          { name: "Dette" as const, value: sizing.debtRetenuKeuro, color: "#2563eb" },
+          { name: "CCA" as const, value: ccaKeuro, color: "#16a34a" },
+        ]
+      : [];
+  const cashFlowChartData = annualCashFlows.map((row) => {
+    const areaBaseKeuro = Math.min(row.revenueP50Keuro, row.revenueP90Keuro);
+
+    return {
+      year: row.year,
+      revenueP50Keuro: row.revenueP50Keuro,
+      revenueP90Keuro: row.revenueP90Keuro,
+      opexTotalKeuro: row.opexKeuro,
+      areaBaseKeuro,
+      areaSpreadKeuro:
+        Math.max(row.revenueP50Keuro, row.revenueP90Keuro) - areaBaseKeuro,
+    };
+  });
+  const capexChartData =
+    cashFlowCapexDetails !== null
+      ? [
+          {
+            name: "CAPEX",
+            modulesKeuro: cashFlowCapexDetails.modulesKeuro,
+            boSKeuro: cashFlowCapexDetails.boSKeuro,
+            raccordementKeuro: cashFlowCapexDetails.raccordementKeuro,
+            apportAffaireKeuro: cashFlowCapexDetails.apportAffaireKeuro,
+            devFeesKeuro: cashFlowCapexDetails.devFeesKeuro,
+          },
+        ]
+      : [];
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-10">
@@ -492,6 +526,13 @@ export default async function ProjectDetailPage({
         </div>
       </section>
 
+      <ProjectFinancialCharts
+        financingData={financingChartData}
+        gearingRealisePct={gearingRealisePct}
+        cashFlowData={cashFlowChartData}
+        capexData={capexChartData}
+      />
+
       <section className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-white p-5">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <h2 className="text-lg font-semibold text-zinc-950">
@@ -698,7 +739,7 @@ export default async function ProjectDetailPage({
                 <th className="px-4 py-3 font-medium">CF actualisé kEUR</th>
                 <th className="px-4 py-3 font-medium">Service dette kEUR</th>
                 <th className="px-4 py-3 font-medium">Service sculpté kEUR</th>
-                <th className="px-4 py-3 font-medium">CFADS P90 kEUR</th>
+                <th className="px-4 py-3 font-medium">CFADS P90 apres IS kEUR</th>
                 <th className="px-4 py-3 font-medium">IS</th>
                 <th className="px-4 py-3 font-medium">Déficit cumulé</th>
                 <th className="px-4 py-3 font-medium">Résultat net</th>
@@ -778,7 +819,7 @@ export default async function ProjectDetailPage({
                     {formatNumber(row.discountedCashFlowKeuro)}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.debtServiceKeuro)}
+                    {formatNumber(row.debtServiceSculptedKeuro ?? row.debtServiceKeuro)}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
                     {row.debtServiceSculptedKeuro !== null
@@ -786,7 +827,7 @@ export default async function ProjectDetailPage({
                       : "-"}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.cfadsP90Keuro)}
+                    {formatNumber(row.cfadsP90AfterTaxKeuro)}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
                     {formatNumber(row.is)}
