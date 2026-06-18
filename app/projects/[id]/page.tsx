@@ -149,8 +149,9 @@ export default async function ProjectDetailPage({
     projectReferenceScenario?.npv ?? maxValue(scenarios.map((scenario) => scenario.npv));
   const kpiIrr =
     projectReferenceScenario?.irr ?? maxValue(scenarios.map((scenario) => scenario.irr));
-  const kpiDscr =
-    referenceMetrics?.dscr ?? minValue(scenarios.map((scenario) => scenario.dscr));
+  const kpiDscr = projectReferenceScenario
+    ? (referenceMetrics?.dscr ?? null)
+    : minValue(scenarios.map((scenario) => scenario.dscr).filter((dscr) => dscr > 0));
   const kpiLcoe =
     projectReferenceScenario?.lcoe ?? minValue(scenarios.map((scenario) => scenario.lcoe));
   const importScenariosForProject = importScenarios.bind(null, project.id);
@@ -951,7 +952,7 @@ export default async function ProjectDetailPage({
                     {formatNumber(scenario.debtRate, " %")}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(scenario.dscr)}
+                    {formatNumber(scenario.dscr > 0 ? scenario.dscr : null)}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
                     {formatMillionEuros(scenario.npv)}

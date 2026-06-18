@@ -59,7 +59,7 @@ export type FinanceEngineResult = {
   npv: number;
   irr: number;
   lcoe: number;
-  dscr: number;
+  dscr: number | null;
   debtAmountKeuro: number | null;
   sizing: SizingResult | null;
   doubleIRR: DoubleIRR | null;
@@ -329,9 +329,9 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
   const tauxEURUSD = input.tauxEURUSD ?? TAUX_EUR_USD_FALLBACK;
   const modulePriceEurWc =
     input.prixModuleUSDWc != null && tauxEURUSD > 0
-      ? input.prixModuleUSDWc / tauxEURUSD
+      ? input.prixModuleUSDWc / 100 / tauxEURUSD
       : 0;
-  const modulesKeuro = modulePriceEurWc * input.capacityMw * 1000;
+  const modulesKeuro = modulePriceEurWc * input.capacityMw * 1_000_000;
   const modulesCtWc =
     input.capacityMw > 0 ? modulesKeuro / (input.capacityMw * 1000) * 100 : 0;
   const boSKeuro = ((input.boSCtWc ?? 0) / 100) * input.capacityMw * 1000;
@@ -681,8 +681,8 @@ function applyWaterfall(
           : null,
       // Realized DSCR: after-tax P90 CFADS / retained sculpted service.
       dscrRealized:
-        sculptedService !== null && sculptedService > 0
-          ? (pre.cfadsP90Keuro - isP90) / sculptedService
+        debtService > 0
+          ? (pre.cfadsP90Keuro - isP90) / debtService
           : null,
       // Target DSCR for this year from the schedule (null when no sculpting or beyond tenor).
       dscrTargetAtYear:
@@ -819,13 +819,12 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
       total + discounted(row.productionP50Mwh, row.year, asRate(input.discountRate)),
     0,
   );
-  // Standard DSCR uses constant-annuity service over debt maturity.
+  // Minimum DSCR uses realized debt service over all years with debt service.
   const dscrValues = annualCashFlows
-    .map((row) => row.dscr)
+    .map((row) => row.dscrRealized)
     .filter((value): value is number => value !== null);
 
-  // Minimum standard DSCR. If no debt, stored as 0.
-  const dscr = dscrValues.length > 0 ? Math.min(...dscrValues) : 0;
+  const dscr = dscrValues.length > 0 ? Math.min(...dscrValues) : null;
 
   const sizing = sculpting.sizing;
 
@@ -885,7 +884,7 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
     npv: round(npv),
     irr: round(irr),
     lcoe: round(lcoe),
-    dscr: round(dscr),
+    dscr: dscr !== null ? round(dscr) : null,
     debtAmountKeuro: sizing !== null ? round(sizing.debtRetenuKeuro) : null,
     doubleIRR,
     sizingIterations: sculpting.iterations,

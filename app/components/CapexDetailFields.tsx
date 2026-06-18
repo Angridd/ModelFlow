@@ -168,16 +168,16 @@ export function CapexDetailFields({
           />
         </label>
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
-          Prix module (USD/Wc)
+          Prix module (ct/Wc USD)
           <input
             name="prixModuleUSDWc"
             type="number"
             min="0"
-            step="0.0001"
+            step="0.01"
             value={prixModuleUSDWc}
             onChange={(event) => setPrixModuleUSDWc(event.target.value)}
-            placeholder="ex. 0.18"
-            title="Prix panneau en USD par Wc - converti automatiquement en EUR"
+            placeholder="ex. 12"
+            title="Prix panneau en centimes USD par Wc - converti automatiquement en EUR"
             className={numberInputClass}
           />
         </label>
