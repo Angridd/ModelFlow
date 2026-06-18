@@ -40,3 +40,19 @@ export type SizingResult = {
   structuringFeeKeuro: number;
   structuringFeeRate: number;
 };
+
+export type DoubleIRR = {
+  irrSPV: number;
+  irrEntreprise: number;
+  npvSPV: number;
+  npvEntreprise: number;
+};
+
+export type T0Flows = {
+  capexEffectifKeuro: number;
+  debtRetenuKeuro: number;
+  equityKeuro: number;
+  ccaApportKeuro: number;
+  margeDevKeuro: number;
+  miseNette: number;
+};
