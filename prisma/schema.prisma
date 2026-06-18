@@ -34,6 +34,7 @@ model Scenario {
   capex               Float
   opex                Float
   yieldMwh            Float
+  yieldP90Mwh         Float?
   tariff              Float
   debtRate            Float
   projectLifeYears    Int     @default(30)
@@ -43,6 +44,11 @@ model Scenario {
   debtMaturityYears   Int     @default(20)
   tariffInflationRate Float   @default(0)
   opexInflationRate   Float   @default(2)
+  dscrTarget          Float?
+  debtTenorYears      Int?
+  dscrSchedule        String?
+  gearingMax          Float?
+  structuringFeeRate  Float?
   dscr                Float
   npv                 Float
   irr                 Float

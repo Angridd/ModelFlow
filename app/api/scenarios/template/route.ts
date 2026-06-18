@@ -4,6 +4,7 @@ const csv = [
     "CAPEX",
     "OPEX",
     "Productible",
+    "Productible P90",
     "Tarif",
     "Dette",
     "Duree projet",
@@ -23,6 +24,7 @@ const csv = [
     "650",
     "18",
     "1450",
+    "1305",
     "79",
     "70",
     "30",
@@ -42,7 +44,7 @@ const csv = [
   .join("\n");
 
 export async function GET() {
-  return new Response(`\uFEFF${csv}`, {
+  return new Response(`﻿${csv}`, {
     headers: {
       "Content-Disposition": 'attachment; filename="modelflow-scenarios-template.csv"',
       "Content-Type": "text/csv; charset=utf-8",

@@ -2,52 +2,96 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { createScenario } from "@/app/actions";
+import { DscrSchedule } from "@/app/components/DscrSchedule";
 import { DEFAULT_FINANCIAL_ASSUMPTIONS } from "@/app/lib/finance/types";
 import { prisma } from "@/app/lib/prisma";
 
-const numericFields = ["capex", "opex", "yieldMwh", "tariff", "debtRate"] as const;
+const primaryFields = [
+  {
+    name: "capex" as const,
+    label: "CAPEX (k€/MW)",
+    step: "0.01",
+    placeholder: "ex. 700",
+    title: "Coût d'investissement en k€ par MW installé (solaire posé : 650–750 k€/MW)",
+  },
+  {
+    name: "opex" as const,
+    label: "OPEX (k€/MW/an)",
+    step: "0.01",
+    placeholder: "ex. 15",
+    title: "Charges d'exploitation annuelles en k€ par MW installé (solaire : 12–18 k€/MW/an)",
+  },
+  {
+    name: "tariff" as const,
+    label: "Tarif (€/MWh)",
+    step: "0.01",
+    placeholder: "ex. 75",
+    title: "Prix de vente de l'électricité en €/MWh (tarif CRE ou contrat de marché)",
+  },
+  {
+    name: "debtRate" as const,
+    label: "Gearing (%)",
+    step: "0.01",
+    placeholder: "ex. 70",
+    title: "Part du CAPEX financée par la dette en % (ex. 70 % pour un financement de projet solaire)",
+  },
+] as const;
 
 const assumptionFields = [
   {
-    name: "projectLifeYears",
-    label: "Duree projet",
+    name: "projectLifeYears" as const,
+    label: "Durée projet (ans)",
     step: "1",
+    placeholder: "ex. 30",
+    title: "Durée totale d'exploitation du projet (ex. 25–30 ans)",
     defaultValue: DEFAULT_FINANCIAL_ASSUMPTIONS.projectLifeYears,
   },
   {
-    name: "degradationRate",
-    label: "Degradation",
+    name: "degradationRate" as const,
+    label: "Dégradation (%/an)",
     step: "0.01",
+    placeholder: "ex. 0.3",
+    title: "Perte de production annuelle des panneaux en % (PV : 0,3–0,5 %/an)",
     defaultValue: DEFAULT_FINANCIAL_ASSUMPTIONS.degradationRate,
   },
   {
-    name: "discountRate",
-    label: "Taux actualisation",
+    name: "discountRate" as const,
+    label: "Taux actualisation (%)",
     step: "0.01",
+    placeholder: "ex. 6",
+    title: "WACC ou coût des fonds propres en % (ex. 6–8 %)",
     defaultValue: DEFAULT_FINANCIAL_ASSUMPTIONS.discountRate,
   },
   {
-    name: "debtInterestRate",
-    label: "Taux dette",
+    name: "debtInterestRate" as const,
+    label: "Taux d'intérêt dette (%)",
     step: "0.01",
+    placeholder: "ex. 4",
+    title: "Taux d'intérêt annuel de la dette senior (financement de projet : 4–5 %)",
     defaultValue: DEFAULT_FINANCIAL_ASSUMPTIONS.debtInterestRate,
   },
   {
-    name: "debtMaturityYears",
-    label: "Maturite dette",
+    name: "debtMaturityYears" as const,
+    label: "Maturité dette (ans)",
     step: "1",
+    placeholder: "ex. 20",
+    title: "Durée d'amortissement de la dette pour le service annualisé (ex. 15–20 ans)",
     defaultValue: DEFAULT_FINANCIAL_ASSUMPTIONS.debtMaturityYears,
   },
   {
-    name: "tariffInflationRate",
-    label: "Inflation tarif",
+    name: "tariffInflationRate" as const,
+    label: "Inflation tarif (%/an)",
     step: "0.01",
+    placeholder: "ex. 0",
+    title: "Revalorisation annuelle du tarif en % (souvent 0 pour les tarifs réglementés)",
     defaultValue: DEFAULT_FINANCIAL_ASSUMPTIONS.tariffInflationRate,
   },
   {
-    name: "opexInflationRate",
-    label: "Inflation OPEX",
+    name: "opexInflationRate" as const,
+    label: "Inflation OPEX (%/an)",
     step: "0.01",
+    placeholder: "ex. 2",
+    title: "Revalorisation annuelle des charges en % (ex. 2 % = inflation générale)",
     defaultValue: DEFAULT_FINANCIAL_ASSUMPTIONS.opexInflationRate,
   },
 ] as const;
@@ -94,23 +138,53 @@ export default async function NewScenarioPage({
           <input
             name="name"
             required
-            className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900"
+            placeholder="ex. Base case"
+            title="Nom du scénario"
+            className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
           />
         </label>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          {numericFields.map((field) => (
-            <label key={field} className="grid gap-2 text-sm font-medium text-zinc-700">
-              {field}
+          {primaryFields.map((field) => (
+            <label key={field.name} className="grid gap-2 text-sm font-medium text-zinc-700">
+              {field.label}
               <input
-                name={field}
+                name={field.name}
                 required
                 type="number"
-                step="0.01"
-                className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900"
+                step={field.step}
+                placeholder={field.placeholder}
+                title={field.title}
+                className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
               />
             </label>
           ))}
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            Productible P50 (MWh/MW/an)
+            <input
+              name="yieldMwh"
+              required
+              type="number"
+              step="0.01"
+              placeholder="ex. 1450"
+              title="Production annuelle en MWh par MW installé — scénario médian P50 (solaire France : 1 300–1 600 MWh/MW/an)"
+              className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            Productible P90 (MWh/MW/an)
+            <input
+              name="yieldP90Mwh"
+              type="number"
+              step="0.01"
+              placeholder="Défaut : P50 × 0,9"
+              title="Production annuelle au niveau de confiance P90 — solaire : environ P50 × 0,9. Utilisé pour le dimensionnement bancaire (DSCR)."
+              className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+            />
+          </label>
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
@@ -126,11 +200,61 @@ export default async function NewScenarioPage({
                 type="number"
                 min="0"
                 step={field.step}
+                placeholder={field.placeholder}
+                title={field.title}
                 defaultValue={field.defaultValue}
-                className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900"
+                className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
               />
             </label>
           ))}
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            Ténor dette sculptée (ans)
+            <input
+              name="debtTenorYears"
+              type="number"
+              step="1"
+              min="0"
+              placeholder="ex. 15"
+              title="Durée de remboursement de la dette sculptée. Si omis, le ténor est déduit de l'année fin de la dernière tranche du profil DSCR."
+              className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            Gearing maximum (%)
+            <input
+              name="gearingMax"
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              placeholder="ex. 70"
+              title="Part maximale du CAPEX financée par dette senior (ex. 70 %)"
+              className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+            />
+          </label>
+        </div>
+
+        <div className="grid gap-2">
+          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            Taux marge structuration (%)
+            <input
+              name="structuringFeeRate"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="ex. 1.5"
+              title="Taux appliqué au headroom DSCR pour calculer la marge facturée à la SPV (ex. 1,5 % du headroom)"
+              className="h-10 w-full max-w-xs rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+            />
+          </label>
+        </div>
+
+        <div className="grid gap-2">
+          <p className="text-sm font-medium text-zinc-700">Profil DSCR cible</p>
+          <DscrSchedule />
         </div>
 
         <div className="flex justify-end gap-3 pt-2">
@@ -144,7 +268,7 @@ export default async function NewScenarioPage({
             type="submit"
             className="inline-flex h-10 items-center justify-center rounded-md bg-zinc-950 px-4 text-sm font-medium text-white hover:bg-zinc-800"
           >
-            Creer
+            Créer
           </button>
         </div>
       </form>

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { calculateScenarioMetrics } from "@/app/lib/finance/engine";
 import { DEFAULT_FINANCIAL_ASSUMPTIONS } from "@/app/lib/finance/types";
+import type { DscrTranche } from "@/app/lib/finance/types";
 import { prisma } from "@/app/lib/prisma";
 
 const scenarioImportColumns = {
@@ -11,6 +12,7 @@ const scenarioImportColumns = {
   capex: "capex",
   opex: "opex",
   yieldMwh: "productible",
+  yieldP90Mwh: "productible p90",
   tariff: "tarif",
   debtRate: "dette",
   projectLifeYears: "duree projet",
@@ -45,6 +47,22 @@ function readNumber(formData: FormData, key: string) {
   }
 
   return value;
+}
+
+function readOptionalNumber(formData: FormData, key: string): number | null {
+  const value = formData.get(key);
+
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+
+  const number = Number(value.trim());
+
+  if (!Number.isFinite(number)) {
+    throw new Error(`Le champ ${key} doit etre un nombre.`);
+  }
+
+  return number;
 }
 
 function readInteger(formData: FormData, key: string) {
@@ -152,11 +170,88 @@ function parseImportedInteger(value: string, key: string) {
   return number;
 }
 
+function readOptionalInteger(formData: FormData, key: string): number | null {
+  const value = formData.get(key);
+
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+
+  const number = Number(value.trim());
+
+  if (!Number.isFinite(number) || !Number.isInteger(number)) {
+    throw new Error(`Le champ ${key} doit etre un entier.`);
+  }
+
+  return number;
+}
+
+function readDscrSchedule(formData: FormData): DscrTranche[] | null {
+  const value = formData.get("dscrSchedule");
+
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("Format du profil DSCR invalide.");
+  }
+
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    return null;
+  }
+
+  const tranches: DscrTranche[] = [];
+
+  for (const item of parsed) {
+    if (
+      typeof item !== "object" ||
+      item === null ||
+      typeof (item as Record<string, unknown>).yearFrom !== "number" ||
+      typeof (item as Record<string, unknown>).yearTo !== "number" ||
+      typeof (item as Record<string, unknown>).dscrValue !== "number"
+    ) {
+      throw new Error("Format du profil DSCR invalide.");
+    }
+
+    const t = item as DscrTranche;
+
+    if (t.yearFrom >= t.yearTo) {
+      throw new Error(
+        `Tranche DSCR invalide : l'année début (${t.yearFrom}) doit être inférieure à l'année fin (${t.yearTo}).`,
+      );
+    }
+
+    if (t.dscrValue <= 1.0) {
+      throw new Error("Le DSCR cible doit être supérieur à 1,0.");
+    }
+
+    tranches.push({ yearFrom: t.yearFrom, yearTo: t.yearTo, dscrValue: t.dscrValue });
+  }
+
+  // Check for overlapping tranches.
+  for (let i = 0; i < tranches.length; i++) {
+    for (let j = i + 1; j < tranches.length; j++) {
+      const a = tranches[i];
+      const b = tranches[j];
+      if (a.yearFrom <= b.yearTo && b.yearFrom <= a.yearTo) {
+        throw new Error(`Les tranches DSCR ${i + 1} et ${j + 1} se chevauchent.`);
+      }
+    }
+  }
+
+  return tranches;
+}
+
 function readScenarioAssumptions(formData: FormData) {
   return {
     capex: readNumber(formData, "capex"),
     opex: readNumber(formData, "opex"),
     yieldMwh: readNumber(formData, "yieldMwh"),
+    yieldP90Mwh: readOptionalNumber(formData, "yieldP90Mwh"),
     tariff: readNumber(formData, "tariff"),
     debtRate: readNumber(formData, "debtRate"),
     projectLifeYears: readInteger(formData, "projectLifeYears"),
@@ -166,6 +261,10 @@ function readScenarioAssumptions(formData: FormData) {
     debtMaturityYears: readInteger(formData, "debtMaturityYears"),
     tariffInflationRate: readNumber(formData, "tariffInflationRate"),
     opexInflationRate: readNumber(formData, "opexInflationRate"),
+    debtTenorYears: readOptionalInteger(formData, "debtTenorYears"),
+    dscrSchedule: readDscrSchedule(formData),
+    gearingMax: readOptionalNumber(formData, "gearingMax"),
+    structuringFeeRate: readOptionalNumber(formData, "structuringFeeRate"),
   };
 }
 
@@ -251,15 +350,18 @@ export async function createScenario(projectId: string, formData: FormData) {
   }
 
   const assumptions = readScenarioAssumptions(formData);
+  const { dscrSchedule, ...assumptionsWithoutSchedule } = assumptions;
   const calculatedMetrics = calculateScenarioMetrics({
     capacityMw: project.capacityMw,
-    ...assumptions,
+    ...assumptionsWithoutSchedule,
+    dscrSchedule,
   });
 
   await prisma.scenario.create({
     data: {
       name: readText(formData, "name"),
-      ...assumptions,
+      ...assumptionsWithoutSchedule,
+      dscrSchedule: dscrSchedule ? JSON.stringify(dscrSchedule) : null,
       dscr: calculatedMetrics.dscr,
       npv: calculatedMetrics.npv,
       irr: calculatedMetrics.irr,
@@ -292,9 +394,11 @@ export async function updateScenario(
   }
 
   const assumptions = readScenarioAssumptions(formData);
+  const { dscrSchedule, ...assumptionsWithoutSchedule } = assumptions;
   const calculatedMetrics = calculateScenarioMetrics({
     capacityMw: project.capacityMw,
-    ...assumptions,
+    ...assumptionsWithoutSchedule,
+    dscrSchedule,
   });
 
   await prisma.scenario.updateMany({
@@ -304,7 +408,8 @@ export async function updateScenario(
     },
     data: {
       name: readText(formData, "name"),
-      ...assumptions,
+      ...assumptionsWithoutSchedule,
+      dscrSchedule: dscrSchedule ? JSON.stringify(dscrSchedule) : null,
       dscr: calculatedMetrics.dscr,
       npv: calculatedMetrics.npv,
       irr: calculatedMetrics.irr,
@@ -335,6 +440,7 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
       capex: scenario.capex,
       opex: scenario.opex,
       yieldMwh: scenario.yieldMwh,
+      yieldP90Mwh: scenario.yieldP90Mwh,
       tariff: scenario.tariff,
       debtRate: scenario.debtRate,
       projectLifeYears: scenario.projectLifeYears,
@@ -344,6 +450,11 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
       debtMaturityYears: scenario.debtMaturityYears,
       tariffInflationRate: scenario.tariffInflationRate,
       opexInflationRate: scenario.opexInflationRate,
+      dscrTarget: scenario.dscrTarget,
+      debtTenorYears: scenario.debtTenorYears,
+      dscrSchedule: scenario.dscrSchedule,
+      gearingMax: scenario.gearingMax,
+      structuringFeeRate: scenario.structuringFeeRate,
       dscr: scenario.dscr,
       npv: scenario.npv,
       irr: scenario.irr,
@@ -453,6 +564,10 @@ export async function importScenarios(projectId: string, formData: FormData) {
       throw new Error("La colonne Scenario est requise.");
     }
 
+    const yieldP90MwhIndex = headerIndexes.get(scenarioImportColumns.yieldP90Mwh);
+    const yieldP90MwhRaw = yieldP90MwhIndex !== undefined ? (row[yieldP90MwhIndex]?.trim() ?? "") : "";
+    const yieldP90MwhValue = yieldP90MwhRaw !== "" ? parseImportedNumber(yieldP90MwhRaw, "Productible P90") : null;
+
     return {
       name,
       capex: parseImportedNumber(readColumn(scenarioImportColumns.capex), "CAPEX"),
@@ -461,6 +576,7 @@ export async function importScenarios(projectId: string, formData: FormData) {
         readColumn(scenarioImportColumns.yieldMwh),
         "Productible",
       ),
+      yieldP90Mwh: yieldP90MwhValue,
       tariff: parseImportedNumber(readColumn(scenarioImportColumns.tariff), "Tarif"),
       debtRate: parseImportedNumber(readColumn(scenarioImportColumns.debtRate), "Dette"),
       projectLifeYears: readOptionalInteger(
