@@ -50,6 +50,23 @@ type CapexComponentDatum = {
   label: string;
 };
 
+type DscrChartDatum = {
+  year: number;
+  dscrRealized: number;
+  dscrTarget: number;
+  dscrGreenBase: number;
+  dscrGreenDelta: number;
+  dscrRedBase: number;
+  dscrRedDelta: number;
+};
+
+type DebtRepaymentChartDatum = {
+  year: number;
+  debtOutstandingKeuro: number;
+  dsraBalanceKeuro: number;
+  debtServiceKeuro: number;
+};
+
 type TooltipPayloadItem = {
   name?: NameType;
   value?: ValueType;
@@ -62,6 +79,8 @@ type ProjectFinancialChartsProps = {
   gearingRealisePct: number | null;
   cashFlowData: CashFlowChartDatum[];
   capexData: CapexChartDatum[];
+  dscrData: DscrChartDatum[];
+  debtRepaymentData: DebtRepaymentChartDatum[];
 };
 
 const chartColors = {
@@ -76,20 +95,27 @@ const chartColors = {
   raccordement: "#f59e0b",
   apport: "#0891b2",
   devFees: "#64748b",
+  dscrRealized: "#2563eb",
+  dscrTarget: "#dc2626",
+  dscrAbove: "#16a34a",
+  dscrBelow: "#dc2626",
+  debtOutstanding: "#2563eb",
+  dsra: "#16a34a",
+  debtService: "#f97316",
 };
 
 function formatKeuro(value: number) {
-  return `${value.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} kEUR`;
+  return `${value.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} k€`;
 }
 
 function formatExactKeuro(value: number) {
-  return `${value.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} kEUR`;
+  return `${value.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} k€`;
 }
 
 function formatMeuro(value: number) {
   return `${(value / 1000).toLocaleString("fr-FR", {
     maximumFractionDigits: 2,
-  })} MEUR`;
+  })} M€`;
 }
 
 function toNumber(value: unknown) {
@@ -109,11 +135,22 @@ function formatAxisKeuro(value: number) {
 }
 
 function formatAxisMeuro(value: number) {
-  return (value / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+  return `${(value / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M€`;
+}
+
+function formatAxisRawKeuro(value: number) {
+  return value.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
 }
 
 function formatTooltipValue(value: unknown) {
   return formatKeuro(toNumber(value));
+}
+
+function formatRatio(value: unknown) {
+  return toNumber(value).toLocaleString("fr-FR", {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+  });
 }
 
 function isTooltipPayloadItem(value: unknown): value is TooltipPayloadItem {
@@ -157,9 +194,13 @@ export function ProjectFinancialCharts({
   gearingRealisePct,
   cashFlowData,
   capexData,
+  dscrData,
+  debtRepaymentData,
 }: ProjectFinancialChartsProps) {
   const hasFinancingData = financingData.some((item) => item.value > 0);
   const hasCashFlowData = cashFlowData.length > 0;
+  const hasDscrData = dscrData.length > 0;
+  const hasDebtRepaymentData = debtRepaymentData.length > 0;
   const hasCapexData =
     capexData.length > 0 &&
     capexData.some(
@@ -201,9 +242,17 @@ export function ProjectFinancialCharts({
       withLabel("Dev fees", item.devFeesKeuro, chartColors.devFees),
       withLabel("Apport d'affaire", item.apportAffaireKeuro, chartColors.apport),
     ];
-  });
+  })
+    .filter((item) => item.valueKeuro > 0)
+    .sort((a, b) => b.valueKeuro - a.valueKeuro);
 
-  if (!hasFinancingData && !hasCashFlowData && !hasCapexData) {
+  if (
+    !hasFinancingData &&
+    !hasCashFlowData &&
+    !hasCapexData &&
+    !hasDscrData &&
+    !hasDebtRepaymentData
+  ) {
     return null;
   }
 
@@ -280,6 +329,134 @@ export function ProjectFinancialCharts({
                   <LabelList dataKey="label" position="right" />
                 </Bar>
               </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      ) : null}
+
+      {hasDscrData ? (
+        <div className="rounded-md border border-zinc-200 bg-white p-5 lg:col-span-2">
+          <h2 className="text-lg font-semibold text-zinc-950">
+            Profil DSCR
+          </h2>
+          <div className="mt-4 h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={dscrData}
+                margin={{ top: 12, right: 24, left: 8, bottom: 8 }}
+              >
+                <CartesianGrid stroke="#e4e4e7" vertical={false} />
+                <XAxis dataKey="year" stroke="#71717a" fontSize={12} />
+                <YAxis stroke="#71717a" fontSize={12} width={48} />
+                <Tooltip formatter={formatRatio} />
+                <Area
+                  dataKey="dscrGreenBase"
+                  stackId="dscr-green"
+                  stroke="transparent"
+                  fill="transparent"
+                  legendType="none"
+                  tooltipType="none"
+                />
+                <Area
+                  dataKey="dscrGreenDelta"
+                  stackId="dscr-green"
+                  name="DSCR > cible"
+                  stroke="transparent"
+                  fill={chartColors.dscrAbove}
+                  fillOpacity={0.16}
+                  legendType="none"
+                  tooltipType="none"
+                />
+                <Area
+                  dataKey="dscrRedBase"
+                  stackId="dscr-red"
+                  stroke="transparent"
+                  fill="transparent"
+                  legendType="none"
+                  tooltipType="none"
+                />
+                <Area
+                  dataKey="dscrRedDelta"
+                  stackId="dscr-red"
+                  name="DSCR < cible"
+                  stroke="transparent"
+                  fill={chartColors.dscrBelow}
+                  fillOpacity={0.14}
+                  legendType="none"
+                  tooltipType="none"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="dscrRealized"
+                  name="DSCR realise"
+                  stroke={chartColors.dscrRealized}
+                  strokeWidth={2}
+                  dot={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="dscrTarget"
+                  name="DSCR cible"
+                  stroke={chartColors.dscrTarget}
+                  strokeDasharray="5 5"
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      ) : null}
+
+      {hasDebtRepaymentData ? (
+        <div className="rounded-md border border-zinc-200 bg-white p-5 lg:col-span-2">
+          <h2 className="text-lg font-semibold text-zinc-950">
+            Remboursement dette et DSRA
+          </h2>
+          <div className="mt-4 h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={debtRepaymentData}
+                margin={{ top: 12, right: 24, left: 8, bottom: 8 }}
+              >
+                <CartesianGrid stroke="#e4e4e7" vertical={false} />
+                <XAxis dataKey="year" stroke="#71717a" fontSize={12} />
+                <YAxis
+                  tickFormatter={formatAxisRawKeuro}
+                  stroke="#71717a"
+                  fontSize={12}
+                  width={56}
+                  label={{ value: "k€", angle: -90, position: "insideLeft" }}
+                />
+                <Tooltip formatter={formatTooltipValue} />
+                <Legend />
+                <Area
+                  type="monotone"
+                  dataKey="debtOutstandingKeuro"
+                  stackId="debt"
+                  name="Encours dette"
+                  stroke={chartColors.debtOutstanding}
+                  fill={chartColors.debtOutstanding}
+                  fillOpacity={0.28}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="dsraBalanceKeuro"
+                  stackId="debt"
+                  name="Solde DSRA"
+                  stroke={chartColors.dsra}
+                  fill={chartColors.dsra}
+                  fillOpacity={0.28}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="debtServiceKeuro"
+                  name="Service dette annuel"
+                  stroke={chartColors.debtService}
+                  strokeWidth={2}
+                  dot={false}
+                />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>

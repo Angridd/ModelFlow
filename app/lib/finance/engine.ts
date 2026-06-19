@@ -31,6 +31,7 @@ const INFLATION_DIVERS_FALLBACK = 2;
 
 export type FinanceEngineInput = FinancialAssumptions & {
   capacityMw: number;
+  commissioningYear?: number | null;
   capex: number;
   opex: number;
   yieldMwh: number;
@@ -51,6 +52,15 @@ export type FinanceEngineInput = FinancialAssumptions & {
   contractDuration?: number | null;
   prixMarcheP50?: number | null;
   prixMarcheP90?: number | null;
+  auroraCurves?: Array<{
+    year: number;
+    high: number;
+    central: number;
+    low: number;
+  }> | null;
+  debtSizingCentralW?: number | null;
+  debtSizingLowW?: number | null;
+  investorCurveW?: number | null;
   assuranceRate?: number | null;
   inflationAssurance?: number | null;
   balancingCost?: number | null;
@@ -98,6 +108,7 @@ export type AnnualCashFlow = {
   discountedCashFlowKeuro: number;
   debtServiceKeuro: number;
   debtServiceSculptedKeuro: number | null;
+  debtOutstandingKeuro: number;
   cfadsP90Keuro: number;
   cfadsP90AfterTaxKeuro: number;
   amort: number;
@@ -161,10 +172,14 @@ type PreRow = {
   cfadsP90Keuro: number;
   debtServiceKeuro: number;
   standardDebtInterestKeuro: number;
+  standardDebtOutstandingKeuro: number;
   amort: number;
 };
 
-type RetainedDebtScheduleItem = Pick<DebtScheduleItem, "principal" | "interest">;
+type RetainedDebtScheduleItem = Pick<
+  DebtScheduleItem,
+  "principal" | "interest" | "outstanding"
+>;
 
 type SizingComputation = {
   sizing: SizingResult | null;
@@ -292,7 +307,7 @@ function buildStandardDebtSchedule(
     const interest = outstanding * debtInterestRate;
     const principal = Math.min(Math.max(0, annualDebtService - interest), outstanding);
     outstanding -= principal;
-    schedule.set(year, { principal, interest });
+    schedule.set(year, { principal, interest, outstanding });
   }
 
   return schedule;
@@ -327,6 +342,47 @@ function resolveSchedule(input: FinanceEngineInput): DscrTranche[] | null {
 
 function resolveGearingMaxPct(input: FinanceEngineInput) {
   return input.gearingMaxPct ?? input.gearingMax ?? null;
+}
+
+function buildAuroraCurveByYear(input: FinanceEngineInput) {
+  return new Map(
+    input.auroraCurves?.map((curve) => [
+      curve.year,
+      {
+        high: curve.high,
+        central: curve.central,
+        low: curve.low,
+      },
+    ]) ?? [],
+  );
+}
+
+function resolveMerchantPrices(
+  input: FinanceEngineInput,
+  auroraCurveByYear: Map<number, { high: number; central: number; low: number }>,
+  projectYear: number,
+  fallbackP50: number,
+  fallbackP90: number,
+) {
+  const calendarYear =
+    input.commissioningYear != null && input.commissioningYear > 0
+      ? input.commissioningYear + projectYear - 1
+      : projectYear;
+  const auroraCurve = auroraCurveByYear.get(calendarYear);
+
+  if (!auroraCurve) {
+    return {
+      investorPrice: fallbackP50,
+      debtSizingPrice: fallbackP90,
+    };
+  }
+
+  return {
+    investorPrice: auroraCurve.central * (input.investorCurveW ?? 1),
+    debtSizingPrice:
+      auroraCurve.central * (input.debtSizingCentralW ?? 0.7) +
+      auroraCurve.low * (input.debtSizingLowW ?? 0.3),
+  };
 }
 
 function hasDetailedCapexInput(input: FinanceEngineInput) {
@@ -668,6 +724,7 @@ function buildPreRows(input: FinanceEngineInput): PreRow[] {
   const contractDuration = input.contractDuration ?? CONTRACT_DURATION_FALLBACK;
   const prixMarcheP50 = input.prixMarcheP50 ?? PRIX_MARCHE_P50_FALLBACK;
   const prixMarcheP90 = input.prixMarcheP90 ?? PRIX_MARCHE_P90_FALLBACK;
+  const auroraCurveByYear = buildAuroraCurveByYear(input);
   // P90 yield: use provided value or fall back to P50 * 0.93.
   const effectiveYieldP90 = input.yieldP90Mwh ?? input.yieldMwh * 0.93;
 
@@ -682,13 +739,20 @@ function buildPreRows(input: FinanceEngineInput): PreRow[] {
     // P90 production year N = yield P90 MWh/MW/year * MW * annual degradation.
     const productionP90 = effectiveYieldP90 * input.capacityMw * degradationFactor;
 
+    const contractedTariff = input.tariff * (1 + tariffInflationRate) ** year;
+    const merchantPrices = resolveMerchantPrices(
+      input,
+      auroraCurveByYear,
+      year,
+      prixMarcheP50,
+      prixMarcheP90,
+    );
     // Tariff year N applies during the contract period, then merchant prices take over.
     const annualTariff =
-      year <= contractDuration
-        ? input.tariff * (1 + tariffInflationRate) ** year
-        : prixMarcheP50;
+      year <= contractDuration ? contractedTariff : merchantPrices.investorPrice;
 
-    const annualTariffP90 = year <= contractDuration ? annualTariff : prixMarcheP90;
+    const annualTariffP90 =
+      year <= contractDuration ? contractedTariff : merchantPrices.debtSizingPrice;
 
     // Revenue kEUR = production MWh * price EUR/MWh / 1000.
     const revenueP50 = (productionP50 * annualTariff) / 1000;
@@ -706,6 +770,8 @@ function buildPreRows(input: FinanceEngineInput): PreRow[] {
     const debtService = year <= input.debtMaturityYears ? annualDebtService : 0;
     const standardDebtInterest =
       standardDebtSchedule.get(year)?.interest ?? 0;
+    const standardDebtOutstanding =
+      standardDebtSchedule.get(year)?.outstanding ?? 0;
 
     preRows.push({
       year,
@@ -719,6 +785,7 @@ function buildPreRows(input: FinanceEngineInput): PreRow[] {
       cfadsP90Keuro: cfadsP90,
       debtServiceKeuro: debtService,
       standardDebtInterestKeuro: standardDebtInterest,
+      standardDebtOutstandingKeuro: standardDebtOutstanding,
       amort: annualAmort,
     });
   }
@@ -820,6 +887,7 @@ function applyWaterfall(
       discountedCashFlowKeuro: discounted(cfadsAfterTax, pre.year, discountRate),
       debtServiceKeuro: pre.debtServiceKeuro,
       debtServiceSculptedKeuro: sculptedService,
+      debtOutstandingKeuro: scheduleItem?.outstanding ?? pre.standardDebtOutstandingKeuro,
       cfadsP90Keuro: pre.cfadsP90Keuro,
       amort: pre.amort,
       ebit,
@@ -869,6 +937,7 @@ function scaledScheduleByYear(
       {
         principal: s.principal * scaleFactor,
         interest: s.interest * scaleFactor,
+        outstanding: s.outstanding * scaleFactor,
       },
     ]) ?? [],
   );

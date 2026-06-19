@@ -413,6 +413,11 @@ export async function updateProject(projectId: string, formData: FormData) {
 
 export async function deleteProject(projectId: string) {
   await prisma.$transaction([
+    prisma.auroraCurve.deleteMany({
+      where: {
+        projectId,
+      },
+    }),
     prisma.scenario.deleteMany({
       where: {
         projectId,
@@ -437,6 +442,18 @@ export async function createScenario(projectId: string, formData: FormData) {
     },
     select: {
       capacityMw: true,
+      commissioningYear: true,
+      debtSizingCentralW: true,
+      debtSizingLowW: true,
+      investorCurveW: true,
+      auroraCurves: {
+        select: {
+          year: true,
+          high: true,
+          central: true,
+          low: true,
+        },
+      },
     },
   });
 
@@ -451,6 +468,11 @@ export async function createScenario(projectId: string, formData: FormData) {
   const { dscrSchedule, ...assumptionsWithoutSchedule } = assumptions;
   const calculatedMetrics = calculateScenarioMetrics({
     capacityMw: project.capacityMw,
+    commissioningYear: project.commissioningYear,
+    auroraCurves: project.auroraCurves,
+    debtSizingCentralW: project.debtSizingCentralW,
+    debtSizingLowW: project.debtSizingLowW,
+    investorCurveW: project.investorCurveW,
     ...assumptionsWithoutSchedule,
     dscrSchedule,
   });
@@ -484,6 +506,18 @@ export async function updateScenario(
     },
     select: {
       capacityMw: true,
+      commissioningYear: true,
+      debtSizingCentralW: true,
+      debtSizingLowW: true,
+      investorCurveW: true,
+      auroraCurves: {
+        select: {
+          year: true,
+          high: true,
+          central: true,
+          low: true,
+        },
+      },
     },
   });
 
@@ -498,6 +532,11 @@ export async function updateScenario(
   const { dscrSchedule, ...assumptionsWithoutSchedule } = assumptions;
   const calculatedMetrics = calculateScenarioMetrics({
     capacityMw: project.capacityMw,
+    commissioningYear: project.commissioningYear,
+    auroraCurves: project.auroraCurves,
+    debtSizingCentralW: project.debtSizingCentralW,
+    debtSizingLowW: project.debtSizingLowW,
+    investorCurveW: project.investorCurveW,
     ...assumptionsWithoutSchedule,
     dscrSchedule,
   });

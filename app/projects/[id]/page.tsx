@@ -6,6 +6,7 @@ import {
   importScenarios,
   setReferenceScenario,
 } from "@/app/actions";
+import { AuroraImport } from "@/app/components/AuroraImport";
 import { DeleteScenarioButton } from "@/app/projects/[id]/delete-scenario-button";
 import {
   calculateAnnualCashFlows,
@@ -38,6 +39,22 @@ function formatNumber(value: number | null, suffix = "") {
 
 function formatYear(value: number) {
   return value > 0 ? String(value) : "-";
+}
+
+function formatDate(value: Date | null) {
+  if (value === null) {
+    return "-";
+  }
+
+  return value.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function formatAuroraTechnology(value: string | null) {
+  return value === "tracking" ? "Tracking solar PV" : "Fixed solar PV";
 }
 
 function formatMillionEuros(value: number | null) {
@@ -83,6 +100,9 @@ export default async function ProjectDetailPage({
       scenarios: {
         orderBy: { name: "asc" },
       },
+      auroraCurves: {
+        orderBy: { year: "asc" },
+      },
     },
   });
 
@@ -93,6 +113,11 @@ export default async function ProjectDetailPage({
   const scenarios = project.scenarios;
   const buildFinanceInput = (scenario: (typeof scenarios)[number]) => ({
     capacityMw: project.capacityMw,
+    commissioningYear: project.commissioningYear,
+    auroraCurves: project.auroraCurves,
+    debtSizingCentralW: project.debtSizingCentralW,
+    debtSizingLowW: project.debtSizingLowW,
+    investorCurveW: project.investorCurveW,
     capex: scenario.capex,
     surfaceHa: scenario.surfaceHa,
     prixModuleUSDWc: scenario.prixModuleUSDWc,
@@ -159,15 +184,18 @@ export default async function ProjectDetailPage({
   const referenceMetrics = projectReferenceScenario
     ? calculateScenarioMetrics(buildFinanceInput(projectReferenceScenario))
     : null;
+  const analysisMetrics = analysisScenario
+    ? calculateScenarioMetrics(buildFinanceInput(analysisScenario))
+    : null;
   const kpiNpv =
-    projectReferenceScenario?.npv ?? maxValue(scenarios.map((scenario) => scenario.npv));
+    referenceMetrics?.npv ?? maxValue(scenarios.map((scenario) => scenario.npv));
   const kpiIrr =
-    projectReferenceScenario?.irr ?? maxValue(scenarios.map((scenario) => scenario.irr));
+    referenceMetrics?.irr ?? maxValue(scenarios.map((scenario) => scenario.irr));
   const kpiDscr = projectReferenceScenario
     ? (referenceMetrics?.dscr ?? null)
     : minValue(scenarios.map((scenario) => scenario.dscr).filter((dscr) => dscr > 0));
   const kpiLcoe =
-    projectReferenceScenario?.lcoe ?? minValue(scenarios.map((scenario) => scenario.lcoe));
+    referenceMetrics?.lcoe ?? minValue(scenarios.map((scenario) => scenario.lcoe));
   const importScenariosForProject = importScenarios.bind(null, project.id);
   const cashFlowScenario = projectReferenceScenario ?? analysisScenario;
   const annualCashFlows = cashFlowScenario
@@ -209,7 +237,7 @@ export default async function ProjectDetailPage({
       : null;
   const analysisNpvNetKeuro =
     analysisScenario !== undefined && analysisDevFeesKeuro !== null
-      ? analysisScenario.npv - analysisDevFeesKeuro
+      ? (analysisMetrics?.npv ?? analysisScenario.npv) - analysisDevFeesKeuro
       : null;
   const financingChartData =
     sizing !== null && ccaKeuro !== null
@@ -244,6 +272,36 @@ export default async function ProjectDetailPage({
           },
         ]
       : [];
+  const dscrChartData = annualCashFlows
+    .filter((row) => {
+      const debtService = row.debtServiceSculptedKeuro ?? row.debtServiceKeuro;
+      return debtService > 0 && row.dscrRealized !== null && row.dscrTargetAtYear !== null;
+    })
+    .map((row) => {
+      const dscrRealized = row.dscrRealized ?? 0;
+      const dscrTarget = row.dscrTargetAtYear ?? 0;
+
+      return {
+        year: row.year,
+        dscrRealized,
+        dscrTarget,
+        dscrGreenBase: Math.min(dscrRealized, dscrTarget),
+        dscrGreenDelta: dscrRealized > dscrTarget ? dscrRealized - dscrTarget : 0,
+        dscrRedBase: Math.min(dscrRealized, dscrTarget),
+        dscrRedDelta: dscrRealized < dscrTarget ? dscrTarget - dscrRealized : 0,
+      };
+    });
+  const debtRepaymentChartData = annualCashFlows
+    .filter((row) => {
+      const debtService = row.debtServiceSculptedKeuro ?? row.debtServiceKeuro;
+      return debtService > 0 || row.debtOutstandingKeuro > 0 || row.dsraSoldeKeuro > 0;
+    })
+    .map((row) => ({
+      year: row.year,
+      debtOutstandingKeuro: row.debtOutstandingKeuro,
+      dsraBalanceKeuro: row.dsraSoldeKeuro,
+      debtServiceKeuro: row.debtServiceSculptedKeuro ?? row.debtServiceKeuro,
+    }));
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-10">
@@ -257,6 +315,15 @@ export default async function ProjectDetailPage({
           </h1>
         </div>
         <div className="flex flex-wrap gap-3">
+          {project.auroraUpdatedAt ? (
+            <span className="inline-flex h-10 items-center rounded-md bg-emerald-100 px-3 text-sm font-medium text-emerald-800">
+              Courbes Aurora · {formatDate(project.auroraUpdatedAt)}
+            </span>
+          ) : (
+            <span className="inline-flex h-10 items-center rounded-md bg-amber-100 px-3 text-sm font-medium text-amber-800">
+              Aucune courbe Aurora
+            </span>
+          )}
           <form action={importScenariosForProject} className="flex gap-2">
             <input
               name="csv"
@@ -337,6 +404,29 @@ export default async function ProjectDetailPage({
           <p className="mt-1 text-zinc-950">
             {formatYear(project.commissioningYear)}
           </p>
+        </div>
+        <div className="sm:col-span-2 lg:col-span-3">
+          <p className="text-sm font-medium text-zinc-500">Courbes Aurora</p>
+          <div className="mt-2 rounded-md border border-zinc-200 bg-zinc-50 p-3">
+            <AuroraImport
+              projectId={project.id}
+              auroraUpdatedAt={project.auroraUpdatedAt?.toISOString() ?? null}
+              auroraTechnology={project.auroraTechnology}
+              debtSizingCentralW={project.debtSizingCentralW}
+              debtSizingLowW={project.debtSizingLowW}
+              investorCurveW={project.investorCurveW}
+            />
+            {project.auroraUpdatedAt ? (
+              <p className="mt-2 text-sm font-medium text-emerald-700">
+                Courbes Aurora · {formatDate(project.auroraUpdatedAt)} ·{" "}
+                {formatAuroraTechnology(project.auroraTechnology)}
+              </p>
+            ) : (
+              <p className="mt-2 text-sm font-medium text-amber-700">
+                Aucune courbe Aurora
+              </p>
+            )}
+          </div>
         </div>
         {cashFlowScenario ? (
           <div>
@@ -531,6 +621,8 @@ export default async function ProjectDetailPage({
         gearingRealisePct={gearingRealisePct}
         cashFlowData={cashFlowChartData}
         capexData={capexChartData}
+        dscrData={dscrChartData}
+        debtRepaymentData={debtRepaymentChartData}
       />
 
       <section className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-white p-5">
@@ -672,7 +764,7 @@ export default async function ProjectDetailPage({
           <div>
             <p className="text-sm font-medium text-zinc-500">VAN Brute</p>
             <p className="mt-1 text-xl font-semibold text-zinc-950">
-              {formatMillionEuros(analysisScenario?.npv ?? null)}
+              {formatMillionEuros(analysisMetrics?.npv ?? analysisScenario?.npv ?? null)}
             </p>
           </div>
           <div>
@@ -684,7 +776,7 @@ export default async function ProjectDetailPage({
           <div>
             <p className="text-sm font-medium text-zinc-500">LCOE</p>
             <p className="mt-1 text-xl font-semibold text-zinc-950">
-              {formatNumber(analysisScenario?.lcoe ?? null, " €/MWh")}
+              {formatNumber(analysisMetrics?.lcoe ?? analysisScenario?.lcoe ?? null, " €/MWh")}
             </p>
           </div>
         </div>
