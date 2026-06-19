@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { calculateScenarioMetrics } from "@/app/lib/finance/engine";
+import {
+  calculateCapexDetails,
+  calculateOpexDetails,
+  calculateScenarioMetrics,
+} from "@/app/lib/finance/engine";
 import { DEFAULT_FINANCIAL_ASSUMPTIONS } from "@/app/lib/finance/types";
 import type { DscrTranche } from "@/app/lib/finance/types";
 import { prisma } from "@/app/lib/prisma";
@@ -248,7 +252,15 @@ function readDscrSchedule(formData: FormData): DscrTranche[] | null {
 
 function readScenarioAssumptions(formData: FormData) {
   return {
-    capex: readNumber(formData, "capex"),
+    capex: readOptionalNumber(formData, "capex") ?? 0,
+    surfaceHa: readOptionalNumber(formData, "surfaceHa"),
+    prixModuleUSDWc: readOptionalNumber(formData, "prixModuleUSDWc"),
+    tauxEURUSD: readOptionalNumber(formData, "tauxEURUSD"),
+    boSCtWc: readOptionalNumber(formData, "boSCtWc"),
+    raccordementOuvrageKEuro: readOptionalNumber(formData, "raccordementOuvrageK€"),
+    tarifQPKEuroPerMW: readOptionalNumber(formData, "tarifQPk€PerMW"),
+    apportAffaireMode: readOptionalText(formData, "apportAffaireMode"),
+    apportAffaireValeur: readOptionalNumber(formData, "apportAffaireValeur"),
     opex: readNumber(formData, "opex"),
     yieldMwh: readNumber(formData, "yieldMwh"),
     yieldP90Mwh: readOptionalNumber(formData, "yieldP90Mwh"),
@@ -261,11 +273,94 @@ function readScenarioAssumptions(formData: FormData) {
     debtMaturityYears: readInteger(formData, "debtMaturityYears"),
     tariffInflationRate: readNumber(formData, "tariffInflationRate"),
     opexInflationRate: readNumber(formData, "opexInflationRate"),
+    contractDuration: readOptionalInteger(formData, "contractDuration"),
+    prixMarcheP50: readOptionalNumber(formData, "prixMarcheP50"),
+    prixMarcheP90: readOptionalNumber(formData, "prixMarcheP90"),
+    assuranceRate: readOptionalNumber(formData, "assuranceRate"),
+    inflationAssurance: readOptionalNumber(formData, "inflationAssurance"),
+    balancingCost: readOptionalNumber(formData, "balancingCost"),
+    omFixedEuroKwc: readOptionalNumber(formData, "omFixedEuroKwc"),
+    mraEuroKwc: readOptionalNumber(formData, "mraEuroKwc"),
+    backOfficeKeuro: readOptionalNumber(formData, "backOfficeKeuro"),
+    diversOpexKeuro: readOptionalNumber(formData, "diversOpexKeuro"),
+    loyerMode: readOptionalText(formData, "loyerMode"),
+    loyerValeur: readOptionalNumber(formData, "loyerValeur"),
+    loyerInflation: readOptionalNumber(formData, "loyerInflation"),
+    inflationOM: readOptionalNumber(formData, "inflationOM"),
+    inflationMRA: readOptionalNumber(formData, "inflationMRA"),
+    inflationBackOffice: readOptionalNumber(formData, "inflationBackOffice"),
+    inflationDivers: readOptionalNumber(formData, "inflationDivers"),
     debtTenorYears: readOptionalInteger(formData, "debtTenorYears"),
     dscrSchedule: readDscrSchedule(formData),
-    gearingMax: readOptionalNumber(formData, "gearingMax"),
-    structuringFeeRate: readOptionalNumber(formData, "structuringFeeRate"),
+    gearingMaxPct:
+      readOptionalNumber(formData, "gearingMaxPct") ??
+      readOptionalNumber(formData, "gearingMax"),
+    tauxIS: readOptionalNumber(formData, "tauxIS"),
+    amortDuree: readOptionalInteger(formData, "amortDuree"),
+    dsraMonths: readOptionalInteger(formData, "dsraMonths"),
+    devFeesKEuroPerMW: readOptionalNumber(formData, "devFeesKEuroPerMW"),
+    tauxISEntreprise: readOptionalNumber(formData, "tauxISEntreprise"),
   };
+}
+
+function readOptionalText(formData: FormData, key: string): string | null {
+  const value = formData.get(key);
+
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+
+  return value.trim();
+}
+
+function withCalculatedCapex<T extends ReturnType<typeof readScenarioAssumptions>>(
+  assumptions: T,
+  capacityMw: number,
+) {
+  const capexDetails = calculateCapexDetails({
+    capacityMw,
+    ...assumptions,
+  });
+
+  return {
+    ...assumptions,
+    capex: capexDetails.capexPerMwKeuro,
+  };
+}
+
+function withCalculatedOpex<T extends ReturnType<typeof readScenarioAssumptions>>(
+  assumptions: T,
+  capacityMw: number,
+) {
+  const productionP50Mwh = assumptions.yieldMwh * capacityMw;
+  const contractDuration = assumptions.contractDuration ?? 20;
+  const tariffInflationRate = assumptions.tariffInflationRate / 100;
+  const annualTariff =
+    contractDuration >= 1
+      ? assumptions.tariff * (1 + tariffInflationRate)
+      : (assumptions.prixMarcheP50 ?? 60);
+  const revenueP50Keuro = productionP50Mwh * annualTariff / 1000;
+  const opexDetails = calculateOpexDetails(
+    {
+      capacityMw,
+      ...assumptions,
+    },
+    1,
+    revenueP50Keuro,
+    productionP50Mwh,
+  );
+
+  return {
+    ...assumptions,
+    opex: opexDetails.opexPerMwKeuro,
+  };
+}
+
+function withCalculatedCapexAndOpex<T extends ReturnType<typeof readScenarioAssumptions>>(
+  assumptions: T,
+  capacityMw: number,
+) {
+  return withCalculatedOpex(withCalculatedCapex(assumptions, capacityMw), capacityMw);
 }
 
 export async function createProject(formData: FormData) {
@@ -349,7 +444,10 @@ export async function createScenario(projectId: string, formData: FormData) {
     redirect("/projects");
   }
 
-  const assumptions = readScenarioAssumptions(formData);
+  const assumptions = withCalculatedCapexAndOpex(
+    readScenarioAssumptions(formData),
+    project.capacityMw,
+  );
   const { dscrSchedule, ...assumptionsWithoutSchedule } = assumptions;
   const calculatedMetrics = calculateScenarioMetrics({
     capacityMw: project.capacityMw,
@@ -362,7 +460,7 @@ export async function createScenario(projectId: string, formData: FormData) {
       name: readText(formData, "name"),
       ...assumptionsWithoutSchedule,
       dscrSchedule: dscrSchedule ? JSON.stringify(dscrSchedule) : null,
-      dscr: calculatedMetrics.dscr,
+      dscr: calculatedMetrics.dscr ?? 0,
       npv: calculatedMetrics.npv,
       irr: calculatedMetrics.irr,
       lcoe: calculatedMetrics.lcoe,
@@ -393,7 +491,10 @@ export async function updateScenario(
     redirect("/projects");
   }
 
-  const assumptions = readScenarioAssumptions(formData);
+  const assumptions = withCalculatedCapexAndOpex(
+    readScenarioAssumptions(formData),
+    project.capacityMw,
+  );
   const { dscrSchedule, ...assumptionsWithoutSchedule } = assumptions;
   const calculatedMetrics = calculateScenarioMetrics({
     capacityMw: project.capacityMw,
@@ -410,7 +511,7 @@ export async function updateScenario(
       name: readText(formData, "name"),
       ...assumptionsWithoutSchedule,
       dscrSchedule: dscrSchedule ? JSON.stringify(dscrSchedule) : null,
-      dscr: calculatedMetrics.dscr,
+      dscr: calculatedMetrics.dscr ?? 0,
       npv: calculatedMetrics.npv,
       irr: calculatedMetrics.irr,
       lcoe: calculatedMetrics.lcoe,
@@ -438,6 +539,14 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
     data: {
       name: `${scenario.name} - Copy`,
       capex: scenario.capex,
+      surfaceHa: scenario.surfaceHa,
+      prixModuleUSDWc: scenario.prixModuleUSDWc,
+      tauxEURUSD: scenario.tauxEURUSD,
+      boSCtWc: scenario.boSCtWc,
+      raccordementOuvrageKEuro: scenario.raccordementOuvrageKEuro,
+      tarifQPKEuroPerMW: scenario.tarifQPKEuroPerMW,
+      apportAffaireMode: scenario.apportAffaireMode,
+      apportAffaireValeur: scenario.apportAffaireValeur,
       opex: scenario.opex,
       yieldMwh: scenario.yieldMwh,
       yieldP90Mwh: scenario.yieldP90Mwh,
@@ -450,11 +559,32 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
       debtMaturityYears: scenario.debtMaturityYears,
       tariffInflationRate: scenario.tariffInflationRate,
       opexInflationRate: scenario.opexInflationRate,
+      contractDuration: scenario.contractDuration,
+      prixMarcheP50: scenario.prixMarcheP50,
+      prixMarcheP90: scenario.prixMarcheP90,
+      assuranceRate: scenario.assuranceRate,
+      inflationAssurance: scenario.inflationAssurance,
+      balancingCost: scenario.balancingCost,
+      omFixedEuroKwc: scenario.omFixedEuroKwc,
+      mraEuroKwc: scenario.mraEuroKwc,
+      backOfficeKeuro: scenario.backOfficeKeuro,
+      diversOpexKeuro: scenario.diversOpexKeuro,
+      loyerMode: scenario.loyerMode,
+      loyerValeur: scenario.loyerValeur,
+      loyerInflation: scenario.loyerInflation,
+      inflationOM: scenario.inflationOM,
+      inflationMRA: scenario.inflationMRA,
+      inflationBackOffice: scenario.inflationBackOffice,
+      inflationDivers: scenario.inflationDivers,
       dscrTarget: scenario.dscrTarget,
       debtTenorYears: scenario.debtTenorYears,
       dscrSchedule: scenario.dscrSchedule,
-      gearingMax: scenario.gearingMax,
-      structuringFeeRate: scenario.structuringFeeRate,
+      gearingMaxPct: scenario.gearingMaxPct,
+      tauxIS: scenario.tauxIS,
+      amortDuree: scenario.amortDuree,
+      dsraMonths: scenario.dsraMonths,
+      devFeesKEuroPerMW: scenario.devFeesKEuroPerMW,
+      tauxISEntreprise: scenario.tauxISEntreprise,
       dscr: scenario.dscr,
       npv: scenario.npv,
       irr: scenario.irr,

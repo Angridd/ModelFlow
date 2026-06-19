@@ -32,6 +32,14 @@ model Scenario {
   id                  String  @id @default(cuid())
   name                String
   capex               Float
+  surfaceHa           Float?
+  prixModuleUSDWc     Float?
+  tauxEURUSD          Float?
+  boSCtWc             Float?
+  raccordementOuvrageKEuro Float? @map("raccordementOuvrageK€")
+  tarifQPKEuroPerMW   Float?  @map("tarifQPk€PerMW")
+  apportAffaireMode   String?
+  apportAffaireValeur Float?
   opex                Float
   yieldMwh            Float
   yieldP90Mwh         Float?
@@ -44,15 +52,36 @@ model Scenario {
   debtMaturityYears   Int     @default(20)
   tariffInflationRate Float   @default(0)
   opexInflationRate   Float   @default(2)
+  contractDuration    Int?
+  prixMarcheP50       Float?
+  prixMarcheP90       Float?
+  assuranceRate       Float?
+  inflationAssurance  Float?
+  balancingCost       Float?
+  omFixedEuroKwc      Float?
+  mraEuroKwc          Float?
+  backOfficeKeuro     Float?
+  diversOpexKeuro     Float?
+  loyerMode           String?
+  loyerValeur         Float?
+  loyerInflation      Float?
+  inflationOM         Float?
+  inflationMRA        Float?
+  inflationBackOffice Float?
+  inflationDivers     Float?
   dscrTarget          Float?
   debtTenorYears      Int?
   dscrSchedule        String?
-  gearingMax          Float?
+  gearingMaxPct       Float?  @map("gearingMax")
   structuringFeeRate  Float?
   tauxIS              Float?
   amortDuree          Int?
   ccaApportKeuro      Float?
   ccaRemunRate        Float?
+  dsraMonths          Int?
+  ccaBloque           Boolean?
+  devFeesKEuroPerMW   Float?
+  tauxISEntreprise    Float?
   dscr                Float
   npv                 Float
   irr                 Float

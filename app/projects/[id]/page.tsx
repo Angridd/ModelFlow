@@ -9,8 +9,11 @@ import {
 import { DeleteScenarioButton } from "@/app/projects/[id]/delete-scenario-button";
 import {
   calculateAnnualCashFlows,
+  calculateCapexDetails,
+  calculateOpexDetails,
   calculateScenarioMetrics,
 } from "@/app/lib/finance/engine";
+import { ProjectFinancialCharts } from "@/app/components/ProjectFinancialCharts";
 import type { DscrTranche } from "@/app/lib/finance/types";
 import { generateSensitivityRows } from "@/app/lib/sensitivity";
 import { prisma } from "@/app/lib/prisma";
@@ -88,6 +91,56 @@ export default async function ProjectDetailPage({
   }
 
   const scenarios = project.scenarios;
+  const buildFinanceInput = (scenario: (typeof scenarios)[number]) => ({
+    capacityMw: project.capacityMw,
+    capex: scenario.capex,
+    surfaceHa: scenario.surfaceHa,
+    prixModuleUSDWc: scenario.prixModuleUSDWc,
+    tauxEURUSD: scenario.tauxEURUSD,
+    boSCtWc: scenario.boSCtWc,
+    raccordementOuvrageKEuro: scenario.raccordementOuvrageKEuro,
+    tarifQPKEuroPerMW: scenario.tarifQPKEuroPerMW,
+    apportAffaireMode: scenario.apportAffaireMode,
+    apportAffaireValeur: scenario.apportAffaireValeur,
+    opex: scenario.opex,
+    omFixedEuroKwc: scenario.omFixedEuroKwc,
+    mraEuroKwc: scenario.mraEuroKwc,
+    backOfficeKeuro: scenario.backOfficeKeuro,
+    diversOpexKeuro: scenario.diversOpexKeuro,
+    loyerMode: scenario.loyerMode,
+    loyerValeur: scenario.loyerValeur,
+    loyerInflation: scenario.loyerInflation,
+    inflationOM: scenario.inflationOM,
+    inflationMRA: scenario.inflationMRA,
+    inflationBackOffice: scenario.inflationBackOffice,
+    inflationDivers: scenario.inflationDivers,
+    yieldMwh: scenario.yieldMwh,
+    yieldP90Mwh: scenario.yieldP90Mwh,
+    tariff: scenario.tariff,
+    debtRate: scenario.debtRate,
+    projectLifeYears: scenario.projectLifeYears,
+    degradationRate: scenario.degradationRate,
+    discountRate: scenario.discountRate,
+    debtInterestRate: scenario.debtInterestRate,
+    debtMaturityYears: scenario.debtMaturityYears,
+    tariffInflationRate: scenario.tariffInflationRate,
+    opexInflationRate: scenario.opexInflationRate,
+    contractDuration: scenario.contractDuration,
+    prixMarcheP50: scenario.prixMarcheP50,
+    prixMarcheP90: scenario.prixMarcheP90,
+    assuranceRate: scenario.assuranceRate,
+    inflationAssurance: scenario.inflationAssurance,
+    balancingCost: scenario.balancingCost,
+    dscrTarget: scenario.dscrTarget,
+    debtTenorYears: scenario.debtTenorYears,
+    dscrSchedule: parseDscrSchedule(scenario.dscrSchedule),
+    gearingMaxPct: scenario.gearingMaxPct,
+    tauxIS: scenario.tauxIS,
+    amortDuree: scenario.amortDuree,
+    dsraMonths: scenario.dsraMonths,
+    devFeesKEuroPerMW: scenario.devFeesKEuroPerMW,
+    tauxISEntreprise: scenario.tauxISEntreprise,
+  });
   const projectReferenceScenario = scenarios.find((scenario) => scenario.isReference);
   const selectedScenarioId =
     typeof scenarioId === "string"
@@ -104,85 +157,93 @@ export default async function ProjectDetailPage({
     ? generateSensitivityRows(analysisScenario, "capex")
     : [];
   const referenceMetrics = projectReferenceScenario
-    ? calculateScenarioMetrics({
-        capacityMw: project.capacityMw,
-        capex: projectReferenceScenario.capex,
-        opex: projectReferenceScenario.opex,
-        yieldMwh: projectReferenceScenario.yieldMwh,
-        yieldP90Mwh: projectReferenceScenario.yieldP90Mwh,
-        tariff: projectReferenceScenario.tariff,
-        debtRate: projectReferenceScenario.debtRate,
-        projectLifeYears: projectReferenceScenario.projectLifeYears,
-        degradationRate: projectReferenceScenario.degradationRate,
-        discountRate: projectReferenceScenario.discountRate,
-        debtInterestRate: projectReferenceScenario.debtInterestRate,
-        debtMaturityYears: projectReferenceScenario.debtMaturityYears,
-        tariffInflationRate: projectReferenceScenario.tariffInflationRate,
-        opexInflationRate: projectReferenceScenario.opexInflationRate,
-        dscrTarget: projectReferenceScenario.dscrTarget,
-        debtTenorYears: projectReferenceScenario.debtTenorYears,
-        dscrSchedule: parseDscrSchedule(projectReferenceScenario.dscrSchedule),
-        gearingMax: projectReferenceScenario.gearingMax,
-        structuringFeeRate: projectReferenceScenario.structuringFeeRate,
-      })
+    ? calculateScenarioMetrics(buildFinanceInput(projectReferenceScenario))
     : null;
   const kpiNpv =
     projectReferenceScenario?.npv ?? maxValue(scenarios.map((scenario) => scenario.npv));
   const kpiIrr =
     projectReferenceScenario?.irr ?? maxValue(scenarios.map((scenario) => scenario.irr));
-  const kpiDscr =
-    referenceMetrics?.dscr ?? minValue(scenarios.map((scenario) => scenario.dscr));
+  const kpiDscr = projectReferenceScenario
+    ? (referenceMetrics?.dscr ?? null)
+    : minValue(scenarios.map((scenario) => scenario.dscr).filter((dscr) => dscr > 0));
   const kpiLcoe =
     projectReferenceScenario?.lcoe ?? minValue(scenarios.map((scenario) => scenario.lcoe));
   const importScenariosForProject = importScenarios.bind(null, project.id);
   const cashFlowScenario = projectReferenceScenario ?? analysisScenario;
   const annualCashFlows = cashFlowScenario
-    ? calculateAnnualCashFlows({
-        capacityMw: project.capacityMw,
-        capex: cashFlowScenario.capex,
-        opex: cashFlowScenario.opex,
-        yieldMwh: cashFlowScenario.yieldMwh,
-        yieldP90Mwh: cashFlowScenario.yieldP90Mwh,
-        tariff: cashFlowScenario.tariff,
-        debtRate: cashFlowScenario.debtRate,
-        projectLifeYears: cashFlowScenario.projectLifeYears,
-        degradationRate: cashFlowScenario.degradationRate,
-        discountRate: cashFlowScenario.discountRate,
-        debtInterestRate: cashFlowScenario.debtInterestRate,
-        debtMaturityYears: cashFlowScenario.debtMaturityYears,
-        tariffInflationRate: cashFlowScenario.tariffInflationRate,
-        opexInflationRate: cashFlowScenario.opexInflationRate,
-        dscrTarget: cashFlowScenario.dscrTarget,
-        debtTenorYears: cashFlowScenario.debtTenorYears,
-        dscrSchedule: parseDscrSchedule(cashFlowScenario.dscrSchedule),
-        gearingMax: cashFlowScenario.gearingMax,
-        structuringFeeRate: cashFlowScenario.structuringFeeRate,
-      })
+    ? calculateAnnualCashFlows(buildFinanceInput(cashFlowScenario))
     : [];
   const cashFlowMetrics = cashFlowScenario
-    ? calculateScenarioMetrics({
-        capacityMw: project.capacityMw,
-        capex: cashFlowScenario.capex,
-        opex: cashFlowScenario.opex,
-        yieldMwh: cashFlowScenario.yieldMwh,
-        yieldP90Mwh: cashFlowScenario.yieldP90Mwh,
-        tariff: cashFlowScenario.tariff,
-        debtRate: cashFlowScenario.debtRate,
-        projectLifeYears: cashFlowScenario.projectLifeYears,
-        degradationRate: cashFlowScenario.degradationRate,
-        discountRate: cashFlowScenario.discountRate,
-        debtInterestRate: cashFlowScenario.debtInterestRate,
-        debtMaturityYears: cashFlowScenario.debtMaturityYears,
-        tariffInflationRate: cashFlowScenario.tariffInflationRate,
-        opexInflationRate: cashFlowScenario.opexInflationRate,
-        dscrTarget: cashFlowScenario.dscrTarget,
-        debtTenorYears: cashFlowScenario.debtTenorYears,
-        dscrSchedule: parseDscrSchedule(cashFlowScenario.dscrSchedule),
-        gearingMax: cashFlowScenario.gearingMax,
-        structuringFeeRate: cashFlowScenario.structuringFeeRate,
-      })
+    ? calculateScenarioMetrics(buildFinanceInput(cashFlowScenario))
     : null;
+  const cashFlowCapexDetails = cashFlowScenario
+    ? calculateCapexDetails(buildFinanceInput(cashFlowScenario))
+    : null;
+  const cashFlowOpexDetails =
+    cashFlowScenario && annualCashFlows[0]
+      ? calculateOpexDetails(
+          buildFinanceInput(cashFlowScenario),
+          1,
+          annualCashFlows[0].revenueP50Keuro,
+          annualCashFlows[0].productionP50Mwh,
+        )
+      : null;
   const sizing = cashFlowMetrics?.sizing ?? null;
+  const capexInitialKeuro = cashFlowScenario
+    ? (cashFlowCapexDetails?.capexTotalKeuro ?? cashFlowScenario.capex * project.capacityMw)
+    : 0;
+  const capexEffectifKeuro = sizing !== null
+    ? capexInitialKeuro + sizing.structuringFeeKeuro
+    : null;
+  const ccaKeuro =
+    sizing !== null && capexEffectifKeuro !== null
+      ? Math.max(0, capexEffectifKeuro - sizing.debtRetenuKeuro)
+      : null;
+  const gearingRealisePct =
+    sizing !== null && capexEffectifKeuro !== null && capexEffectifKeuro > 0
+      ? sizing.debtRetenuKeuro / capexEffectifKeuro * 100
+      : null;
+  const analysisDevFeesKeuro =
+    analysisScenario !== undefined
+      ? (analysisScenario.devFeesKEuroPerMW ?? 0) * project.capacityMw
+      : null;
+  const analysisNpvNetKeuro =
+    analysisScenario !== undefined && analysisDevFeesKeuro !== null
+      ? analysisScenario.npv - analysisDevFeesKeuro
+      : null;
+  const financingChartData =
+    sizing !== null && ccaKeuro !== null
+      ? [
+          { name: "Dette" as const, value: sizing.debtRetenuKeuro, color: "#2563eb" },
+          { name: "CCA" as const, value: ccaKeuro, color: "#16a34a" },
+        ]
+      : [];
+  const cashFlowChartData = annualCashFlows.map((row) => {
+    const areaBaseKeuro = Math.min(row.revenueP50Keuro, row.revenueP90Keuro);
+
+    return {
+      year: row.year,
+      revenueP50Keuro: row.revenueP50Keuro,
+      revenueP90Keuro: row.revenueP90Keuro,
+      opexTotalKeuro: row.opexKeuro,
+      areaBaseKeuro,
+      areaSpreadKeuro:
+        Math.max(row.revenueP50Keuro, row.revenueP90Keuro) - areaBaseKeuro,
+    };
+  });
+  const capexChartData =
+    cashFlowCapexDetails !== null
+      ? [
+          {
+            name: "CAPEX",
+            modulesKeuro: cashFlowCapexDetails.modulesKeuro,
+            boSKeuro: cashFlowCapexDetails.boSKeuro,
+            raccordementKeuro: cashFlowCapexDetails.raccordementKeuro,
+            apportAffaireKeuro: cashFlowCapexDetails.apportAffaireKeuro,
+            devFeesKeuro: cashFlowCapexDetails.devFeesKeuro,
+          },
+        ]
+      : [];
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-10">
@@ -291,7 +352,7 @@ export default async function ProjectDetailPage({
             <p className="mt-1 text-zinc-950">
               {cashFlowScenario.yieldP90Mwh !== null
                 ? formatNumber(cashFlowScenario.yieldP90Mwh, " MWh/MW/an")
-                : formatNumber(cashFlowScenario.yieldMwh * 0.9, " MWh/MW/an (défaut)")}
+                : formatNumber(cashFlowScenario.yieldMwh * 0.93, " MWh/MW/an (défaut)")}
             </p>
           </div>
         ) : null}
@@ -301,6 +362,116 @@ export default async function ProjectDetailPage({
             <p className="mt-1 text-zinc-950">
               {formatMillionEuros(sizing.debtRetenuKeuro)}
             </p>
+          </div>
+        ) : null}
+        {cashFlowCapexDetails !== null ? (
+          <div className="sm:col-span-2 lg:col-span-3">
+            <p className="text-sm font-medium text-zinc-500">Detail CAPEX</p>
+            <div className="mt-2 grid gap-2 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <span className="text-zinc-500">Modules</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowCapexDetails.modulesKeuro, " kEUR")}{" "}
+                  <span className="text-zinc-500">
+                    {formatNumber(cashFlowCapexDetails.modulesCtWc, " ct/Wc equiv.")}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">BoS</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowCapexDetails.boSKeuro, " kEUR")}{" "}
+                  <span className="text-zinc-500">
+                    {formatNumber(cashFlowCapexDetails.boSCtWc, " ct/Wc")}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Raccord.</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowCapexDetails.raccordementKeuro, " kEUR")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Apport</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowCapexDetails.apportAffaireKeuro, " kEUR")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Dev fees</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowCapexDetails.devFeesKeuro, " kEUR")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Total</span>
+                <p className="font-semibold text-zinc-950">
+                  {formatNumber(cashFlowCapexDetails.capexTotalKeuro, " kEUR")}{" "}
+                  <span className="text-zinc-500">
+                    {formatNumber(cashFlowCapexDetails.capexPerMwKeuro, " kEUR/MWc")}
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {cashFlowOpexDetails !== null ? (
+          <div className="sm:col-span-2 lg:col-span-3">
+            <p className="text-sm font-medium text-zinc-500">Detail OPEX an 1</p>
+            <div className="mt-2 grid gap-2 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <span className="text-zinc-500">O&M</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowOpexDetails.omKeuro, " kEUR/an")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">MRA</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowOpexDetails.mraKeuro, " kEUR/an")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Back-off</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowOpexDetails.backOfficeKeuro, " kEUR/an")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Divers</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowOpexDetails.diversKeuro, " kEUR/an")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Loyer</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowOpexDetails.loyerKeuro, " kEUR/an")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Assurance</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowOpexDetails.assuranceKeuro, " kEUR/an")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Balancing</span>
+                <p className="font-medium text-zinc-950">
+                  {formatNumber(cashFlowOpexDetails.balancingKeuro, " kEUR/an")}
+                </p>
+              </div>
+              <div>
+                <span className="text-zinc-500">Total</span>
+                <p className="font-semibold text-zinc-950">
+                  {formatNumber(cashFlowOpexDetails.opexTotalKeuro, " kEUR/an")}{" "}
+                  <span className="text-zinc-500">
+                    {formatNumber(cashFlowOpexDetails.opexPerMwKeuro, " kEUR/MWc")}
+                  </span>
+                </p>
+              </div>
+            </div>
           </div>
         ) : null}
         {cashFlowScenario?.dscrSchedule ? (
@@ -354,6 +525,13 @@ export default async function ProjectDetailPage({
           </p>
         </div>
       </section>
+
+      <ProjectFinancialCharts
+        financingData={financingChartData}
+        gearingRealisePct={gearingRealisePct}
+        cashFlowData={cashFlowChartData}
+        capexData={capexChartData}
+      />
 
       <section className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-white p-5">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
@@ -423,7 +601,7 @@ export default async function ProjectDetailPage({
             {sizing.debtGearingMaxKeuro !== null ? (
               <div>
                 <p className="text-sm font-medium text-zinc-500">
-                  Gearing max ({cashFlowScenario?.gearingMax ?? ""}%)
+                  Gearing max ({cashFlowScenario?.gearingMaxPct ?? ""}%)
                 </p>
                 <p className="mt-1 text-zinc-950">
                   {formatNumber(sizing.debtGearingMaxKeuro, " k€")}
@@ -457,11 +635,21 @@ export default async function ProjectDetailPage({
                 {formatNumber(sizing.headroomKeuro, " k€")}
               </p>
             </div>
+            <div>
+              <p className="text-sm font-medium text-zinc-500">CCA</p>
+              <p className="mt-1 text-zinc-950">
+                {formatNumber(ccaKeuro, " k€")}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-zinc-500">Gearing réalisé</p>
+              <p className="mt-1 text-zinc-950">
+                {formatNumber(gearingRealisePct, " %")}
+              </p>
+            </div>
             {sizing.structuringFeeKeuro > 0 ? (
               <div>
-                <p className="text-sm font-medium text-zinc-500">
-                  Marge structuration ({sizing.structuringFeeRate}%)
-                </p>
+                <p className="text-sm font-medium text-zinc-500">Marge structuration</p>
                 <p className="mt-1 font-semibold text-green-700">
                   +{formatNumber(sizing.structuringFeeKeuro, " k€")}
                 </p>
@@ -482,15 +670,15 @@ export default async function ProjectDetailPage({
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
-            <p className="text-sm font-medium text-zinc-500">VAN</p>
+            <p className="text-sm font-medium text-zinc-500">VAN Brute</p>
             <p className="mt-1 text-xl font-semibold text-zinc-950">
               {formatMillionEuros(analysisScenario?.npv ?? null)}
             </p>
           </div>
           <div>
-            <p className="text-sm font-medium text-zinc-500">TRI</p>
+            <p className="text-sm font-medium text-zinc-500">VAN Nette</p>
             <p className="mt-1 text-xl font-semibold text-zinc-950">
-              {formatNumber(analysisScenario?.irr ?? null, " %")}
+              {formatMillionEuros(analysisNpvNetKeuro)}
             </p>
           </div>
           <div>
@@ -502,6 +690,31 @@ export default async function ProjectDetailPage({
         </div>
       </section>
 
+      {cashFlowMetrics?.doubleIRR !== null && cashFlowMetrics?.doubleIRR !== undefined ? (
+        <section className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-white p-5">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <h2 className="text-lg font-semibold text-zinc-950">Double TRI</h2>
+            <p className="text-sm font-medium text-zinc-500">
+              {cashFlowScenario?.name ?? "-"}
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <p className="text-sm font-medium text-zinc-500">TRI Invest</p>
+              <p className="mt-1 text-zinc-950">
+                {formatNumber(cashFlowMetrics.doubleIRR.irrInvest, " %")}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-zinc-500">TRI entreprise</p>
+              <p className="mt-1 text-zinc-950">
+                {formatNumber(cashFlowMetrics.doubleIRR.irrEntreprise, " %")}
+              </p>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <section className="flex flex-col gap-3">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <h2 className="text-lg font-semibold text-zinc-950">
@@ -512,7 +725,7 @@ export default async function ProjectDetailPage({
           </p>
         </div>
         <div className="overflow-x-auto rounded-md border border-zinc-200 bg-white">
-          <table className="w-full min-w-[2350px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[3450px] border-collapse text-left text-sm">
             <thead className="bg-zinc-100 text-zinc-600">
               <tr>
                 <th className="px-4 py-3 font-medium">Annee</th>
@@ -526,7 +739,15 @@ export default async function ProjectDetailPage({
                 <th className="px-4 py-3 font-medium">CF actualisé kEUR</th>
                 <th className="px-4 py-3 font-medium">Service dette kEUR</th>
                 <th className="px-4 py-3 font-medium">Service sculpté kEUR</th>
-                <th className="px-4 py-3 font-medium">CFADS P90 kEUR</th>
+                <th className="px-4 py-3 font-medium">CFADS P90 apres IS kEUR</th>
+                <th className="px-4 py-3 font-medium">IS</th>
+                <th className="px-4 py-3 font-medium">Déficit cumulé</th>
+                <th className="px-4 py-3 font-medium">Résultat net</th>
+                <th className="px-4 py-3 font-medium">CFADS après IS</th>
+                <th className="px-4 py-3 font-medium">DSRA solde</th>
+                <th className="px-4 py-3 font-medium">Cash bloqué</th>
+                <th className="px-4 py-3 font-medium">Dividende</th>
+                <th className="px-4 py-3 font-medium">Flux actionnaire</th>
                 <th className="px-4 py-3 font-medium">DSCR (P90)</th>
                 <th className="px-4 py-3 font-medium">DSCR cible</th>
                 <th className="px-4 py-3 font-medium">DSCR réalisé</th>
@@ -538,6 +759,14 @@ export default async function ProjectDetailPage({
               {sizing !== null ? (
                 <tr className="bg-zinc-50 italic text-zinc-500">
                   <td className="px-4 py-3 font-medium text-zinc-700">0</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
+                  <td className="px-4 py-3">-</td>
                   <td className="px-4 py-3">-</td>
                   <td className="px-4 py-3">-</td>
                   <td className="px-4 py-3">-</td>
@@ -590,7 +819,7 @@ export default async function ProjectDetailPage({
                     {formatNumber(row.discountedCashFlowKeuro)}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.debtServiceKeuro)}
+                    {formatNumber(row.debtServiceSculptedKeuro ?? row.debtServiceKeuro)}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
                     {row.debtServiceSculptedKeuro !== null
@@ -598,7 +827,31 @@ export default async function ProjectDetailPage({
                       : "-"}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.cfadsP90Keuro)}
+                    {formatNumber(row.cfadsP90AfterTaxKeuro)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.is)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.deficitCumuleKeuro)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.resultatNet)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.cfadsAfterTax)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.dsraSoldeKeuro)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.cashBloqueKeuro)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.dividende)}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-700">
+                    {formatNumber(row.fluxActionnaire)}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
                     {formatNumber(row.dscr)}
@@ -615,7 +868,7 @@ export default async function ProjectDetailPage({
               ))}
               {annualCashFlows.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-center text-zinc-500" colSpan={17}>
+                  <td className="px-4 py-8 text-center text-zinc-500" colSpan={25}>
                     -
                   </td>
                 </tr>
@@ -720,7 +973,7 @@ export default async function ProjectDetailPage({
                     {formatNumber(scenario.debtRate, " %")}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(scenario.dscr)}
+                    {formatNumber(scenario.dscr > 0 ? scenario.dscr : null)}
                   </td>
                   <td className="px-4 py-3 text-zinc-700">
                     {formatMillionEuros(scenario.npv)}

@@ -2,8 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { updateScenario } from "@/app/actions";
+import { CapexDetailFields } from "@/app/components/CapexDetailFields";
 import { DscrSchedule } from "@/app/components/DscrSchedule";
-import type { DscrTranche } from "@/app/lib/finance/types";
+import { OpexDetailFields } from "@/app/components/OpexDetailFields";
+import {
+  DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS,
+  type DscrTranche,
+} from "@/app/lib/finance/types";
 import { prisma } from "@/app/lib/prisma";
 
 const primaryFields = [
@@ -27,13 +32,6 @@ const primaryFields = [
     step: "0.01",
     placeholder: "ex. 75",
     title: "Prix de vente de l'électricité en €/MWh (tarif CRE ou contrat de marché)",
-  },
-  {
-    name: "debtRate" as const,
-    label: "Gearing (%)",
-    step: "0.01",
-    placeholder: "ex. 70",
-    title: "Part du CAPEX financée par la dette en % (ex. 70 % pour un financement de projet solaire)",
   },
 ] as const;
 
@@ -68,9 +66,9 @@ const assumptionFields = [
   },
   {
     name: "debtMaturityYears" as const,
-    label: "Maturité dette (ans)",
+    label: "Durée de la dette (ans)",
     step: "1",
-    placeholder: "ex. 20",
+    placeholder: "ex. 18",
     title: "Durée d'amortissement de la dette pour le service annualisé (ex. 15–20 ans)",
   },
   {
@@ -86,6 +84,102 @@ const assumptionFields = [
     step: "0.01",
     placeholder: "ex. 2",
     title: "Revalorisation annuelle des charges en % (ex. 2 % = inflation générale)",
+  },
+] as const;
+
+const fiscalFields = [
+  {
+    name: "tauxIS" as const,
+    label: "Taux IS (%)",
+    step: "0.01",
+    placeholder: "ex. 25",
+    title: "Taux d'impot sur les societes applique au resultat fiscal.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.tauxIS,
+  },
+  {
+    name: "amortDuree" as const,
+    label: "Duree amortissement (ans)",
+    step: "1",
+    placeholder: "ex. 20",
+    title: "Duree d'amortissement comptable utilisee pour le calcul fiscal.",
+  },
+  {
+    name: "dsraMonths" as const,
+    label: "DSRA (mois)",
+    step: "1",
+    placeholder: "ex. 6",
+    title: "Nombre de mois de service dette a couvrir en reserve DSRA.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.dsraMonths,
+  },
+  {
+    name: "devFeesKEuroPerMW" as const,
+    label: "Dev fees (kEUR/MW)",
+    step: "0.01",
+    placeholder: "ex. 110",
+    title: "Frais de developpement factures au closing, en kEUR par MW.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.devFeesKEuroPerMW,
+  },
+  {
+    name: "tauxISEntreprise" as const,
+    label: "Taux IS entreprise (%)",
+    step: "0.01",
+    placeholder: "ex. 25",
+    title: "Taux IS applique aux revenus de l'entreprise pour le double TRI.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.tauxISEntreprise,
+  },
+] as const;
+
+const revenueFields = [
+  {
+    name: "contractDuration" as const,
+    label: "Duree contrat tarifaire (ans)",
+    step: "1",
+    placeholder: "ex. 20",
+    title: "Duree du tarif contractuel. Prix marche applique ensuite",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.contractDuration,
+  },
+  {
+    name: "prixMarcheP50" as const,
+    label: "Prix marche post-contrat P50 (EUR/MWh)",
+    step: "0.01",
+    placeholder: "ex. 60",
+    title: "Prix marche applique au scenario P50 apres la periode contractuelle.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.prixMarcheP50,
+  },
+  {
+    name: "prixMarcheP90" as const,
+    label: "Prix marche post-contrat P90 (EUR/MWh)",
+    step: "0.01",
+    placeholder: "ex. 55",
+    title: "Prix marche applique au scenario P90 apres la periode contractuelle.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.prixMarcheP90,
+  },
+] as const;
+
+const opexExtraFields = [
+  {
+    name: "assuranceRate" as const,
+    label: "Assurance (% du CA P50)",
+    step: "0.01",
+    placeholder: "ex. 2.5",
+    title: "Assurance annuelle calculee en pourcentage du chiffre d'affaires P50.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.assuranceRate,
+  },
+  {
+    name: "inflationAssurance" as const,
+    label: "Inflation assurance (%/an)",
+    step: "0.01",
+    placeholder: "ex. 2",
+    title: "Inflation annuelle appliquee au cout d'assurance.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationAssurance,
+  },
+  {
+    name: "balancingCost" as const,
+    label: "Balancing cost (EUR/MWh)",
+    step: "0.01",
+    placeholder: "ex. 2",
+    title: "Cout de balancing applique a la production P50.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.balancingCost,
   },
 ] as const;
 
@@ -126,6 +220,7 @@ export default async function EditScenarioPage({
         select: {
           id: true,
           name: true,
+          capacityMw: true,
         },
       },
     },
@@ -176,9 +271,28 @@ export default async function EditScenarioPage({
             className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
           />
         </label>
+        <input type="hidden" name="debtRate" value={scenario.debtRate} />
+
+        <CapexDetailFields
+          capacityMw={scenario.project.capacityMw}
+          initialValue={{
+            capex: scenario.capex,
+            surfaceHa: scenario.surfaceHa,
+            prixModuleUSDWc: scenario.prixModuleUSDWc,
+            tauxEURUSD: scenario.tauxEURUSD ?? 1.08,
+            boSCtWc: scenario.boSCtWc,
+            raccordementOuvrageKEuro: scenario.raccordementOuvrageKEuro,
+            tarifQPKEuroPerMW: scenario.tarifQPKEuroPerMW,
+            apportAffaireMode: scenario.apportAffaireMode,
+            apportAffaireValeur: scenario.apportAffaireValeur,
+            devFeesKEuroPerMW:
+              scenario.devFeesKEuroPerMW ??
+              DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.devFeesKEuroPerMW,
+          }}
+        />
 
         <div className="grid gap-5 sm:grid-cols-2">
-          {primaryFields.map((field) => (
+          {primaryFields.filter((field) => field.name !== "capex" && field.name !== "opex").map((field) => (
             <label key={field.name} className="grid gap-2 text-sm font-medium text-zinc-700">
               {field.label}
               <input
@@ -216,12 +330,102 @@ export default async function EditScenarioPage({
               type="number"
               step="0.01"
               defaultValue={scenario.yieldP90Mwh ?? ""}
-              placeholder="Défaut : P50 × 0,9"
-              title="Production annuelle au niveau de confiance P90 — solaire : environ P50 × 0,9. Utilisé pour le dimensionnement bancaire (DSCR)."
+              placeholder="Défaut : P50 × 0,93"
+              title="Production annuelle au niveau de confiance P90 — solaire : environ P50 × 0,93. Utilisé pour le dimensionnement bancaire (DSCR)."
               className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
             />
           </label>
         </div>
+
+        <section className="grid gap-4 rounded-md border border-zinc-200 bg-zinc-50 p-4">
+          <h2 className="text-sm font-semibold text-zinc-950">Revenus</h2>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {revenueFields.map((field) => (
+              <label
+                key={field.name}
+                className="grid gap-2 text-sm font-medium text-zinc-700"
+              >
+                {field.label}
+                <input
+                  name={field.name}
+                  type="number"
+                  min="0"
+                  step={field.step}
+                  defaultValue={scenario[field.name] ?? field.defaultValue}
+                  placeholder={field.placeholder}
+                  title={field.title}
+                  className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+                />
+              </label>
+            ))}
+          </div>
+        </section>
+
+        <section className="grid gap-4 rounded-md border border-zinc-200 bg-zinc-50 p-4">
+          <h2 className="text-sm font-semibold text-zinc-950">OPEX</h2>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {opexExtraFields.map((field) => (
+              <label
+                key={field.name}
+                className="grid gap-2 text-sm font-medium text-zinc-700"
+              >
+                {field.label}
+                <input
+                  name={field.name}
+                  type="number"
+                  min="0"
+                  step={field.step}
+                  defaultValue={scenario[field.name] ?? field.defaultValue}
+                  placeholder={field.placeholder}
+                  title={field.title}
+                  className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+                />
+              </label>
+            ))}
+          </div>
+        </section>
+
+        <OpexDetailFields
+          capacityMw={scenario.project.capacityMw}
+          initialValue={{
+            opex: scenario.opex,
+            surfaceHa: scenario.surfaceHa,
+            yieldMwh: scenario.yieldMwh,
+            tariff: scenario.tariff,
+            tariffInflationRate: scenario.tariffInflationRate,
+            contractDuration:
+              scenario.contractDuration ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.contractDuration,
+            prixMarcheP50:
+              scenario.prixMarcheP50 ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.prixMarcheP50,
+            assuranceRate:
+              scenario.assuranceRate ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.assuranceRate,
+            inflationAssurance:
+              scenario.inflationAssurance ??
+              DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationAssurance,
+            balancingCost:
+              scenario.balancingCost ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.balancingCost,
+            omFixedEuroKwc:
+              scenario.omFixedEuroKwc ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.omFixedEuroKwc,
+            mraEuroKwc: scenario.mraEuroKwc ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.mraEuroKwc,
+            backOfficeKeuro:
+              scenario.backOfficeKeuro ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.backOfficeKeuro,
+            diversOpexKeuro:
+              scenario.diversOpexKeuro ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.diversOpexKeuro,
+            loyerMode: scenario.loyerMode,
+            loyerValeur: scenario.loyerValeur,
+            loyerInflation:
+              scenario.loyerInflation ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.loyerInflation,
+            inflationOM:
+              scenario.inflationOM ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationOM,
+            inflationMRA:
+              scenario.inflationMRA ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationMRA,
+            inflationBackOffice:
+              scenario.inflationBackOffice ??
+              DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationBackOffice,
+            inflationDivers:
+              scenario.inflationDivers ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationDivers,
+          }}
+        />
 
         <div className="grid gap-5 sm:grid-cols-2">
           {assumptionFields.map((field) => (
@@ -247,53 +451,58 @@ export default async function EditScenarioPage({
 
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="grid gap-2 text-sm font-medium text-zinc-700">
-            Ténor dette sculptée (ans)
+            Gearing maximum autorisé (%)
             <input
-              name="debtTenorYears"
-              type="number"
-              step="1"
-              min="0"
-              defaultValue={scenario.debtTenorYears ?? ""}
-              placeholder="ex. 15"
-              title="Durée de remboursement de la dette sculptée. Si omis, le ténor est déduit de l'année fin de la dernière tranche du profil DSCR."
-              className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
-            />
-          </label>
-          <label className="grid gap-2 text-sm font-medium text-zinc-700">
-            Gearing maximum (%)
-            <input
-              name="gearingMax"
+              name="gearingMaxPct"
               type="number"
               step="0.01"
               min="0"
               max="100"
-              defaultValue={scenario.gearingMax ?? ""}
-              placeholder="ex. 70"
-              title="Part maximale du CAPEX financée par dette senior (ex. 70 %)"
+              defaultValue={
+                scenario.gearingMaxPct ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.gearingMax
+              }
+              placeholder="ex. 90"
+              title="Plafond de dette en % du CAPEX effectif"
               className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
             />
           </label>
         </div>
 
-        <div className="grid gap-2">
-          <label className="grid gap-2 text-sm font-medium text-zinc-700">
-            Taux marge structuration (%)
-            <input
-              name="structuringFeeRate"
-              type="number"
-              step="0.01"
-              min="0"
-              defaultValue={scenario.structuringFeeRate ?? ""}
-              placeholder="ex. 1.5"
-              title="Taux appliqué au headroom DSCR pour calculer la marge facturée à la SPV (ex. 1,5 % du headroom)"
-              className="h-10 w-full max-w-xs rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
-            />
-          </label>
-        </div>
+        <section className="grid gap-4 rounded-md border border-zinc-200 bg-zinc-50 p-4">
+          <h2 className="text-sm font-semibold text-zinc-950">Fiscalité & CCA</h2>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {fiscalFields.map((field) => (
+              <label
+                key={field.name}
+                className="grid gap-2 text-sm font-medium text-zinc-700"
+              >
+                {field.label}
+                <input
+                  name={field.name}
+                  type="number"
+                  min="0"
+                  step={field.step}
+                  defaultValue={
+                    "defaultValue" in field
+                      ? (scenario[field.name] ?? field.defaultValue)
+                      : (scenario[field.name] ?? "")
+                  }
+                  placeholder={field.placeholder}
+                  title={field.title}
+                  className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+                />
+              </label>
+            ))}
+          </div>
+        </section>
 
         <div className="grid gap-2">
           <p className="text-sm font-medium text-zinc-700">Profil DSCR cible</p>
-          <DscrSchedule initialValue={initialDscrSchedule} />
+          <DscrSchedule
+            initialValue={
+              initialDscrSchedule ?? [...DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.dscrSchedule]
+            }
+          />
         </div>
 
         <div className="flex justify-end gap-3 pt-2">
