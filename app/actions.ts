@@ -274,8 +274,6 @@ function readScenarioAssumptions(formData: FormData) {
     tariffInflationRate: readNumber(formData, "tariffInflationRate"),
     opexInflationRate: readNumber(formData, "opexInflationRate"),
     contractDuration: readOptionalInteger(formData, "contractDuration"),
-    prixMarcheP50: readOptionalNumber(formData, "prixMarcheP50"),
-    prixMarcheP90: readOptionalNumber(formData, "prixMarcheP90"),
     assuranceRate: readOptionalNumber(formData, "assuranceRate"),
     inflationAssurance: readOptionalNumber(formData, "inflationAssurance"),
     balancingCost: readOptionalNumber(formData, "balancingCost"),
@@ -300,6 +298,26 @@ function readScenarioAssumptions(formData: FormData) {
     dsraMonths: readOptionalInteger(formData, "dsraMonths"),
     devFeesKEuroPerMW: readOptionalNumber(formData, "devFeesKEuroPerMW"),
     tauxISEntreprise: readOptionalNumber(formData, "tauxISEntreprise"),
+  };
+}
+
+function readAuroraWeights(formData: FormData) {
+  const investorCurveW = readOptionalNumber(formData, "investorCurveW");
+  const debtSizingCentralW = readOptionalNumber(formData, "debtSizingCentralW");
+  const debtSizingLowW = readOptionalNumber(formData, "debtSizingLowW");
+
+  if (
+    debtSizingCentralW !== null &&
+    debtSizingLowW !== null &&
+    Math.round((debtSizingCentralW + debtSizingLowW) * 100) !== 10000
+  ) {
+    throw new Error("Les ponderations Debt Sizing Central + Low doivent etre egales a 100 %.");
+  }
+
+  return {
+    investorCurveW: investorCurveW !== null ? investorCurveW / 100 : null,
+    debtSizingCentralW: debtSizingCentralW !== null ? debtSizingCentralW / 100 : null,
+    debtSizingLowW: debtSizingLowW !== null ? debtSizingLowW / 100 : null,
   };
 }
 
@@ -338,7 +356,7 @@ function withCalculatedOpex<T extends ReturnType<typeof readScenarioAssumptions>
   const annualTariff =
     contractDuration >= 1
       ? assumptions.tariff * (1 + tariffInflationRate)
-      : (assumptions.prixMarcheP50 ?? 60);
+      : 0;
   const revenueP50Keuro = productionP50Mwh * annualTariff / 1000;
   const opexDetails = calculateOpexDetails(
     {
@@ -457,17 +475,33 @@ export async function createScenario(projectId: string, formData: FormData) {
     readScenarioAssumptions(formData),
     project.capacityMw,
   );
+  const auroraWeights = readAuroraWeights(formData);
+  const effectiveInvestorCurveW = auroraWeights.investorCurveW ?? project.investorCurveW;
+  const effectiveDebtSizingCentralW =
+    auroraWeights.debtSizingCentralW ?? project.debtSizingCentralW;
+  const effectiveDebtSizingLowW = auroraWeights.debtSizingLowW ?? project.debtSizingLowW;
   const { dscrSchedule, ...assumptionsWithoutSchedule } = assumptions;
   const calculatedMetrics = calculateScenarioMetrics({
     capacityMw: project.capacityMw,
     commissioningYear: project.commissioningYear,
     auroraCurves,
-    debtSizingCentralW: project.debtSizingCentralW,
-    debtSizingLowW: project.debtSizingLowW,
-    investorCurveW: project.investorCurveW,
+    debtSizingCentralW: effectiveDebtSizingCentralW,
+    debtSizingLowW: effectiveDebtSizingLowW,
+    investorCurveW: effectiveInvestorCurveW,
     ...assumptionsWithoutSchedule,
     dscrSchedule,
   });
+
+  if (
+    auroraWeights.investorCurveW !== null ||
+    auroraWeights.debtSizingCentralW !== null ||
+    auroraWeights.debtSizingLowW !== null
+  ) {
+    await prisma.project.update({
+      where: { id: projectId },
+      data: auroraWeights,
+    });
+  }
 
   await prisma.scenario.create({
     data: {
@@ -518,17 +552,33 @@ export async function updateScenario(
     readScenarioAssumptions(formData),
     project.capacityMw,
   );
+  const auroraWeights = readAuroraWeights(formData);
+  const effectiveInvestorCurveW = auroraWeights.investorCurveW ?? project.investorCurveW;
+  const effectiveDebtSizingCentralW =
+    auroraWeights.debtSizingCentralW ?? project.debtSizingCentralW;
+  const effectiveDebtSizingLowW = auroraWeights.debtSizingLowW ?? project.debtSizingLowW;
   const { dscrSchedule, ...assumptionsWithoutSchedule } = assumptions;
   const calculatedMetrics = calculateScenarioMetrics({
     capacityMw: project.capacityMw,
     commissioningYear: project.commissioningYear,
     auroraCurves,
-    debtSizingCentralW: project.debtSizingCentralW,
-    debtSizingLowW: project.debtSizingLowW,
-    investorCurveW: project.investorCurveW,
+    debtSizingCentralW: effectiveDebtSizingCentralW,
+    debtSizingLowW: effectiveDebtSizingLowW,
+    investorCurveW: effectiveInvestorCurveW,
     ...assumptionsWithoutSchedule,
     dscrSchedule,
   });
+
+  if (
+    auroraWeights.investorCurveW !== null ||
+    auroraWeights.debtSizingCentralW !== null ||
+    auroraWeights.debtSizingLowW !== null
+  ) {
+    await prisma.project.update({
+      where: { id: projectId },
+      data: auroraWeights,
+    });
+  }
 
   await prisma.scenario.updateMany({
     where: {
@@ -588,8 +638,6 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
       tariffInflationRate: scenario.tariffInflationRate,
       opexInflationRate: scenario.opexInflationRate,
       contractDuration: scenario.contractDuration,
-      prixMarcheP50: scenario.prixMarcheP50,
-      prixMarcheP90: scenario.prixMarcheP90,
       assuranceRate: scenario.assuranceRate,
       inflationAssurance: scenario.inflationAssurance,
       balancingCost: scenario.balancingCost,

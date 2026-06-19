@@ -10,7 +10,6 @@ type OpexDetailInitialValue = {
   tariff?: number | null;
   tariffInflationRate?: number | null;
   contractDuration?: number | null;
-  prixMarcheP50?: number | null;
   assuranceRate?: number | null;
   inflationAssurance?: number | null;
   balancingCost?: number | null;
@@ -131,10 +130,6 @@ export function OpexDetailFields({
     "contractDuration",
     syncedInitialValue(initialValue.contractDuration, 20),
   );
-  const prixMarcheP50 = useSyncedFormNumber(
-    "prixMarcheP50",
-    syncedInitialValue(initialValue.prixMarcheP50, 60),
-  );
   const assuranceRate = useSyncedFormNumber(
     "assuranceRate",
     syncedInitialValue(initialValue.assuranceRate, 2.5),
@@ -152,7 +147,7 @@ export function OpexDetailFields({
   const annualTariff =
     contractDuration >= 1
       ? tariff * (1 + tariffInflationRate / 100)
-      : prixMarcheP50;
+      : 0;
   const revenueP50Keuro = productionP50Mwh * annualTariff / 1000;
 
   const details = useMemo(
@@ -174,7 +169,6 @@ export function OpexDetailFields({
           opexInflationRate: 0,
           surfaceHa,
           contractDuration,
-          prixMarcheP50,
           assuranceRate,
           inflationAssurance,
           balancingCost,
@@ -212,7 +206,6 @@ export function OpexDetailFields({
       loyerValeur,
       mraEuroKwc,
       omFixedEuroKwc,
-      prixMarcheP50,
       productionP50Mwh,
       revenueP50Keuro,
       surfaceHa,

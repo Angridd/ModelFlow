@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
+import { headers } from "next/headers";
 import { createScenario } from "@/app/actions";
 import { CapexDetailFields } from "@/app/components/CapexDetailFields";
 import { DscrSchedule } from "@/app/components/DscrSchedule";
@@ -145,22 +146,6 @@ const revenueFields = [
     title: "Duree du tarif contractuel. Prix marche applique ensuite",
     defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.contractDuration,
   },
-  {
-    name: "prixMarcheP50" as const,
-    label: "Prix marche post-contrat P50 (EUR/MWh)",
-    step: "0.01",
-    placeholder: "ex. 60",
-    title: "Prix marche applique au scenario P50 apres la periode contractuelle.",
-    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.prixMarcheP50,
-  },
-  {
-    name: "prixMarcheP90" as const,
-    label: "Prix marche post-contrat P90 (EUR/MWh)",
-    step: "0.01",
-    placeholder: "ex. 55",
-    title: "Prix marche applique au scenario P90 apres la periode contractuelle.",
-    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.prixMarcheP90,
-  },
 ] as const;
 
 const opexExtraFields = [
@@ -190,6 +175,117 @@ const opexExtraFields = [
   },
 ] as const;
 
+type AuroraStatus = {
+  imported: boolean;
+  technology: string | null;
+  updatedAt: string | null;
+};
+
+async function getAuroraStatus(): Promise<AuroraStatus> {
+  const headersList = await headers();
+  const host = headersList.get("host");
+
+  if (!host) {
+    return { imported: false, technology: null, updatedAt: null };
+  }
+
+  const protocol = headersList.get("x-forwarded-proto") ?? "http";
+  const response = await fetch(`${protocol}://${host}/api/aurora/status`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return { imported: false, technology: null, updatedAt: null };
+  }
+
+  return response.json() as Promise<AuroraStatus>;
+}
+
+function formatDate(value: string | null) {
+  return value
+    ? new Date(value).toLocaleDateString("fr-FR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+    : "-";
+}
+
+function formatTechnology(value: string | null) {
+  return value === "tracking" ? "Tracking" : "Fixed";
+}
+
+function AuroraPriceCurveFields({
+  status,
+  investorCurveW = 1,
+  debtSizingCentralW = 0.7,
+  debtSizingLowW = 0.3,
+}: {
+  status: AuroraStatus;
+  investorCurveW?: number | null;
+  debtSizingCentralW?: number | null;
+  debtSizingLowW?: number | null;
+}) {
+  return (
+    <section className="grid gap-4 rounded-md border border-zinc-200 bg-zinc-50 p-4">
+      <h2 className="text-sm font-semibold text-zinc-950">
+        Courbes de prix post-contrat
+      </h2>
+      {status.imported ? (
+        <>
+          <span className="inline-flex w-fit rounded-md bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800">
+            Courbes Aurora importees · {formatTechnology(status.technology)} ·{" "}
+            {formatDate(status.updatedAt)}
+          </span>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              Pondération Investor Curve - Central (%)
+              <input
+                name="investorCurveW"
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue={(investorCurveW ?? 1) * 100}
+                title="100% = courbe Central Aurora pour le TRI investisseur"
+                className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              Pondération Debt Sizing - Central (%)
+              <input
+                name="debtSizingCentralW"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                defaultValue={(debtSizingCentralW ?? 0.7) * 100}
+                className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              Pondération Debt Sizing - Low (%)
+              <input
+                name="debtSizingLowW"
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                defaultValue={(debtSizingLowW ?? 0.3) * 100}
+                title="Central + Low doit etre egal a 100 %."
+                className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+              />
+            </label>
+          </div>
+        </>
+      ) : (
+        <span className="inline-flex w-fit rounded-md bg-amber-100 px-3 py-1 text-sm font-medium text-amber-800">
+          Aucune courbe Aurora — importer depuis la liste des projets
+        </span>
+      )}
+    </section>
+  );
+}
+
 export default async function NewScenarioPage({
   params,
 }: {
@@ -200,7 +296,14 @@ export default async function NewScenarioPage({
   const { id } = await params;
   const project = await prisma.project.findUnique({
     where: { id },
-    select: { id: true, name: true, capacityMw: true },
+    select: {
+      id: true,
+      name: true,
+      capacityMw: true,
+      investorCurveW: true,
+      debtSizingCentralW: true,
+      debtSizingLowW: true,
+    },
   });
 
   if (!project) {
@@ -208,6 +311,7 @@ export default async function NewScenarioPage({
   }
 
   const createScenarioForProject = createScenario.bind(null, project.id);
+  const auroraStatus = await getAuroraStatus();
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-10">
@@ -315,6 +419,13 @@ export default async function NewScenarioPage({
           </div>
         </section>
 
+        <AuroraPriceCurveFields
+          status={auroraStatus}
+          investorCurveW={project.investorCurveW}
+          debtSizingCentralW={project.debtSizingCentralW}
+          debtSizingLowW={project.debtSizingLowW}
+        />
+
         <section className="grid gap-4 rounded-md border border-zinc-200 bg-zinc-50 p-4">
           <h2 className="text-sm font-semibold text-zinc-950">OPEX</h2>
           <div className="grid gap-5 sm:grid-cols-2">
@@ -348,7 +459,6 @@ export default async function NewScenarioPage({
             tariff: 0,
             tariffInflationRate: DEFAULT_FINANCIAL_ASSUMPTIONS.tariffInflationRate,
             contractDuration: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.contractDuration,
-            prixMarcheP50: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.prixMarcheP50,
             assuranceRate: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.assuranceRate,
             inflationAssurance: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationAssurance,
             balancingCost: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.balancingCost,

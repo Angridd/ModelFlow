@@ -25,8 +25,6 @@ export const DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS = {
   devFeesKEuroPerMW: 110,
   gearingMax: 95,
   contractDuration: 20,
-  prixMarcheP50: 60,
-  prixMarcheP90: 55,
   assuranceRate: 2.5,
   inflationAssurance: 2,
   balancingCost: 2,

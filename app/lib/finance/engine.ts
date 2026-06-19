@@ -13,8 +13,6 @@ const DSCR_FALLBACK = 1.3;
 const STRUCTURING_FEE_RATE = 1;
 const CCA_REMUN_RATE = 0;
 const CONTRACT_DURATION_FALLBACK = 20;
-const PRIX_MARCHE_P50_FALLBACK = 60;
-const PRIX_MARCHE_P90_FALLBACK = 55;
 const ASSURANCE_RATE_FALLBACK = 2.5;
 const INFLATION_ASSURANCE_FALLBACK = 2;
 const BALANCING_COST_FALLBACK = 2;
@@ -50,8 +48,6 @@ export type FinanceEngineInput = FinancialAssumptions & {
   devFeesKEuroPerMW?: number | null;
   tauxISEntreprise?: number | null;
   contractDuration?: number | null;
-  prixMarcheP50?: number | null;
-  prixMarcheP90?: number | null;
   auroraCurves?: Array<{
     year: number;
     high: number;
@@ -361,8 +357,6 @@ function resolveMerchantPrices(
   input: FinanceEngineInput,
   auroraCurveByYear: Map<number, { high: number; central: number; low: number }>,
   projectYear: number,
-  fallbackP50: number,
-  fallbackP90: number,
 ) {
   const calendarYear =
     input.commissioningYear != null && input.commissioningYear > 0
@@ -372,8 +366,8 @@ function resolveMerchantPrices(
 
   if (!auroraCurve) {
     return {
-      investorPrice: fallbackP50,
-      debtSizingPrice: fallbackP90,
+      investorPrice: 0,
+      debtSizingPrice: 0,
     };
   }
 
@@ -722,8 +716,6 @@ function buildPreRows(input: FinanceEngineInput): PreRow[] {
     ? initialInvestment / amortDuree
     : 0;
   const contractDuration = input.contractDuration ?? CONTRACT_DURATION_FALLBACK;
-  const prixMarcheP50 = input.prixMarcheP50 ?? PRIX_MARCHE_P50_FALLBACK;
-  const prixMarcheP90 = input.prixMarcheP90 ?? PRIX_MARCHE_P90_FALLBACK;
   const auroraCurveByYear = buildAuroraCurveByYear(input);
   // P90 yield: use provided value or fall back to P50 * 0.93.
   const effectiveYieldP90 = input.yieldP90Mwh ?? input.yieldMwh * 0.93;
@@ -744,8 +736,6 @@ function buildPreRows(input: FinanceEngineInput): PreRow[] {
       input,
       auroraCurveByYear,
       year,
-      prixMarcheP50,
-      prixMarcheP90,
     );
     // Tariff year N applies during the contract period, then merchant prices take over.
     const annualTariff =

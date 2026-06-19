@@ -136,8 +136,6 @@ export default async function ProjectDetailPage({
     tariffInflationRate: scenario.tariffInflationRate,
     opexInflationRate: scenario.opexInflationRate,
     contractDuration: scenario.contractDuration,
-    prixMarcheP50: scenario.prixMarcheP50,
-    prixMarcheP90: scenario.prixMarcheP90,
     assuranceRate: scenario.assuranceRate,
     inflationAssurance: scenario.inflationAssurance,
     balancingCost: scenario.balancingCost,

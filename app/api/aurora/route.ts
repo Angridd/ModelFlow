@@ -69,7 +69,7 @@ function extractSheetCurve(
   });
   const yearColumns = extractYears(rows, sheetName);
   const sectionRowIndex = rows.findIndex((row) =>
-    row.some((cell) => normalizeCell(cell) === "uncurtailed capture price"),
+    row.some((cell) => normalizeCell(cell).includes("uncurtailed capture price")),
   );
 
   if (sectionRowIndex < 0) {
@@ -81,7 +81,7 @@ function extractSheetCurve(
   const targetLabel = technology === "fixed" ? "fixed solar pv" : "tracking solar pv";
   const targetRow = rows
     .slice(sectionRowIndex + 1)
-    .find((row) => row.some((cell) => normalizeCell(cell) === targetLabel));
+    .find((row) => row.some((cell) => normalizeCell(cell).includes(targetLabel)));
 
   if (!targetRow) {
     throw new Error(
