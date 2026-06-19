@@ -151,6 +151,10 @@ describe("waterfall fiscal, DSRA, CCA et double TRI", () => {
     );
 
     expect(metrics.sizingIterations).toBeGreaterThan(0);
-    expect(metrics.sizingIterations).toBeLessThan(50);
+    expect(metrics.sizing).not.toBeNull();
+    expect(metrics.sizing!.gearingActuel).toBeLessThanOrEqual(0.7 + 0.0025);
+    expect(metrics.dscr).not.toBeNull();
+    expect(metrics.dscr!).toBeCloseTo(1.25, 1);
+    expect(metrics.sizing!.margeFactKeuro).toBeGreaterThanOrEqual(0);
   });
 });

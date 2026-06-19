@@ -211,15 +211,15 @@ export default async function ProjectDetailPage({
     ? (cashFlowCapexDetails?.capexTotalKeuro ?? cashFlowScenario.capex * project.capacityMw)
     : 0;
   const capexEffectifKeuro = sizing !== null
-    ? capexInitialKeuro + sizing.structuringFeeKeuro
+    ? capexInitialKeuro + sizing.margeFactKeuro
     : null;
   const ccaKeuro =
     sizing !== null && capexEffectifKeuro !== null
       ? Math.max(0, capexEffectifKeuro - sizing.debtRetenuKeuro)
       : null;
   const gearingRealisePct =
-    sizing !== null && capexEffectifKeuro !== null && capexEffectifKeuro > 0
-      ? sizing.debtRetenuKeuro / capexEffectifKeuro * 100
+    sizing !== null
+      ? sizing.gearingActuel * 100
       : null;
   const analysisDevFeesKeuro =
     analysisScenario !== undefined
@@ -606,8 +606,15 @@ export default async function ProjectDetailPage({
               </div>
             </div>
             <div>
-              <p className="meta-label">Headroom DSCR</p>
-              <p className="meta-value">{formatNumber(sizing.headroomKeuro, " k€")}</p>
+              <p className="meta-label">Ecart contrainte gearing</p>
+              <p className="meta-value">
+                {formatNumber(
+                  sizing.debtGearingMaxKeuro !== null
+                    ? sizing.debtGearingMaxKeuro - sizing.debtRetenuKeuro
+                    : null,
+                  " k€",
+                )}
+              </p>
             </div>
             <div>
               <p className="meta-label">CCA</p>
@@ -617,11 +624,11 @@ export default async function ProjectDetailPage({
               <p className="meta-label">Gearing réalisé</p>
               <p className="meta-value">{formatNumber(gearingRealisePct, " %")}</p>
             </div>
-            {sizing.structuringFeeKeuro > 0 ? (
+            {sizing.margeFactKeuro > 0 ? (
               <div>
-                <p className="meta-label">Marge structuration</p>
+                <p className="meta-label">Marge facturable</p>
                 <p style={{ fontWeight: 700, color: "var(--ps-green)", marginTop: "0.2rem" }}>
-                  +{formatNumber(sizing.structuringFeeKeuro, " k€")}
+                  +{formatNumber(sizing.margeFactKeuro, " k€")}
                 </p>
               </div>
             ) : null}

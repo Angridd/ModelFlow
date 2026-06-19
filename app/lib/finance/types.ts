@@ -58,12 +58,12 @@ export type DscrTranche = {
 
 export type SizingResult = {
   debtSculptedKeuro: number;
-  debtGearingMaxKeuro: number | null; // null when gearingMax not configured
+  debtGearingMaxKeuro: number | null;
   debtRetenuKeuro: number;
-  headroomKeuro: number;
+  margeFactKeuro: number;
+  gearingActuel: number;
   bindingConstraint: "dscr" | "gearing" | "equal";
-  structuringFeeKeuro: number;
-  structuringFeeRate: number;
+  iterationsCount: number;
 };
 
 export type T0Flows = {

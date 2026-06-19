@@ -1,60 +1,50 @@
 import { describe, expect, it } from "vitest";
-import { sizingResult } from "@/app/lib/finance/engine";
+import { calculateScenarioMetrics } from "@/app/lib/finance/engine";
+import type { FinanceEngineInput } from "@/app/lib/finance/engine";
 
-describe("sizingResult", () => {
-  it("DSCR contraint — debtSculpted < debtGearingMax", () => {
-    // debtSculpted = 5 000, capex = 10 000, gearingMax = 70 % → gearingMax = 7 000
-    // headroom = 7 000 - 5 000 = 2 000
-    // structuringFee = 2 000 × 1,5 = 3 000
-    const result = sizingResult(5000, 10000, 70, 1.5);
+function input(overrides: Partial<FinanceEngineInput> = {}): FinanceEngineInput {
+  return {
+    capacityMw: 10,
+    capex: 650,
+    opex: 10,
+    yieldMwh: 1850,
+    yieldP90Mwh: 1700,
+    tariff: 105,
+    debtRate: 60,
+    projectLifeYears: 25,
+    degradationRate: 0.3,
+    discountRate: 6,
+    debtInterestRate: 4,
+    debtMaturityYears: 12,
+    tariffInflationRate: 0,
+    opexInflationRate: 1,
+    tauxIS: 25,
+    debtTenorYears: 12,
+    dscrSchedule: [{ yearFrom: 1, yearTo: 12, dscrValue: 1.25 }],
+    gearingMaxPct: 70,
+    ...overrides,
+  };
+}
 
-    expect(result.bindingConstraint).toBe("dscr");
-    expect(result.debtGearingMaxKeuro).toBeCloseTo(7000);
-    expect(result.debtRetenuKeuro).toBeCloseTo(5000);
-    expect(result.headroomKeuro).toBeCloseTo(2000);
-    expect(result.structuringFeeKeuro).toBeCloseTo(3000);
-    expect(result.structuringFeeRate).toBe(1.5);
+describe("ajusteMargeFacturable", () => {
+  it("borne le gearing, garde le DSCR cible et retourne une marge positive ou nulle", () => {
+    const metrics = calculateScenarioMetrics(input());
+
+    expect(metrics.sizing).not.toBeNull();
+    expect(metrics.sizing!.gearingActuel).toBeLessThanOrEqual(0.7 + 0.0025);
+    expect(metrics.dscr).not.toBeNull();
+    expect(metrics.dscr!).toBeCloseTo(1.25, 1);
+    expect(metrics.sizing!.margeFactKeuro).toBeGreaterThanOrEqual(0);
   });
 
-  it("Gearing contraint — debtSculpted > debtGearingMax", () => {
-    // debtSculpted = 8 000, gearingMax cap = 7 000 → gearing binds
-    // headroom = 0 → structuringFee = 0
-    const result = sizingResult(8000, 10000, 70, 1.5);
+  it("fonctionne sans contrainte gearing avec une marge nulle", () => {
+    const metrics = calculateScenarioMetrics(input({ gearingMaxPct: null }));
 
-    expect(result.bindingConstraint).toBe("gearing");
-    expect(result.debtGearingMaxKeuro).toBeCloseTo(7000);
-    expect(result.debtRetenuKeuro).toBeCloseTo(7000);
-    expect(result.headroomKeuro).toBeCloseTo(0);
-    expect(result.structuringFeeKeuro).toBeCloseTo(0);
-  });
-
-  it("Contraintes égales — debtSculpted === debtGearingMax", () => {
-    // debtSculpted = 7 000, gearingMax cap = 7 000 → equal
-    const result = sizingResult(7000, 10000, 70, 1.5);
-
-    expect(result.bindingConstraint).toBe("equal");
-    expect(result.debtRetenuKeuro).toBeCloseTo(7000);
-    expect(result.headroomKeuro).toBeCloseTo(0);
-    expect(result.structuringFeeKeuro).toBeCloseTo(0);
-  });
-
-  it("gearingMax null — pas de contrainte gearing", () => {
-    // No bank cap: debtRetenu = debtSculpted, headroom = 0, no fee.
-    const result = sizingResult(5000, 10000, null, 1.5);
-
-    expect(result.debtGearingMaxKeuro).toBeNull();
-    expect(result.bindingConstraint).toBe("dscr");
-    expect(result.debtRetenuKeuro).toBeCloseTo(5000);
-    expect(result.headroomKeuro).toBeCloseTo(0);
-    expect(result.structuringFeeKeuro).toBeCloseTo(0);
-  });
-
-  it("structuringFeeRate = 0 → structuringFeeKeuro = 0 même avec headroom", () => {
-    // headroom = 2 000 but feeRate = 0 → no fee revenue
-    const result = sizingResult(5000, 10000, 70, 0);
-
-    expect(result.bindingConstraint).toBe("dscr");
-    expect(result.headroomKeuro).toBeCloseTo(2000);
-    expect(result.structuringFeeKeuro).toBeCloseTo(0);
+    expect(metrics.sizing).not.toBeNull();
+    expect(metrics.sizing!.debtGearingMaxKeuro).toBeNull();
+    expect(metrics.sizing!.margeFactKeuro).toBe(0);
+    expect(metrics.sizing!.bindingConstraint).toBe("dscr");
+    expect(metrics.dscr).not.toBeNull();
+    expect(metrics.dscr!).toBeCloseTo(1.25, 1);
   });
 });

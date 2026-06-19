@@ -10,7 +10,6 @@ import type {
 const IRR_MIN_RATE = -0.9999;
 const IRR_MAX_RATE = 10;
 const DSCR_FALLBACK = 1.3;
-const STRUCTURING_FEE_RATE = 1;
 const CCA_REMUN_RATE = 0;
 const CONTRACT_DURATION_FALLBACK = 20;
 const ASSURANCE_RATE_FALLBACK = 2.5;
@@ -180,6 +179,7 @@ type RetainedDebtScheduleItem = Pick<
 type SizingComputation = {
   sizing: SizingResult | null;
   scheduleByYear: Map<number, RetainedDebtScheduleItem>;
+  annualCashFlows: AnnualCashFlow[];
   iterations: number;
 };
 
@@ -559,44 +559,19 @@ export function calculateOpexDetails(
  * When gearingMax is null there is no bank gearing cap: debtRetenu = debtSculpted,
  * headroom = 0, structuringFee = 0.
  */
-export function sizingResult(
+function resolveBindingConstraint(
   debtSculptedKeuro: number,
-  capexKeuro: number,
-  gearingMax: number | null,
-  structuringFeeRate: number,
-): SizingResult {
-  if (gearingMax === null) {
-    return {
-      debtSculptedKeuro,
-      debtGearingMaxKeuro: null,
-      debtRetenuKeuro: debtSculptedKeuro,
-      headroomKeuro: 0,
-      bindingConstraint: "dscr",
-      structuringFeeKeuro: 0,
-      structuringFeeRate,
-    };
+  debtGearingMaxKeuro: number | null,
+): SizingResult["bindingConstraint"] {
+  if (debtGearingMaxKeuro === null) {
+    return "dscr";
   }
 
-  const debtGearingMaxKeuro = capexKeuro * gearingMax / 100;
-  const debtRetenuKeuro = Math.min(debtSculptedKeuro, debtGearingMaxKeuro);
-  const headroomKeuro = debtGearingMaxKeuro - debtRetenuKeuro;
-  const bindingConstraint: SizingResult["bindingConstraint"] =
-    debtSculptedKeuro < debtGearingMaxKeuro
-      ? "dscr"
-      : debtSculptedKeuro > debtGearingMaxKeuro
-        ? "gearing"
-        : "equal";
-  const structuringFeeKeuro = headroomKeuro * structuringFeeRate;
+  if (Math.abs(debtSculptedKeuro - debtGearingMaxKeuro) < 0.001) {
+    return "equal";
+  }
 
-  return {
-    debtSculptedKeuro,
-    debtGearingMaxKeuro,
-    debtRetenuKeuro,
-    headroomKeuro,
-    bindingConstraint,
-    structuringFeeKeuro,
-    structuringFeeRate,
-  };
+  return debtSculptedKeuro < debtGearingMaxKeuro ? "dscr" : "gearing";
 }
 
 /**
@@ -694,8 +669,257 @@ export function sculptDebt(
   return { debtAmountKeuro, schedule: result.schedule };
 }
 
-function buildPreRows(input: FinanceEngineInput): PreRow[] {
-  const initialInvestment = calculateCapexDetails(input).capexTotalKeuro;
+function debtScheduleFromRetainedDebt(
+  cashFlows: ReadonlyArray<{ year: number; cfadsP90AfterTaxKeuro: number }>,
+  dscrSchedule: DscrTranche[],
+  debtInterestRatePercent: number,
+  tenorYears: number,
+  debtRetenuKeuro: number,
+) {
+  const debtRate = asRate(debtInterestRatePercent);
+  const schedule = new Map<number, RetainedDebtScheduleItem>();
+  let outstanding = Math.max(0, debtRetenuKeuro);
+
+  for (const row of cashFlows.filter((cashFlow) => cashFlow.year <= tenorYears)) {
+    if (outstanding <= 0) {
+      schedule.set(row.year, { principal: 0, interest: 0, outstanding: 0 });
+      continue;
+    }
+
+    const interest = outstanding * debtRate;
+    const targetDebtService =
+      row.cfadsP90AfterTaxKeuro / dscrForYear(row.year, dscrSchedule);
+    const principal = Math.min(Math.max(0, targetDebtService - interest), outstanding);
+
+    outstanding = Math.max(0, outstanding - principal);
+    schedule.set(row.year, { principal, interest, outstanding });
+  }
+
+  return schedule;
+}
+
+function presentValueDebtCapacity(
+  cashFlows: ReadonlyArray<{ year: number; cfadsP90AfterTaxKeuro: number }>,
+  dscrSchedule: DscrTranche[],
+  debtInterestRatePercent: number,
+  tenorYears: number,
+) {
+  const debtRate = asRate(debtInterestRatePercent);
+
+  return Math.max(
+    0,
+    cashFlows
+      .filter((row) => row.year <= tenorYears)
+      .reduce((pv, row) => {
+        const service = row.cfadsP90AfterTaxKeuro / dscrForYear(row.year, dscrSchedule);
+        return pv + service / (1 + debtRate) ** row.year;
+      }, 0),
+  );
+}
+
+type MarginSizingResult = {
+  sizing: SizingResult;
+  scheduleByYear: Map<number, RetainedDebtScheduleItem>;
+  iterationsCount: number;
+};
+
+function sizingWithFacturableMargin(
+  input: FinanceEngineInput,
+  capexTotalKeuro: number,
+  margeFactKeuro: number,
+  dscrSchedule: DscrTranche[],
+  debtTenorYears: number,
+  gearingMaxPct: number | null,
+): MarginSizingResult {
+  const discountRate = asRate(input.discountRate);
+  const capexEffectifKeuro = capexTotalKeuro + margeFactKeuro;
+  const debtGearingMaxKeuro =
+    gearingMaxPct !== null ? capexEffectifKeuro * gearingMaxPct / 100 : null;
+  let debtRetenuKeuro = 0;
+  let scheduleByYear = new Map<number, RetainedDebtScheduleItem>();
+  let preRows = buildPreRows(input, capexEffectifKeuro);
+  let taxRows = applyWaterfall(
+    preRows,
+    scheduleByYear,
+    input,
+    discountRate,
+    dscrSchedule,
+    debtTenorYears,
+    0,
+  );
+  let debtSculptedKeuro = 0;
+  let iterationsCount = 0;
+
+  for (let iteration = 0; iteration < 50; iteration += 1) {
+    iterationsCount = iteration + 1;
+    scheduleByYear = debtScheduleFromRetainedDebt(
+      taxRows,
+      dscrSchedule,
+      input.debtInterestRate,
+      debtTenorYears,
+      debtRetenuKeuro,
+    );
+    preRows = buildPreRows(input, capexEffectifKeuro);
+    taxRows = applyWaterfall(
+      preRows,
+      scheduleByYear,
+      input,
+      discountRate,
+      dscrSchedule,
+      debtTenorYears,
+      0,
+    );
+    debtSculptedKeuro = presentValueDebtCapacity(
+      taxRows,
+      dscrSchedule,
+      input.debtInterestRate,
+      debtTenorYears,
+    );
+
+    const nextDebtRetenuKeuro =
+      debtGearingMaxKeuro !== null
+        ? Math.min(debtSculptedKeuro, debtGearingMaxKeuro)
+        : debtSculptedKeuro;
+
+    if (Math.abs(nextDebtRetenuKeuro - debtRetenuKeuro) < 0.001) {
+      debtRetenuKeuro = nextDebtRetenuKeuro;
+      break;
+    }
+
+    debtRetenuKeuro = nextDebtRetenuKeuro;
+  }
+
+  scheduleByYear = debtScheduleFromRetainedDebt(
+    taxRows,
+    dscrSchedule,
+    input.debtInterestRate,
+    debtTenorYears,
+    debtRetenuKeuro,
+  );
+  preRows = buildPreRows(input, capexEffectifKeuro);
+  taxRows = applyWaterfall(
+    preRows,
+    scheduleByYear,
+    input,
+    discountRate,
+    dscrSchedule,
+    debtTenorYears,
+    0,
+  );
+  debtSculptedKeuro = presentValueDebtCapacity(
+    taxRows,
+    dscrSchedule,
+    input.debtInterestRate,
+    debtTenorYears,
+  );
+
+  const gearingActuel =
+    capexEffectifKeuro > 0 ? debtRetenuKeuro / capexEffectifKeuro : 0;
+
+  return {
+    sizing: {
+      debtSculptedKeuro,
+      debtGearingMaxKeuro,
+      debtRetenuKeuro,
+      margeFactKeuro,
+      gearingActuel,
+      bindingConstraint: resolveBindingConstraint(debtSculptedKeuro, debtGearingMaxKeuro),
+      iterationsCount,
+    },
+    scheduleByYear,
+    iterationsCount,
+  };
+}
+
+function ajusteMargeFacturable(
+  input: FinanceEngineInput,
+  capexTotalKeuro: number,
+  dscrSchedule: DscrTranche[],
+  debtTenorYears: number,
+  gearingMaxPct: number,
+): MarginSizingResult {
+  let iterationsCount = 0;
+  let result = sizingWithFacturableMargin(
+    input,
+    capexTotalKeuro,
+    0,
+    dscrSchedule,
+    debtTenorYears,
+    gearingMaxPct,
+  );
+  iterationsCount += result.iterationsCount;
+  const gearingMaxRatio = gearingMaxPct / 100;
+
+  if (result.sizing.gearingActuel < gearingMaxRatio) {
+    result.sizing.iterationsCount = iterationsCount;
+    return result;
+  }
+
+  let marge = 0;
+  let margePrecedente = 0;
+  let pas = 20_000;
+  const maxIter = 500;
+  let marginIterations = 0;
+
+  while (result.sizing.gearingActuel > gearingMaxRatio && marginIterations < maxIter) {
+    margePrecedente = marge;
+    marge += pas;
+    result = sizingWithFacturableMargin(
+      input,
+      capexTotalKeuro,
+      marge,
+      dscrSchedule,
+      debtTenorYears,
+      gearingMaxPct,
+    );
+    iterationsCount += result.iterationsCount;
+    pas *= 2;
+    marginIterations += 1;
+  }
+
+  pas = (marge - margePrecedente) / 2;
+  marge = margePrecedente;
+
+  while (pas > 1 && marginIterations < maxIter) {
+    marge += pas;
+    result = sizingWithFacturableMargin(
+      input,
+      capexTotalKeuro,
+      marge,
+      dscrSchedule,
+      debtTenorYears,
+      gearingMaxPct,
+    );
+    iterationsCount += result.iterationsCount;
+
+    if (result.sizing.gearingActuel < gearingMaxRatio) {
+      marge -= pas;
+    }
+
+    pas /= 2;
+    marginIterations += 1;
+  }
+
+  result = sizingWithFacturableMargin(
+    input,
+    capexTotalKeuro,
+    marge,
+    dscrSchedule,
+    debtTenorYears,
+    gearingMaxPct,
+  );
+  iterationsCount += result.iterationsCount;
+  result.sizing.iterationsCount = iterationsCount;
+
+  return result;
+}
+
+function buildPreRows(
+  input: FinanceEngineInput,
+  investmentOverrideKeuro?: number,
+): PreRow[] {
+  const initialInvestment =
+    investmentOverrideKeuro ?? calculateCapexDetails(input).capexTotalKeuro;
   const initialDebt = initialInvestment * (input.debtRate / 100);
   const degradationRate = asRate(input.degradationRate);
   const debtInterestRate = asRate(input.debtInterestRate);
@@ -917,27 +1141,8 @@ function applyWaterfall(
   });
 }
 
-function scaledScheduleByYear(
-  sculptedResult: { schedule: DebtScheduleItem[] } | null,
-  scaleFactor: number,
-) {
-  return new Map(
-    sculptedResult?.schedule.map((s) => [
-      s.year,
-      {
-        principal: s.principal * scaleFactor,
-        interest: s.interest * scaleFactor,
-        outstanding: s.outstanding * scaleFactor,
-      },
-    ]) ?? [],
-  );
-}
-
-function calculateSculpting(
-  input: FinanceEngineInput,
-  preRows: PreRow[],
-  initialInvestment: number,
-): SizingComputation {
+function calculateFinancing(input: FinanceEngineInput): SizingComputation {
+  const initialInvestment = calculateCapexDetails(input).capexTotalKeuro;
   const discountRate = asRate(input.discountRate);
   const effectiveSchedule = resolveSchedule(input);
   const effectiveTenor = input.debtTenorYears ?? input.debtMaturityYears;
@@ -945,89 +1150,72 @@ function calculateSculpting(
   const hasSculpting = effectiveSchedule !== null && effectiveTenor > 0;
 
   if (!hasSculpting) {
-    return { sizing: null, scheduleByYear: new Map(), iterations: 0 };
-  }
-
-  let scheduleByYear = new Map<number, RetainedDebtScheduleItem>();
-  let sizing: SizingResult | null = null;
-
-  for (let iteration = 0; iteration < 50; iteration += 1) {
-    const taxRows = applyWaterfall(
-      preRows,
-      scheduleByYear,
+    const retainedDebt = initialInvestment * input.debtRate / 100;
+    const annualCashFlows = applyWaterfall(
+      buildPreRows(input),
+      new Map(),
       input,
       discountRate,
       effectiveSchedule,
       effectiveTenor,
-      0,
+      Math.max(0, initialInvestment - retainedDebt),
     );
-    const debtSizingFlows = taxRows.map((row) => ({
-      year: row.year,
-      cfadsP90Keuro: row.cfadsP90AfterTaxKeuro,
-    }));
-    const sculptedResult = sculptDebt(
-      debtSizingFlows,
-      effectiveSchedule!,
-      input.debtInterestRate,
-      effectiveTenor,
-      initialInvestment,
-    );
-    const nextSizing =
-      sculptedResult !== null
-        ? sizingResult(
-            sculptedResult.debtAmountKeuro,
-            initialInvestment,
-            resolveGearingMaxPct(input),
-            STRUCTURING_FEE_RATE,
-          )
-        : null;
-    const scaleFactor =
-      nextSizing !== null && nextSizing.debtSculptedKeuro > 0
-        ? nextSizing.debtRetenuKeuro / nextSizing.debtSculptedKeuro
-        : 1;
-    const nextScheduleByYear = scaledScheduleByYear(sculptedResult, scaleFactor);
-    const previousDebt = sizing?.debtRetenuKeuro ?? 0;
-    const nextDebt = nextSizing?.debtRetenuKeuro ?? 0;
 
-    sizing = nextSizing;
-    scheduleByYear = nextScheduleByYear;
-
-    if (Math.abs(nextDebt - previousDebt) < 0.01) {
-      return { sizing, scheduleByYear, iterations: iteration + 1 };
-    }
+    return {
+      sizing: null,
+      scheduleByYear: new Map(),
+      annualCashFlows,
+      iterations: 0,
+    };
   }
 
-  return { sizing, scheduleByYear, iterations: 50 };
-}
-
-export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashFlow[] {
-  const initialInvestment = calculateCapexDetails(input).capexTotalKeuro;
-  const discountRate = asRate(input.discountRate);
-  const preRows = buildPreRows(input);
-  const effectiveSchedule = resolveSchedule(input);
-  const effectiveTenor = input.debtTenorYears ?? input.debtMaturityYears;
-  const { sizing, scheduleByYear } = calculateSculpting(input, preRows, initialInvestment);
-  const capexEffectif = initialInvestment + (sizing?.structuringFeeKeuro ?? 0);
-  const retainedDebt = sizing?.debtRetenuKeuro ?? initialInvestment * input.debtRate / 100;
-  const ccaPrincipalKeuro = Math.max(0, capexEffectif - retainedDebt);
-
-  return applyWaterfall(
-    preRows,
-    scheduleByYear,
+  const gearingMaxPct = resolveGearingMaxPct(input);
+  const marginResult =
+    gearingMaxPct === null
+      ? sizingWithFacturableMargin(
+          input,
+          initialInvestment,
+          0,
+          effectiveSchedule,
+          effectiveTenor,
+          null,
+        )
+      : ajusteMargeFacturable(
+          input,
+          initialInvestment,
+          effectiveSchedule,
+          effectiveTenor,
+          gearingMaxPct,
+        );
+  const capexEffectif = initialInvestment + marginResult.sizing.margeFactKeuro;
+  const ccaPrincipalKeuro = Math.max(0, capexEffectif - marginResult.sizing.debtRetenuKeuro);
+  const annualCashFlows = applyWaterfall(
+    buildPreRows(input, capexEffectif),
+    marginResult.scheduleByYear,
     input,
     discountRate,
     effectiveSchedule,
     effectiveTenor,
     ccaPrincipalKeuro,
   );
+
+  return {
+    sizing: marginResult.sizing,
+    scheduleByYear: marginResult.scheduleByYear,
+    annualCashFlows,
+    iterations: marginResult.sizing.iterationsCount,
+  };
+}
+
+export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashFlow[] {
+  return calculateFinancing(input).annualCashFlows;
 }
 
 export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngineResult {
   // Initial investment kEUR comes from detailed CAPEX when configured, else legacy capex kEUR/MW.
   const initialInvestment = calculateCapexDetails(input).capexTotalKeuro;
-  const preRows = buildPreRows(input);
-  const sculpting = calculateSculpting(input, preRows, initialInvestment);
-  const annualCashFlows = calculateAnnualCashFlows(input);
+  const financing = calculateFinancing(input);
+  const annualCashFlows = financing.annualCashFlows;
 
   // VAN and TRI use after-tax P50 operating cash-flows.
   const cashFlows = annualCashFlows.map((row) => row.cfadsAfterTax);
@@ -1047,17 +1235,20 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
   );
   // Minimum DSCR uses realized debt service only on years where principal + interest is paid.
   const dscrValues = annualCashFlows
-    .filter((row) => (row.debtServiceSculptedKeuro ?? row.debtServiceKeuro) > 0)
-    .map((row) => row.dscrRealized)
+    .map((row) => {
+      const debtService = row.debtServiceSculptedKeuro ?? row.debtServiceKeuro;
+      return debtService > 0 && row.dscrRealized !== null && row.dscrRealized < 100
+        ? row.dscrRealized
+        : null;
+    })
     .filter((value): value is number => value !== null);
 
   const dscr = dscrValues.length > 0 ? Math.min(...dscrValues) : null;
 
-  const sizing = sculpting.sizing;
+  const sizing = financing.sizing;
 
-  // Structuring fee is an upfront SPV cost — added to effective CAPEX.
-  const structuringFee = sizing?.structuringFeeKeuro ?? 0;
-  const capexEffectif = initialInvestment + structuringFee;
+  const margeFact = sizing?.margeFactKeuro ?? 0;
+  const capexEffectif = initialInvestment + margeFact;
 
   // NPV kEUR = sum of discounted P50 cash-flows - effective CAPEX.
   const npv = discountedCashFlows - capexEffectif;
@@ -1072,7 +1263,7 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
       : 0;
   const retainedDebt = sizing?.debtRetenuKeuro ?? initialInvestment * input.debtRate / 100;
   const ccaKeuro = Math.max(0, capexEffectif - retainedDebt);
-  const margeDev = input.margeDevKeuro ?? structuringFee;
+  const margeDev = input.margeDevKeuro ?? margeFact;
   const devFeesKeuro = (input.devFeesKEuroPerMW ?? 0) * input.capacityMw;
   const tauxISEntreprise = input.tauxISEntreprise ?? input.tauxIS ?? 0;
   const netEntrepriseFactor = 1 - asRate(tauxISEntreprise);
@@ -1114,7 +1305,7 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
     dscr: dscr !== null ? round(dscr) : null,
     debtAmountKeuro: sizing !== null ? round(sizing.debtRetenuKeuro) : null,
     doubleIRR,
-    sizingIterations: sculpting.iterations,
+    sizingIterations: financing.iterations,
     sizing: sizing !== null
       ? {
           ...sizing,
@@ -1122,8 +1313,8 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
           debtGearingMaxKeuro:
             sizing.debtGearingMaxKeuro !== null ? round(sizing.debtGearingMaxKeuro) : null,
           debtRetenuKeuro: round(sizing.debtRetenuKeuro),
-          headroomKeuro: round(sizing.headroomKeuro),
-          structuringFeeKeuro: round(sizing.structuringFeeKeuro),
+          margeFactKeuro: round(sizing.margeFactKeuro),
+          gearingActuel: round(sizing.gearingActuel, 6),
         }
       : null,
   };
