@@ -12,12 +12,47 @@ function formatAuroraTechnology(value: string | null | undefined) {
   return value === "tracking" ? "Tracking" : "Fixed";
 }
 
+function getStatusStripe(status: string): string {
+  const s = status.toLowerCase();
+  if (s === "approved" || s === "rtb") return "stripe-green";
+  if (s === "in review" || s === "permitted") return "stripe-blue";
+  return "stripe-yellow";
+}
+
+function getStatusBadgeClass(status: string): string {
+  const s = status.toLowerCase();
+  if (s === "approved" || s === "rtb") return "badge badge-green";
+  if (s === "in review" || s === "permitted") return "badge badge-blue";
+  return "badge badge-yellow";
+}
+
+function fmtIrr(v: number | null | undefined) {
+  if (v == null || v <= 0) return "-";
+  return `${v.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`;
+}
+
+function fmtNpv(v: number | null | undefined) {
+  if (v == null) return "-";
+  return `${(v / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} M€`;
+}
+
+function fmtLcoe(v: number | null | undefined) {
+  if (v == null || v <= 0) return "-";
+  return `${v.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} €/MWh`;
+}
+
 export default async function ProjectsPage() {
   await connection();
 
   const [projects, latestAuroraCurve] = await Promise.all([
     prisma.project.findMany({
       orderBy: { createdAt: "desc" },
+      include: {
+        scenarios: {
+          where: { isReference: true },
+          take: 1,
+        },
+      },
     }),
     prisma.auroraCurve.findFirst({
       orderBy: { updatedAt: "desc" },
@@ -25,79 +60,126 @@ export default async function ProjectsPage() {
   ]);
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-10">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-10">
+      <div className="page-header">
         <div>
-          <Link href="/" className="text-sm font-medium text-zinc-500 hover:text-zinc-900">
-            ModelFlow
-          </Link>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-zinc-950">
-            Projets
-          </h1>
+          <h1 className="page-title">Projets</h1>
+          <p style={{ fontSize: "0.875rem", color: "#6b7280", marginTop: "0.25rem" }}>
+            {projects.length} projet{projects.length !== 1 ? "s" : ""} dans le portefeuille
+          </p>
         </div>
-        <Link
-          href="/projects/new"
-          className="inline-flex h-10 items-center justify-center rounded-md bg-zinc-950 px-4 text-sm font-medium text-white hover:bg-zinc-800"
-        >
-          Nouveau projet
+        <Link href="/projects/new" className="btn-primary">
+          + Nouveau projet
         </Link>
       </div>
 
-      <section className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-white p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-950">Courbes Aurora</h2>
+      {/* Aurora section */}
+      <div className="aurora-section">
+        <div>
+          <p className="section-title" style={{ fontSize: "0.95rem" }}>Courbes Aurora</p>
+          <div style={{ marginTop: "0.5rem" }}>
             {latestAuroraCurve ? (
-              <span className="mt-2 inline-flex rounded-md bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800">
-                Courbes Aurora · {formatAuroraQuarter(latestAuroraCurve.updatedAt)} ·{" "}
+              <span className="badge badge-green">
+                {formatAuroraQuarter(latestAuroraCurve.updatedAt)} ·{" "}
                 {formatAuroraTechnology(latestAuroraCurve.technology)}
               </span>
             ) : (
-              <span className="mt-2 inline-flex rounded-md bg-amber-100 px-3 py-1 text-sm font-medium text-amber-800">
-                Aucune courbe Aurora
-              </span>
+              <span className="badge badge-yellow">Aucune courbe Aurora</span>
             )}
           </div>
-          <AuroraImport
-            auroraUpdatedAt={latestAuroraCurve?.updatedAt.toISOString() ?? null}
-            auroraTechnology={latestAuroraCurve?.technology ?? null}
-            debtSizingCentralW={null}
-            debtSizingLowW={null}
-            investorCurveW={null}
-          />
         </div>
-      </section>
+        <AuroraImport
+          auroraUpdatedAt={latestAuroraCurve?.updatedAt.toISOString() ?? null}
+          auroraTechnology={latestAuroraCurve?.technology ?? null}
+          debtSizingCentralW={null}
+          debtSizingLowW={null}
+          investorCurveW={null}
+        />
+      </div>
 
-      <div className="overflow-hidden rounded-md border border-zinc-200 bg-white">
-        <table className="w-full border-collapse text-left text-sm">
-          <thead className="bg-zinc-100 text-zinc-600">
-            <tr>
-              <th className="px-4 py-3 font-medium">Nom</th>
-              <th className="px-4 py-3 font-medium">Technologie</th>
-              <th className="px-4 py-3 font-medium">Capacite</th>
-              <th className="px-4 py-3 font-medium">Statut</th>
-              <th className="px-4 py-3 font-medium">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-200">
-            {projects.map((project) => (
-              <tr key={project.id}>
-                <td className="px-4 py-3 font-medium">
-                  <Link
-                    href={`/projects/${project.id}`}
-                    className="text-zinc-950 hover:text-zinc-600"
-                  >
-                    {project.name}
-                  </Link>
-                </td>
-                <td className="px-4 py-3 text-zinc-700">{project.technology}</td>
-                <td className="px-4 py-3 text-zinc-700">{project.capacityMw} MW</td>
-                <td className="px-4 py-3 text-zinc-700">{project.status}</td>
-                <td className="px-4 py-3 text-zinc-700">
-                  <div className="flex gap-2">
+      {/* Projects grid */}
+      {projects.length === 0 ? (
+        <div
+          className="card"
+          style={{ textAlign: "center", padding: "3rem 2rem", color: "#6b7280" }}
+        >
+          <p style={{ fontSize: "1rem", fontWeight: 600, color: "#374151" }}>
+            Aucun projet pour le moment.
+          </p>
+          <p style={{ fontSize: "0.875rem", marginTop: "0.375rem" }}>
+            Créez votre premier projet pour commencer.
+          </p>
+          <Link
+            href="/projects/new"
+            className="btn-primary"
+            style={{ marginTop: "1.25rem", display: "inline-flex" }}
+          >
+            + Nouveau projet
+          </Link>
+        </div>
+      ) : (
+        <div className="projects-grid">
+          {projects.map((project, i) => {
+            const refScenario = project.scenarios[0];
+            const delayClass = `delay-${Math.min(i + 1, 6) as 1 | 2 | 3 | 4 | 5 | 6}`;
+            return (
+              <div key={project.id} className={`project-card fade-up ${delayClass}`}>
+                <div className={`project-card-stripe ${getStatusStripe(project.status)}`} />
+                <div className="project-card-body">
+                  <div className="project-card-name">{project.name}</div>
+                  <div className="project-card-mw">
+                    {project.capacityMw}{" "}
+                    <span
+                      style={{
+                        fontSize: "0.875rem",
+                        fontWeight: 500,
+                        color: "#6b7280",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      MW
+                    </span>
+                  </div>
+                  <div className="project-card-badges">
+                    <span className={getStatusBadgeClass(project.status)}>
+                      {project.status}
+                    </span>
+                    <span className="badge badge-blue">{project.technology}</span>
+                    {project.region ? (
+                      <span className="badge badge-gray">{project.region}</span>
+                    ) : null}
+                    {project.ao ? (
+                      <span className="badge badge-gray">{project.ao}</span>
+                    ) : null}
+                  </div>
+                  {refScenario ? (
+                    <div className="project-card-kpis">
+                      <div className="project-card-kpi">
+                        <span className="project-card-kpi-label">TRI</span>
+                        <span className="project-card-kpi-value">
+                          {fmtIrr(refScenario.irr)}
+                        </span>
+                      </div>
+                      <div className="project-card-kpi">
+                        <span className="project-card-kpi-label">VAN</span>
+                        <span className="project-card-kpi-value">
+                          {fmtNpv(refScenario.npv)}
+                        </span>
+                      </div>
+                      <div className="project-card-kpi">
+                        <span className="project-card-kpi-label">LCOE</span>
+                        <span className="project-card-kpi-value">
+                          {fmtLcoe(refScenario.lcoe)}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ height: "0.5rem" }} />
+                  )}
+                  <div className="project-card-cta">
                     <Link
                       href={`/projects/${project.id}/edit`}
-                      className="inline-flex h-8 items-center justify-center rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
+                      className="btn-secondary btn-sm"
                     >
                       Modifier
                     </Link>
@@ -105,20 +187,19 @@ export default async function ProjectsPage() {
                       projectId={project.id}
                       projectName={project.name}
                     />
+                    <Link
+                      href={`/projects/${project.id}`}
+                      className="btn-primary btn-sm"
+                    >
+                      Voir →
+                    </Link>
                   </div>
-                </td>
-              </tr>
-            ))}
-            {projects.length === 0 ? (
-              <tr>
-                <td className="px-4 py-8 text-center text-zinc-500" colSpan={5}>
-                  Aucun projet pour le moment.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </main>
   );
 }

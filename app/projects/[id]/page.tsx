@@ -66,6 +66,13 @@ function parseDscrSchedule(json: string | null): DscrTranche[] | null {
   }
 }
 
+function getStatusBadgeClass(status: string): string {
+  const s = status.toLowerCase();
+  if (s === "approved" || s === "rtb") return "badge badge-green";
+  if (s === "in review" || s === "permitted") return "badge badge-blue";
+  return "badge badge-yellow";
+}
+
 export default async function ProjectDetailPage({
   params,
   searchParams,
@@ -287,110 +294,148 @@ export default async function ProjectDetailPage({
     }));
 
   return (
-    <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-10">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <Link href="/projects" className="text-sm font-medium text-zinc-500 hover:text-zinc-900">
-            Projets
-          </Link>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-zinc-950">
-            {project.name}
-          </h1>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <form action={importScenariosForProject} className="flex gap-2">
-            <input
-              name="csv"
-              type="file"
-              accept=".csv,text/csv"
-              required
-              className="h-10 max-w-48 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-700"
-            />
-            <button
-              type="submit"
-              className="inline-flex h-10 items-center justify-center rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
+    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-10">
+      {/* ── Hero ── */}
+      <div className="project-hero">
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+          <div>
+            <Link href="/projects" className="page-breadcrumb" style={{ color: "rgba(255,255,255,0.55)" }}>
+              ← Projets
+            </Link>
+            <h1 className="project-hero-title">{project.name}</h1>
+            <div className="project-hero-badges">
+              <span className={getStatusBadgeClass(project.status)}>{project.status}</span>
+              <span className="badge badge-ghost">{project.technology}</span>
+              {project.region ? <span className="badge badge-ghost">{project.region}</span> : null}
+              <span className="badge badge-ghost">{project.capacityMw} MW</span>
+              {project.ao ? <span className="badge badge-ghost">{project.ao}</span> : null}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+            <form action={importScenariosForProject} className="flex gap-2">
+              <input
+                name="csv"
+                type="file"
+                accept=".csv,text/csv"
+                required
+                style={{ height: "2.5rem", maxWidth: "11rem", borderRadius: 8, border: "1px solid rgba(255,255,255,0.25)", background: "rgba(255,255,255,0.1)", padding: "0 0.75rem", fontSize: "0.8rem", color: "rgba(255,255,255,0.85)" }}
+              />
+              <button
+                type="submit"
+                className="btn-secondary"
+                style={{ background: "rgba(255,255,255,0.12)", borderColor: "rgba(255,255,255,0.2)", color: "white" }}
+              >
+                Import CSV
+              </button>
+            </form>
+            <Link
+              href="/api/scenarios/template"
+              className="btn-secondary"
+              style={{ background: "rgba(255,255,255,0.12)", borderColor: "rgba(255,255,255,0.2)", color: "white" }}
             >
-              Importer CSV
-            </button>
-          </form>
-          <Link
-            href="/api/scenarios/template"
-            className="inline-flex h-10 items-center justify-center rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
-          >
-            Télécharger template CSV
-          </Link>
-          <Link
-            href={`/api/projects/${project.id}/scenarios/export`}
-            className="inline-flex h-10 items-center justify-center rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
-          >
-            Exporter CSV
-          </Link>
-          <Link
-            href={`/projects/${project.id}/scenarios/new`}
-            className="inline-flex h-10 items-center justify-center rounded-md bg-zinc-950 px-4 text-sm font-medium text-white hover:bg-zinc-800"
-          >
-            Nouveau scénario
-          </Link>
+              Template
+            </Link>
+            <Link
+              href={`/api/projects/${project.id}/scenarios/export`}
+              className="btn-secondary"
+              style={{ background: "rgba(255,255,255,0.12)", borderColor: "rgba(255,255,255,0.2)", color: "white" }}
+            >
+              Export CSV
+            </Link>
+            <Link
+              href={`/projects/${project.id}/scenarios/new`}
+              className="btn-primary"
+              style={{ background: "white", color: "var(--ps-blue-dark)" }}
+            >
+              + Scénario
+            </Link>
+          </div>
         </div>
       </div>
 
-      <section className="grid gap-4 rounded-md border border-zinc-200 bg-white p-5 sm:grid-cols-2 lg:grid-cols-3">
+      {/* ── KPI Cards (float over hero bottom) ── */}
+      <div
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        style={{ marginTop: "-3rem", position: "relative", zIndex: 10 }}
+      >
+        <div className="kpi-card fade-up delay-1">
+          <span className="kpi-label">
+            {projectReferenceScenario ? "VAN référence" : "Meilleure VAN"}
+          </span>
+          <span className="kpi-value">{formatMillionEuros(kpiNpv)}</span>
+        </div>
+        <div className="kpi-card fade-up delay-2">
+          <span className="kpi-label">
+            {projectReferenceScenario ? "TRI référence" : "Meilleur TRI"}
+          </span>
+          <span className="kpi-value">{formatNumber(kpiIrr, " %")}</span>
+        </div>
+        <div className="kpi-card fade-up delay-3">
+          <span className="kpi-label">
+            {projectReferenceScenario ? "DSCR référence" : "DSCR minimum"}
+          </span>
+          <span className="kpi-value">{formatNumber(kpiDscr)}</span>
+        </div>
+        <div className="kpi-card fade-up delay-4">
+          <span className="kpi-label">
+            {projectReferenceScenario ? "LCOE référence" : "LCOE minimum"}
+          </span>
+          <span className="kpi-value">{formatNumber(kpiLcoe, " €/MWh")}</span>
+        </div>
+      </div>
+
+      {/* ── Project metadata ── */}
+      <section className="card grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div>
-          <p className="text-sm font-medium text-zinc-500">Technologie</p>
-          <p className="mt-1 text-zinc-950">{project.technology}</p>
+          <p className="meta-label">Technologie</p>
+          <p className="meta-value">{project.technology}</p>
         </div>
         <div>
-          <p className="text-sm font-medium text-zinc-500">Pays</p>
-          <p className="mt-1 text-zinc-950">{project.country}</p>
+          <p className="meta-label">Pays</p>
+          <p className="meta-value">{project.country}</p>
         </div>
         <div>
-          <p className="text-sm font-medium text-zinc-500">Capacite</p>
-          <p className="mt-1 text-zinc-950">{project.capacityMw} MW</p>
+          <p className="meta-label">Capacité</p>
+          <p className="meta-value">{project.capacityMw} MW</p>
         </div>
         <div>
-          <p className="text-sm font-medium text-zinc-500">Statut</p>
-          <p className="mt-1 text-zinc-950">{project.status}</p>
+          <p className="meta-label">Statut</p>
+          <p className="meta-value">{project.status}</p>
         </div>
         <div>
-          <p className="text-sm font-medium text-zinc-500">AO</p>
-          <p className="mt-1 text-zinc-950">{project.ao}</p>
+          <p className="meta-label">AO</p>
+          <p className="meta-value">{project.ao}</p>
         </div>
         <div>
-          <p className="text-sm font-medium text-zinc-500">Priorite</p>
-          <p className="mt-1 text-zinc-950">{project.priority}</p>
+          <p className="meta-label">Priorité</p>
+          <p className="meta-value">{project.priority}</p>
         </div>
         <div>
-          <p className="text-sm font-medium text-zinc-500">Cas</p>
-          <p className="mt-1 text-zinc-950">{project.caseType}</p>
+          <p className="meta-label">Cas</p>
+          <p className="meta-value">{project.caseType}</p>
         </div>
         <div>
-          <p className="text-sm font-medium text-zinc-500">Region</p>
-          <p className="mt-1 text-zinc-950">{project.region}</p>
+          <p className="meta-label">Région</p>
+          <p className="meta-value">{project.region}</p>
         </div>
         <div>
-          <p className="text-sm font-medium text-zinc-500">Tarif projet</p>
-          <p className="mt-1 text-zinc-950">
-            {formatNumber(project.tariff, " €/MWh")}
-          </p>
+          <p className="meta-label">Tarif projet</p>
+          <p className="meta-value">{formatNumber(project.tariff, " €/MWh")}</p>
         </div>
         <div>
-          <p className="text-sm font-medium text-zinc-500">Mise en service</p>
-          <p className="mt-1 text-zinc-950">
-            {formatYear(project.commissioningYear)}
-          </p>
+          <p className="meta-label">Mise en service</p>
+          <p className="meta-value">{formatYear(project.commissioningYear)}</p>
         </div>
         {cashFlowScenario ? (
           <div>
-            <p className="text-sm font-medium text-zinc-500">Productible P50</p>
-            <p className="mt-1 text-zinc-950">
-              {formatNumber(cashFlowScenario.yieldMwh, " MWh/MW/an")}
-            </p>
+            <p className="meta-label">Productible P50</p>
+            <p className="meta-value">{formatNumber(cashFlowScenario.yieldMwh, " MWh/MW/an")}</p>
           </div>
         ) : null}
         {cashFlowScenario ? (
           <div>
-            <p className="text-sm font-medium text-zinc-500">Productible P90</p>
-            <p className="mt-1 text-zinc-950">
+            <p className="meta-label">Productible P90</p>
+            <p className="meta-value">
               {cashFlowScenario.yieldP90Mwh !== null
                 ? formatNumber(cashFlowScenario.yieldP90Mwh, " MWh/MW/an")
                 : formatNumber(cashFlowScenario.yieldMwh * 0.93, " MWh/MW/an (défaut)")}
@@ -399,57 +444,55 @@ export default async function ProjectDetailPage({
         ) : null}
         {sizing !== null ? (
           <div>
-            <p className="text-sm font-medium text-zinc-500">Dette retenue</p>
-            <p className="mt-1 text-zinc-950">
-              {formatMillionEuros(sizing.debtRetenuKeuro)}
-            </p>
+            <p className="meta-label">Dette retenue</p>
+            <p className="meta-value">{formatMillionEuros(sizing.debtRetenuKeuro)}</p>
           </div>
         ) : null}
         {cashFlowCapexDetails !== null ? (
           <div className="sm:col-span-2 lg:col-span-3">
-            <p className="text-sm font-medium text-zinc-500">Detail CAPEX</p>
-            <div className="mt-2 grid gap-2 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            <p className="meta-label">Détail CAPEX</p>
+            <div className="mt-2 grid gap-2 rounded-lg bg-zinc-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-3" style={{ border: "1px solid #e5e7eb" }}>
               <div>
-                <span className="text-zinc-500">Modules</span>
-                <p className="font-medium text-zinc-950">
+                <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Modules</span>
+                <p style={{ fontWeight: 600, color: "#0d1117" }}>
                   {formatNumber(cashFlowCapexDetails.modulesKeuro, " kEUR")}{" "}
-                  <span className="text-zinc-500">
-                    {formatNumber(cashFlowCapexDetails.modulesCtWc, " ct/Wc equiv.")}
+                  <span style={{ fontWeight: 400, color: "#9ca3af" }}>
+                    {formatNumber(cashFlowCapexDetails.modulesCtWc, " ct/Wc")}
                   </span>
                 </p>
               </div>
               <div>
-                <span className="text-zinc-500">BoS</span>
-                <p className="font-medium text-zinc-950">
+                <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>BoS</span>
+                <p style={{ fontWeight: 600, color: "#0d1117" }}>
                   {formatNumber(cashFlowCapexDetails.boSKeuro, " kEUR")}{" "}
-                  <span className="text-zinc-500">
+                  <span style={{ fontWeight: 400, color: "#9ca3af" }}>
                     {formatNumber(cashFlowCapexDetails.boSCtWc, " ct/Wc")}
                   </span>
                 </p>
               </div>
               <div>
-                <span className="text-zinc-500">Raccord.</span>
-                <p className="font-medium text-zinc-950">
+                <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Raccordement</span>
+                <p style={{ fontWeight: 600, color: "#0d1117" }}>
                   {formatNumber(cashFlowCapexDetails.raccordementKeuro, " kEUR")}
                 </p>
               </div>
               <div>
-                <span className="text-zinc-500">Apport</span>
-                <p className="font-medium text-zinc-950">
+                <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Apport d&apos;affaire</span>
+                <p style={{ fontWeight: 600, color: "#0d1117" }}>
                   {formatNumber(cashFlowCapexDetails.apportAffaireKeuro, " kEUR")}
                 </p>
               </div>
               <div>
-                <span className="text-zinc-500">Dev fees</span>
-                <p className="font-medium text-zinc-950">
+                <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Dev fees</span>
+                <p style={{ fontWeight: 600, color: "#0d1117" }}>
                   {formatNumber(cashFlowCapexDetails.devFeesKeuro, " kEUR")}
                 </p>
               </div>
               <div>
-                <span className="text-zinc-500">Total</span>
-                <p className="font-semibold text-zinc-950">
+                <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Total</span>
+                <p style={{ fontWeight: 700, color: "var(--ps-blue-dark)" }}>
                   {formatNumber(cashFlowCapexDetails.capexTotalKeuro, " kEUR")}{" "}
-                  <span className="text-zinc-500">
+                  <span style={{ fontWeight: 400, color: "#9ca3af" }}>
                     {formatNumber(cashFlowCapexDetails.capexPerMwKeuro, " kEUR/MWc")}
                   </span>
                 </p>
@@ -459,55 +502,27 @@ export default async function ProjectDetailPage({
         ) : null}
         {cashFlowOpexDetails !== null ? (
           <div className="sm:col-span-2 lg:col-span-3">
-            <p className="text-sm font-medium text-zinc-500">Detail OPEX an 1</p>
-            <div className="mt-2 grid gap-2 rounded-md border border-zinc-200 bg-zinc-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <p className="meta-label">Détail OPEX an 1</p>
+            <div className="mt-2 grid gap-2 rounded-lg bg-zinc-50 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4" style={{ border: "1px solid #e5e7eb" }}>
+              {[
+                { label: "O&M", value: formatNumber(cashFlowOpexDetails.omKeuro, " kEUR/an") },
+                { label: "MRA", value: formatNumber(cashFlowOpexDetails.mraKeuro, " kEUR/an") },
+                { label: "Back-office", value: formatNumber(cashFlowOpexDetails.backOfficeKeuro, " kEUR/an") },
+                { label: "Divers", value: formatNumber(cashFlowOpexDetails.diversKeuro, " kEUR/an") },
+                { label: "Loyer", value: formatNumber(cashFlowOpexDetails.loyerKeuro, " kEUR/an") },
+                { label: "Assurance", value: formatNumber(cashFlowOpexDetails.assuranceKeuro, " kEUR/an") },
+                { label: "Balancing", value: formatNumber(cashFlowOpexDetails.balancingKeuro, " kEUR/an") },
+              ].map(({ label, value }) => (
+                <div key={label}>
+                  <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>{label}</span>
+                  <p style={{ fontWeight: 600, color: "#0d1117" }}>{value}</p>
+                </div>
+              ))}
               <div>
-                <span className="text-zinc-500">O&M</span>
-                <p className="font-medium text-zinc-950">
-                  {formatNumber(cashFlowOpexDetails.omKeuro, " kEUR/an")}
-                </p>
-              </div>
-              <div>
-                <span className="text-zinc-500">MRA</span>
-                <p className="font-medium text-zinc-950">
-                  {formatNumber(cashFlowOpexDetails.mraKeuro, " kEUR/an")}
-                </p>
-              </div>
-              <div>
-                <span className="text-zinc-500">Back-off</span>
-                <p className="font-medium text-zinc-950">
-                  {formatNumber(cashFlowOpexDetails.backOfficeKeuro, " kEUR/an")}
-                </p>
-              </div>
-              <div>
-                <span className="text-zinc-500">Divers</span>
-                <p className="font-medium text-zinc-950">
-                  {formatNumber(cashFlowOpexDetails.diversKeuro, " kEUR/an")}
-                </p>
-              </div>
-              <div>
-                <span className="text-zinc-500">Loyer</span>
-                <p className="font-medium text-zinc-950">
-                  {formatNumber(cashFlowOpexDetails.loyerKeuro, " kEUR/an")}
-                </p>
-              </div>
-              <div>
-                <span className="text-zinc-500">Assurance</span>
-                <p className="font-medium text-zinc-950">
-                  {formatNumber(cashFlowOpexDetails.assuranceKeuro, " kEUR/an")}
-                </p>
-              </div>
-              <div>
-                <span className="text-zinc-500">Balancing</span>
-                <p className="font-medium text-zinc-950">
-                  {formatNumber(cashFlowOpexDetails.balancingKeuro, " kEUR/an")}
-                </p>
-              </div>
-              <div>
-                <span className="text-zinc-500">Total</span>
-                <p className="font-semibold text-zinc-950">
+                <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Total</span>
+                <p style={{ fontWeight: 700, color: "var(--ps-blue-dark)" }}>
                   {formatNumber(cashFlowOpexDetails.opexTotalKeuro, " kEUR/an")}{" "}
-                  <span className="text-zinc-500">
+                  <span style={{ fontWeight: 400, color: "#9ca3af" }}>
                     {formatNumber(cashFlowOpexDetails.opexPerMwKeuro, " kEUR/MWc")}
                   </span>
                 </p>
@@ -517,54 +532,16 @@ export default async function ProjectDetailPage({
         ) : null}
         {cashFlowScenario?.dscrSchedule ? (
           <div className="sm:col-span-2 lg:col-span-3">
-            <p className="text-sm font-medium text-zinc-500">Profil DSCR cible</p>
+            <p className="meta-label">Profil DSCR cible</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {(parseDscrSchedule(cashFlowScenario.dscrSchedule) ?? []).map((t, i) => (
-                <span
-                  key={i}
-                  className="inline-flex items-center rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700"
-                >
+                <span key={i} className="badge badge-blue">
                   {t.dscrValue.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} · an {t.yearFrom}–{t.yearTo}
                 </span>
               ))}
             </div>
           </div>
         ) : null}
-      </section>
-
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-md border border-zinc-200 bg-white p-5">
-          <p className="text-sm font-medium text-zinc-500">
-            {projectReferenceScenario ? "VAN référence" : "Meilleure VAN"}
-          </p>
-          <p className="mt-3 text-2xl font-semibold text-zinc-950">
-            {formatMillionEuros(kpiNpv)}
-          </p>
-        </div>
-        <div className="rounded-md border border-zinc-200 bg-white p-5">
-          <p className="text-sm font-medium text-zinc-500">
-            {projectReferenceScenario ? "TRI référence" : "Meilleur TRI"}
-          </p>
-          <p className="mt-3 text-2xl font-semibold text-zinc-950">
-            {formatNumber(kpiIrr, " %")}
-          </p>
-        </div>
-        <div className="rounded-md border border-zinc-200 bg-white p-5">
-          <p className="text-sm font-medium text-zinc-500">
-            {projectReferenceScenario ? "DSCR référence" : "DSCR minimum"}
-          </p>
-          <p className="mt-3 text-2xl font-semibold text-zinc-950">
-            {formatNumber(kpiDscr)}
-          </p>
-        </div>
-        <div className="rounded-md border border-zinc-200 bg-white p-5">
-          <p className="text-sm font-medium text-zinc-500">
-            {projectReferenceScenario ? "LCOE référence" : "LCOE minimum"}
-          </p>
-          <p className="mt-3 text-2xl font-semibold text-zinc-950">
-            {formatNumber(kpiLcoe, " €/MWh")}
-          </p>
-        </div>
       </section>
 
       <ProjectFinancialCharts
@@ -576,124 +553,74 @@ export default async function ProjectDetailPage({
         debtRepaymentData={debtRepaymentChartData}
       />
 
-      <section className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-white p-5">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <h2 className="text-lg font-semibold text-zinc-950">
-            Hypotheses financieres
-          </h2>
-          <p className="text-sm font-medium text-zinc-500">
-            {cashFlowScenario?.name ?? "-"}
-          </p>
+      <section className="card">
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+          <h2 className="section-title">Hypothèses financières</h2>
+          <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>{cashFlowScenario?.name ?? "-"}</span>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-7">
-          <div>
-            <p className="text-sm font-medium text-zinc-500">Duree projet</p>
-            <p className="mt-1 text-zinc-950">
-              {cashFlowScenario ? `${cashFlowScenario.projectLifeYears} ans` : "-"}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-zinc-500">Taux actualisation</p>
-            <p className="mt-1 text-zinc-950">
-              {formatNumber(cashFlowScenario?.discountRate ?? null, " %")}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-zinc-500">Degradation</p>
-            <p className="mt-1 text-zinc-950">
-              {formatNumber(cashFlowScenario?.degradationRate ?? null, " %")}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-zinc-500">Taux dette</p>
-            <p className="mt-1 text-zinc-950">
-              {formatNumber(cashFlowScenario?.debtInterestRate ?? null, " %")}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-zinc-500">Maturite dette</p>
-            <p className="mt-1 text-zinc-950">
-              {cashFlowScenario ? `${cashFlowScenario.debtMaturityYears} ans` : "-"}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-zinc-500">Inflation tarif</p>
-            <p className="mt-1 text-zinc-950">
-              {formatNumber(cashFlowScenario?.tariffInflationRate ?? null, " %")}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm font-medium text-zinc-500">Inflation OPEX</p>
-            <p className="mt-1 text-zinc-950">
-              {formatNumber(cashFlowScenario?.opexInflationRate ?? null, " %")}
-            </p>
-          </div>
+          {[
+            { label: "Durée projet", value: cashFlowScenario ? `${cashFlowScenario.projectLifeYears} ans` : "-" },
+            { label: "Actualisation", value: formatNumber(cashFlowScenario?.discountRate ?? null, " %") },
+            { label: "Dégradation", value: formatNumber(cashFlowScenario?.degradationRate ?? null, " %") },
+            { label: "Taux dette", value: formatNumber(cashFlowScenario?.debtInterestRate ?? null, " %") },
+            { label: "Maturité dette", value: cashFlowScenario ? `${cashFlowScenario.debtMaturityYears} ans` : "-" },
+            { label: "Inflation tarif", value: formatNumber(cashFlowScenario?.tariffInflationRate ?? null, " %") },
+            { label: "Inflation OPEX", value: formatNumber(cashFlowScenario?.opexInflationRate ?? null, " %") },
+          ].map(({ label, value }) => (
+            <div key={label}>
+              <p className="meta-label">{label}</p>
+              <p className="meta-value">{value}</p>
+            </div>
+          ))}
         </div>
       </section>
 
       {sizing !== null ? (
-        <section className="flex flex-col gap-4 rounded-md border border-zinc-200 bg-white p-5">
-          <h2 className="text-lg font-semibold text-zinc-950">Structuration dette</h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="card">
+          <h2 className="section-title" style={{ marginBottom: "1rem" }}>Structuration dette</h2>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div>
-              <p className="text-sm font-medium text-zinc-500">Dette sculptée (P90)</p>
-              <p className="mt-1 text-zinc-950">
-                {formatNumber(sizing.debtSculptedKeuro, " k€")}
-              </p>
+              <p className="meta-label">Dette sculptée (P90)</p>
+              <p className="meta-value">{formatNumber(sizing.debtSculptedKeuro, " k€")}</p>
             </div>
             {sizing.debtGearingMaxKeuro !== null ? (
               <div>
-                <p className="text-sm font-medium text-zinc-500">
-                  Gearing max ({cashFlowScenario?.gearingMaxPct ?? ""}%)
-                </p>
-                <p className="mt-1 text-zinc-950">
-                  {formatNumber(sizing.debtGearingMaxKeuro, " k€")}
-                </p>
+                <p className="meta-label">Gearing max ({cashFlowScenario?.gearingMaxPct ?? ""}%)</p>
+                <p className="meta-value">{formatNumber(sizing.debtGearingMaxKeuro, " k€")}</p>
               </div>
             ) : null}
-            <div className="flex flex-col gap-1.5">
-              <p className="text-sm font-medium text-zinc-500">Dette retenue</p>
-              <div className="flex items-center gap-2">
-                <p className="text-lg font-semibold text-zinc-950">
+            <div>
+              <p className="meta-label">Dette retenue</p>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.2rem" }}>
+                <span style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--ps-blue-dark)" }}>
                   {formatNumber(sizing.debtRetenuKeuro, " k€")}
-                </p>
+                </span>
                 {sizing.bindingConstraint === "dscr" ? (
-                  <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                    Contraint par DSCR
-                  </span>
+                  <span className="constraint-badge dscr">DSCR</span>
                 ) : sizing.bindingConstraint === "gearing" ? (
-                  <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
-                    Contraint par gearing
-                  </span>
+                  <span className="constraint-badge gearing">Gearing</span>
                 ) : (
-                  <span className="inline-flex items-center rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-800">
-                    Contraintes égales
-                  </span>
+                  <span className="constraint-badge equal">Égal</span>
                 )}
               </div>
             </div>
             <div>
-              <p className="text-sm font-medium text-zinc-500">Headroom DSCR</p>
-              <p className="mt-1 text-zinc-950">
-                {formatNumber(sizing.headroomKeuro, " k€")}
-              </p>
+              <p className="meta-label">Headroom DSCR</p>
+              <p className="meta-value">{formatNumber(sizing.headroomKeuro, " k€")}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-zinc-500">CCA</p>
-              <p className="mt-1 text-zinc-950">
-                {formatNumber(ccaKeuro, " k€")}
-              </p>
+              <p className="meta-label">CCA</p>
+              <p className="meta-value">{formatNumber(ccaKeuro, " k€")}</p>
             </div>
             <div>
-              <p className="text-sm font-medium text-zinc-500">Gearing réalisé</p>
-              <p className="mt-1 text-zinc-950">
-                {formatNumber(gearingRealisePct, " %")}
-              </p>
+              <p className="meta-label">Gearing réalisé</p>
+              <p className="meta-value">{formatNumber(gearingRealisePct, " %")}</p>
             </div>
             {sizing.structuringFeeKeuro > 0 ? (
               <div>
-                <p className="text-sm font-medium text-zinc-500">Marge structuration</p>
-                <p className="mt-1 font-semibold text-green-700">
+                <p className="meta-label">Marge structuration</p>
+                <p style={{ fontWeight: 700, color: "var(--ps-green)", marginTop: "0.2rem" }}>
                   +{formatNumber(sizing.structuringFeeKeuro, " k€")}
                 </p>
               </div>
@@ -702,31 +629,27 @@ export default async function ProjectDetailPage({
         </section>
       ) : null}
 
-      <section className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-white p-5">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <h2 className="text-lg font-semibold text-zinc-950">
-            Resultats calcules
-          </h2>
-          <p className="text-sm font-medium text-zinc-500">
-            {analysisScenario?.name ?? "-"}
-          </p>
+      <section className="card">
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+          <h2 className="section-title">Résultats calculés</h2>
+          <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>{analysisScenario?.name ?? "-"}</span>
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
-            <p className="text-sm font-medium text-zinc-500">VAN Brute</p>
-            <p className="mt-1 text-xl font-semibold text-zinc-950">
+            <p className="meta-label">VAN Brute</p>
+            <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--ps-blue-dark)", marginTop: "0.2rem" }}>
               {formatMillionEuros(analysisMetrics?.npv ?? analysisScenario?.npv ?? null)}
             </p>
           </div>
           <div>
-            <p className="text-sm font-medium text-zinc-500">VAN Nette</p>
-            <p className="mt-1 text-xl font-semibold text-zinc-950">
+            <p className="meta-label">VAN Nette</p>
+            <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--ps-green)", marginTop: "0.2rem" }}>
               {formatMillionEuros(analysisNpvNetKeuro)}
             </p>
           </div>
           <div>
-            <p className="text-sm font-medium text-zinc-500">LCOE</p>
-            <p className="mt-1 text-xl font-semibold text-zinc-950">
+            <p className="meta-label">LCOE</p>
+            <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--ps-blue-mid)", marginTop: "0.2rem" }}>
               {formatNumber(analysisMetrics?.lcoe ?? analysisScenario?.lcoe ?? null, " €/MWh")}
             </p>
           </div>
@@ -734,23 +657,21 @@ export default async function ProjectDetailPage({
       </section>
 
       {cashFlowMetrics?.doubleIRR !== null && cashFlowMetrics?.doubleIRR !== undefined ? (
-        <section className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-white p-5">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-            <h2 className="text-lg font-semibold text-zinc-950">Double TRI</h2>
-            <p className="text-sm font-medium text-zinc-500">
-              {cashFlowScenario?.name ?? "-"}
-            </p>
+        <section className="card">
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
+            <h2 className="section-title">Double TRI</h2>
+            <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>{cashFlowScenario?.name ?? "-"}</span>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <p className="text-sm font-medium text-zinc-500">TRI Invest</p>
-              <p className="mt-1 text-zinc-950">
+              <p className="meta-label">TRI Invest</p>
+              <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--ps-green)", marginTop: "0.2rem" }}>
                 {formatNumber(cashFlowMetrics.doubleIRR.irrInvest, " %")}
               </p>
             </div>
             <div>
-              <p className="text-sm font-medium text-zinc-500">TRI entreprise</p>
-              <p className="mt-1 text-zinc-950">
+              <p className="meta-label">TRI Entreprise</p>
+              <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--ps-blue-dark)", marginTop: "0.2rem" }}>
                 {formatNumber(cashFlowMetrics.doubleIRR.irrEntreprise, " %")}
               </p>
             </div>
@@ -759,159 +680,98 @@ export default async function ProjectDetailPage({
       ) : null}
 
       <section className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <h2 className="text-lg font-semibold text-zinc-950">
-            Cash-flows annuels
-          </h2>
-          <p className="text-sm font-medium text-zinc-500">
-            {cashFlowScenario?.name ?? "-"}
-          </p>
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
+          <h2 className="section-title">Cash-flows annuels</h2>
+          <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>{cashFlowScenario?.name ?? "-"}</span>
         </div>
-        <div className="overflow-x-auto rounded-md border border-zinc-200 bg-white">
-          <table className="w-full min-w-[3450px] border-collapse text-left text-sm">
-            <thead className="bg-zinc-100 text-zinc-600">
+        <div className="overflow-x-auto" style={{ borderRadius: "var(--radius-card)", boxShadow: "var(--shadow-card)", background: "white" }}>
+          <table className="ps-table" style={{ minWidth: "3450px" }}>
+            <thead>
               <tr>
-                <th className="px-4 py-3 font-medium">Annee</th>
-                <th className="px-4 py-3 font-medium">Tarif €/MWh</th>
-                <th className="px-4 py-3 font-medium">Prod. P50 MWh</th>
-                <th className="px-4 py-3 font-medium">Prod. P90 MWh</th>
-                <th className="px-4 py-3 font-medium">CA P50 kEUR</th>
-                <th className="px-4 py-3 font-medium">CA P90 kEUR</th>
-                <th className="px-4 py-3 font-medium">OPEX kEUR</th>
-                <th className="px-4 py-3 font-medium">CF P50 kEUR</th>
-                <th className="px-4 py-3 font-medium">CF actualisé kEUR</th>
-                <th className="px-4 py-3 font-medium">Service dette kEUR</th>
-                <th className="px-4 py-3 font-medium">Service sculpté kEUR</th>
-                <th className="px-4 py-3 font-medium">CFADS P90 apres IS kEUR</th>
-                <th className="px-4 py-3 font-medium">IS</th>
-                <th className="px-4 py-3 font-medium">Déficit cumulé</th>
-                <th className="px-4 py-3 font-medium">Résultat net</th>
-                <th className="px-4 py-3 font-medium">CFADS après IS</th>
-                <th className="px-4 py-3 font-medium">DSRA solde</th>
-                <th className="px-4 py-3 font-medium">Cash bloqué</th>
-                <th className="px-4 py-3 font-medium">Dividende</th>
-                <th className="px-4 py-3 font-medium">Flux actionnaire</th>
-                <th className="px-4 py-3 font-medium">DSCR (P90)</th>
-                <th className="px-4 py-3 font-medium">DSCR cible</th>
-                <th className="px-4 py-3 font-medium">DSCR réalisé</th>
-                <th className="px-4 py-3 font-medium">Dette sculptée kEUR</th>
-                <th className="px-4 py-3 font-medium">Dette retenue kEUR</th>
+                <th className="col-left">Année</th>
+                <th>Tarif €/MWh</th>
+                <th>Prod. P50 MWh</th>
+                <th>Prod. P90 MWh</th>
+                <th>CA P50 k€</th>
+                <th>CA P90 k€</th>
+                <th>OPEX k€</th>
+                <th>CF P50 k€</th>
+                <th>CF actualisé k€</th>
+                <th>Svc dette k€</th>
+                <th>Svc sculpté k€</th>
+                <th>CFADS P90 IS k€</th>
+                <th>IS</th>
+                <th>Déficit cum.</th>
+                <th>Résultat net</th>
+                <th>CFADS ap. IS</th>
+                <th>DSRA solde</th>
+                <th>Cash bloqué</th>
+                <th>Dividende</th>
+                <th>Flux action.</th>
+                <th>DSCR P90</th>
+                <th>DSCR cible</th>
+                <th>DSCR réalisé</th>
+                <th>Dette sculptée k€</th>
+                <th>Dette retenue k€</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200">
+            <tbody>
               {sizing !== null ? (
-                <tr className="bg-zinc-50 italic text-zinc-500">
-                  <td className="px-4 py-3 font-medium text-zinc-700">0</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3">-</td>
-                  <td className="px-4 py-3 font-medium text-zinc-700">
+                <tr style={{ fontStyle: "italic", color: "#6b7280", background: "#f8fafc" }}>
+                  <td className="col-left">0</td>
+                  {Array.from({ length: 22 }, (_, i) => <td key={i}>-</td>)}
+                  <td className="col-left" style={{ color: "var(--ps-blue-dark)", fontStyle: "normal" }}>
                     {formatNumber(sizing.debtSculptedKeuro)}
                   </td>
-                  <td className="px-4 py-3 font-medium text-zinc-700">
+                  <td style={{ color: "var(--ps-blue-dark)", fontStyle: "normal" }}>
                     {formatNumber(sizing.debtRetenuKeuro)}
                   </td>
                 </tr>
               ) : null}
               {annualCashFlows.map((row) => (
                 <tr key={row.year}>
-                  <td className="px-4 py-3 font-medium text-zinc-950">
-                    {row.year}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.annualTariff)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.productionP50Mwh)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.productionP90Mwh)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.revenueP50Keuro)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.revenueP90Keuro)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.opexKeuro)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
+                  <td className="col-left">{row.year}</td>
+                  <td>{formatNumber(row.annualTariff)}</td>
+                  <td>{formatNumber(row.productionP50Mwh)}</td>
+                  <td>{formatNumber(row.productionP90Mwh)}</td>
+                  <td>{formatNumber(row.revenueP50Keuro)}</td>
+                  <td>{formatNumber(row.revenueP90Keuro)}</td>
+                  <td className="val-neg">{formatNumber(row.opexKeuro)}</td>
+                  <td className={row.cashFlowKeuro >= 0 ? "val-pos" : "val-neg"}>
                     {formatNumber(row.cashFlowKeuro)}
                   </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.discountedCashFlowKeuro)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.debtServiceSculptedKeuro ?? row.debtServiceKeuro)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
+                  <td>{formatNumber(row.discountedCashFlowKeuro)}</td>
+                  <td>{formatNumber(row.debtServiceSculptedKeuro ?? row.debtServiceKeuro)}</td>
+                  <td>
                     {row.debtServiceSculptedKeuro !== null
                       ? formatNumber(row.debtServiceSculptedKeuro)
                       : "-"}
                   </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.cfadsP90AfterTaxKeuro)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.is)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.deficitCumuleKeuro)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
+                  <td>{formatNumber(row.cfadsP90AfterTaxKeuro)}</td>
+                  <td>{formatNumber(row.is)}</td>
+                  <td>{formatNumber(row.deficitCumuleKeuro)}</td>
+                  <td className={row.resultatNet !== null && row.resultatNet >= 0 ? "val-pos" : "val-neg"}>
                     {formatNumber(row.resultatNet)}
                   </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.cfadsAfterTax)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.dsraSoldeKeuro)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.cashBloqueKeuro)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
+                  <td>{formatNumber(row.cfadsAfterTax)}</td>
+                  <td>{formatNumber(row.dsraSoldeKeuro)}</td>
+                  <td>{formatNumber(row.cashBloqueKeuro)}</td>
+                  <td className={row.dividende !== null && row.dividende >= 0 ? "val-pos" : ""}>
                     {formatNumber(row.dividende)}
                   </td>
-                  <td className="px-4 py-3 text-zinc-700">
+                  <td className={row.fluxActionnaire !== null && row.fluxActionnaire >= 0 ? "val-pos" : "val-neg"}>
                     {formatNumber(row.fluxActionnaire)}
                   </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(row.dscr)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {row.dscrTargetAtYear !== null ? formatNumber(row.dscrTargetAtYear) : "-"}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {row.dscrRealized !== null ? formatNumber(row.dscrRealized) : "-"}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-500">-</td>
-                  <td className="px-4 py-3 text-zinc-500">-</td>
+                  <td>{formatNumber(row.dscr)}</td>
+                  <td>{row.dscrTargetAtYear !== null ? formatNumber(row.dscrTargetAtYear) : "-"}</td>
+                  <td>{row.dscrRealized !== null ? formatNumber(row.dscrRealized) : "-"}</td>
+                  <td>-</td>
+                  <td>-</td>
                 </tr>
               ))}
               {annualCashFlows.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-center text-zinc-500" colSpan={25}>
+                  <td colSpan={25} style={{ textAlign: "center", padding: "2rem", color: "#6b7280" }}>
                     -
                   </td>
                 </tr>
@@ -921,19 +781,18 @@ export default async function ProjectDetailPage({
         </div>
       </section>
 
-      <section className="flex flex-col gap-4 rounded-md border border-zinc-200 bg-white p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <section className="card flex flex-col gap-4">
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
           <div>
-            <h2 className="text-lg font-semibold text-zinc-950">Analyses</h2>
-            <p className="mt-1 text-sm text-zinc-500">
-              Sensibilités sur scénario de référence
-            </p>
+            <h2 className="section-title">Analyses de sensibilité</h2>
+            <p className="section-subtitle">Sensibilités sur scénario sélectionné</p>
           </div>
-          <form className="flex gap-2">
+          <form style={{ display: "flex", gap: "0.5rem" }}>
             <select
               name="scenarioId"
               defaultValue={analysisScenario?.id}
-              className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-sm text-zinc-950 outline-none focus:border-zinc-900"
+              className="h-10 px-3"
+              style={{ fontSize: "0.875rem" }}
             >
               {scenarios.map((scenario) => (
                 <option key={scenario.id} value={scenario.id}>
@@ -941,10 +800,7 @@ export default async function ProjectDetailPage({
                 </option>
               ))}
             </select>
-            <button
-              type="submit"
-              className="inline-flex h-10 items-center justify-center rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
-            >
+            <button type="submit" className="btn-secondary">
               Analyser
             </button>
           </form>
@@ -967,95 +823,61 @@ export default async function ProjectDetailPage({
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold text-zinc-950">
-          Comparaison des scénarios
-        </h2>
-        <div className="overflow-x-auto rounded-md border border-zinc-200 bg-white">
-          <table className="w-full min-w-[980px] border-collapse text-left text-sm">
-            <thead className="bg-zinc-100 text-zinc-600">
+        <h2 className="section-title">Comparaison des scénarios</h2>
+        <div className="overflow-x-auto" style={{ borderRadius: "var(--radius-card)", boxShadow: "var(--shadow-card)", background: "white" }}>
+          <table className="ps-table" style={{ minWidth: "980px" }}>
+            <thead>
               <tr>
-                <th className="px-4 py-3 font-medium">Nom</th>
-                <th className="px-4 py-3 font-medium">CAPEX</th>
-                <th className="px-4 py-3 font-medium">OPEX</th>
-                <th className="px-4 py-3 font-medium">Yield MWh</th>
-                <th className="px-4 py-3 font-medium">Tarif</th>
-                <th className="px-4 py-3 font-medium">Dette</th>
-                <th className="px-4 py-3 font-medium">DSCR</th>
-                <th className="px-4 py-3 font-medium">VAN</th>
-                <th className="px-4 py-3 font-medium">TRI</th>
-                <th className="px-4 py-3 font-medium">LCOE</th>
-                <th className="px-4 py-3 font-medium">Actions</th>
+                <th className="col-left">Scénario</th>
+                <th>CAPEX</th>
+                <th>OPEX</th>
+                <th>Yield MWh</th>
+                <th>Tarif</th>
+                <th>Dette</th>
+                <th>DSCR</th>
+                <th>VAN</th>
+                <th>TRI</th>
+                <th>LCOE</th>
+                <th className="col-left">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-200">
+            <tbody>
               {scenarios.map((scenario) => (
                 <tr key={scenario.id}>
-                  <td className="px-4 py-3 font-medium text-zinc-950">
-                    <div className="flex items-center gap-2">
+                  <td className="col-left">
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                       <span>{scenario.name}</span>
                       {scenario.isReference ? (
-                        <span className="rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white">
-                          Référence
-                        </span>
+                        <span className="badge badge-blue" style={{ fontSize: "0.6rem" }}>Référence</span>
                       ) : null}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(scenario.capex, " k€/MW")}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(scenario.opex, " k€/MW")}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(scenario.yieldMwh)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(scenario.tariff, " €/MWh")}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(scenario.debtRate, " %")}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(scenario.dscr > 0 ? scenario.dscr : null)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatMillionEuros(scenario.npv)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(scenario.irr, " %")}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    {formatNumber(scenario.lcoe, " €/MWh")}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-700">
-                    <div className="flex gap-2">
+                  <td>{formatNumber(scenario.capex, " k€/MW")}</td>
+                  <td>{formatNumber(scenario.opex, " k€/MW")}</td>
+                  <td>{formatNumber(scenario.yieldMwh)}</td>
+                  <td>{formatNumber(scenario.tariff, " €/MWh")}</td>
+                  <td>{formatNumber(scenario.debtRate, " %")}</td>
+                  <td>{formatNumber(scenario.dscr > 0 ? scenario.dscr : null)}</td>
+                  <td className="val-pos">{formatMillionEuros(scenario.npv)}</td>
+                  <td className="val-pos">{formatNumber(scenario.irr, " %")}</td>
+                  <td>{formatNumber(scenario.lcoe, " €/MWh")}</td>
+                  <td className="col-left">
+                    <div style={{ display: "flex", gap: "0.375rem", flexWrap: "wrap" }}>
                       <Link
                         href={`/projects/${project.id}/scenarios/${scenario.id}/edit`}
-                        className="inline-flex h-8 items-center justify-center rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
+                        className="btn-secondary btn-sm"
                       >
                         Modifier
                       </Link>
                       <form action={cloneScenario.bind(null, project.id, scenario.id)}>
-                        <button
-                          type="submit"
-                          className="inline-flex h-8 items-center justify-center rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
-                        >
+                        <button type="submit" className="btn-secondary btn-sm">
                           Dupliquer
                         </button>
                       </form>
                       {!scenario.isReference ? (
-                        <form
-                          action={setReferenceScenario.bind(
-                            null,
-                            project.id,
-                            scenario.id,
-                          )}
-                        >
-                          <button
-                            type="submit"
-                            className="inline-flex h-8 items-center justify-center rounded-md border border-zinc-300 px-3 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
-                          >
-                            Définir comme référence
+                        <form action={setReferenceScenario.bind(null, project.id, scenario.id)}>
+                          <button type="submit" className="btn-secondary btn-sm">
+                            Définir réf.
                           </button>
                         </form>
                       ) : null}
@@ -1070,7 +892,7 @@ export default async function ProjectDetailPage({
               ))}
               {scenarios.length === 0 ? (
                 <tr>
-                  <td className="px-4 py-8 text-center text-zinc-500" colSpan={11}>
+                  <td colSpan={11} style={{ textAlign: "center", padding: "2rem", color: "#6b7280" }}>
                     -
                   </td>
                 </tr>
@@ -1095,38 +917,32 @@ function SensitivityTable({
   rows: ReturnType<typeof generateSensitivityRows>;
 }) {
   return (
-    <div className="overflow-x-auto rounded-md border border-zinc-200">
-      <table className="w-full min-w-[520px] border-collapse text-left text-sm">
-        <thead className="bg-zinc-100 text-zinc-600">
+    <div className="overflow-x-auto" style={{ borderRadius: 10, border: "1px solid #e5e7eb" }}>
+      <table className="ps-table" style={{ minWidth: "520px" }}>
+        <thead>
           <tr>
-            <th className="px-4 py-3 font-medium">{title}</th>
-            <th className="px-4 py-3 font-medium">Variation</th>
-            <th className="px-4 py-3 font-medium">{valueLabel}</th>
-            <th className="px-4 py-3 font-medium">VAN</th>
-            <th className="px-4 py-3 font-medium">TRI</th>
+            <th className="col-left">{title}</th>
+            <th>Variation</th>
+            <th>{valueLabel}</th>
+            <th>VAN</th>
+            <th>TRI</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-zinc-200">
+        <tbody>
           {rows.map((row) => (
             <tr key={row.label}>
-              <td className="px-4 py-3 font-medium text-zinc-950">{row.label}</td>
-              <td className="px-4 py-3 text-zinc-700">
+              <td className="col-left">{row.label}</td>
+              <td style={{ color: row.variation > 0 ? "var(--ps-green)" : row.variation < 0 ? "var(--ps-red)" : undefined }}>
                 {formatPercent(row.variation)}
               </td>
-              <td className="px-4 py-3 text-zinc-700">
-                {formatNumber(row.value, valueSuffix)}
-              </td>
-              <td className="px-4 py-3 text-zinc-700">
-                {formatMillionEuros(row.npv)}
-              </td>
-              <td className="px-4 py-3 text-zinc-700">
-                {formatNumber(row.irr, " %")}
-              </td>
+              <td>{formatNumber(row.value, valueSuffix)}</td>
+              <td className="val-pos">{formatMillionEuros(row.npv)}</td>
+              <td className="val-pos">{formatNumber(row.irr, " %")}</td>
             </tr>
           ))}
           {rows.length === 0 ? (
             <tr>
-              <td className="px-4 py-8 text-center text-zinc-500" colSpan={5}>
+              <td colSpan={5} style={{ textAlign: "center", padding: "2rem", color: "#6b7280" }}>
                 -
               </td>
             </tr>

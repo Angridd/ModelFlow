@@ -220,18 +220,15 @@ function AuroraPriceCurveFields({
   debtSizingLowW?: number | null;
 }) {
   return (
-    <section className="grid gap-4 rounded-md border border-zinc-200 bg-zinc-50 p-4">
-      <h2 className="text-sm font-semibold text-zinc-950">
-        Courbes de prix post-contrat
-      </h2>
+    <section className="form-section">
+      <p className="form-section-head">Courbes de prix post-contrat (Aurora)</p>
       {status.imported ? (
         <>
-          <span className="inline-flex w-fit rounded-md bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800">
-            Courbes Aurora importees · {formatTechnology(status.technology)} ·{" "}
-            {formatDate(status.updatedAt)}
+          <span className="badge badge-green" style={{ marginBottom: "1rem", display: "inline-flex" }}>
+            Aurora importé · {formatTechnology(status.technology)} · {formatDate(status.updatedAt)}
           </span>
           <div className="grid gap-5 sm:grid-cols-2">
-            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
               Pondération Investor Curve - Central (%)
               <input
                 name="investorCurveW"
@@ -240,10 +237,10 @@ function AuroraPriceCurveFields({
                 step="0.01"
                 defaultValue={(investorCurveW ?? 1) * 100}
                 title="100% = courbe Central Aurora pour le TRI investisseur"
-                className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+                className="h-10 px-3"
               />
             </label>
-            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
               Pondération Debt Sizing - Central (%)
               <input
                 name="debtSizingCentralW"
@@ -252,10 +249,10 @@ function AuroraPriceCurveFields({
                 max="100"
                 step="0.01"
                 defaultValue={(debtSizingCentralW ?? 0.7) * 100}
-                className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+                className="h-10 px-3"
               />
             </label>
-            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
               Pondération Debt Sizing - Low (%)
               <input
                 name="debtSizingLowW"
@@ -265,13 +262,13 @@ function AuroraPriceCurveFields({
                 step="0.01"
                 defaultValue={(debtSizingLowW ?? 0.3) * 100}
                 title="Central + Low doit etre egal a 100 %."
-                className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+                className="h-10 px-3"
               />
             </label>
           </div>
         </>
       ) : (
-        <span className="inline-flex w-fit rounded-md bg-amber-100 px-3 py-1 text-sm font-medium text-amber-800">
+        <span className="badge badge-yellow">
           Aucune courbe Aurora — importer depuis la liste des projets
         </span>
       )}
@@ -345,30 +342,23 @@ export default async function EditScenarioPage({
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-10">
       <div>
-        <Link
-          href={`/projects/${scenario.project.id}`}
-          className="text-sm font-medium text-zinc-500 hover:text-zinc-900"
-        >
-          {scenario.project.name}
+        <Link href={`/projects/${scenario.project.id}`} className="page-breadcrumb">
+          ← {scenario.project.name}
         </Link>
-        <h1 className="mt-2 text-3xl font-semibold tracking-normal text-zinc-950">
-          Modifier le scénario
-        </h1>
+        <h1 className="page-title" style={{ marginTop: "0.25rem" }}>Modifier le scénario</h1>
       </div>
 
-      <form
-        action={updateScenarioForProject}
-        className="grid gap-5 rounded-md border border-zinc-200 bg-white p-6"
-      >
-        <label className="grid gap-2 text-sm font-medium text-zinc-700">
-          Nom
+      <form action={updateScenarioForProject} className="form-card grid gap-5">
+        <span className="form-section-title">Identification</span>
+        <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+          Nom du scénario
           <input
             name="name"
             required
             defaultValue={scenario.name}
             placeholder="ex. Base case"
             title="Nom du scénario"
-            className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+            className="h-10 px-3"
           />
         </label>
         <input type="hidden" name="debtRate" value={scenario.debtRate} />
@@ -391,9 +381,11 @@ export default async function EditScenarioPage({
           }}
         />
 
+        <span className="form-section-title">Paramètres clés</span>
+
         <div className="grid gap-5 sm:grid-cols-2">
           {primaryFields.filter((field) => field.name !== "capex" && field.name !== "opex").map((field) => (
-            <label key={field.name} className="grid gap-2 text-sm font-medium text-zinc-700">
+            <label key={field.name} className="grid gap-1.5 text-sm font-medium text-zinc-700">
               {field.label}
               <input
                 name={field.name}
@@ -403,14 +395,14 @@ export default async function EditScenarioPage({
                 defaultValue={scenario[field.name]}
                 placeholder={field.placeholder}
                 title={field.title}
-                className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+                className="h-10 px-3"
               />
             </label>
           ))}
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
             Productible P50 (MWh/MW/an)
             <input
               name="yieldMwh"
@@ -420,10 +412,10 @@ export default async function EditScenarioPage({
               defaultValue={scenario.yieldMwh}
               placeholder="ex. 1450"
               title="Production annuelle en MWh par MW installé — scénario médian P50 (solaire France : 1 300–1 600 MWh/MW/an)"
-              className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+              className="h-10 px-3"
             />
           </label>
-          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
             Productible P90 (MWh/MW/an)
             <input
               name="yieldP90Mwh"
@@ -432,19 +424,16 @@ export default async function EditScenarioPage({
               defaultValue={scenario.yieldP90Mwh ?? ""}
               placeholder="Défaut : P50 × 0,93"
               title="Production annuelle au niveau de confiance P90 — solaire : environ P50 × 0,93. Utilisé pour le dimensionnement bancaire (DSCR)."
-              className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+              className="h-10 px-3"
             />
           </label>
         </div>
 
-        <section className="grid gap-4 rounded-md border border-zinc-200 bg-zinc-50 p-4">
-          <h2 className="text-sm font-semibold text-zinc-950">Revenus</h2>
+        <section className="form-section">
+          <p className="form-section-head">Revenus</p>
           <div className="grid gap-5 sm:grid-cols-2">
             {revenueFields.map((field) => (
-              <label
-                key={field.name}
-                className="grid gap-2 text-sm font-medium text-zinc-700"
-              >
+              <label key={field.name} className="grid gap-1.5 text-sm font-medium text-zinc-700">
                 {field.label}
                 <input
                   name={field.name}
@@ -454,7 +443,7 @@ export default async function EditScenarioPage({
                   defaultValue={scenario[field.name] ?? field.defaultValue}
                   placeholder={field.placeholder}
                   title={field.title}
-                  className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+                  className="h-10 px-3"
                 />
               </label>
             ))}
@@ -468,14 +457,11 @@ export default async function EditScenarioPage({
           debtSizingLowW={scenario.project.debtSizingLowW}
         />
 
-        <section className="grid gap-4 rounded-md border border-zinc-200 bg-zinc-50 p-4">
-          <h2 className="text-sm font-semibold text-zinc-950">OPEX</h2>
+        <section className="form-section">
+          <p className="form-section-head">OPEX complémentaires</p>
           <div className="grid gap-5 sm:grid-cols-2">
             {opexExtraFields.map((field) => (
-              <label
-                key={field.name}
-                className="grid gap-2 text-sm font-medium text-zinc-700"
-              >
+              <label key={field.name} className="grid gap-1.5 text-sm font-medium text-zinc-700">
                 {field.label}
                 <input
                   name={field.name}
@@ -485,7 +471,7 @@ export default async function EditScenarioPage({
                   defaultValue={scenario[field.name] ?? field.defaultValue}
                   placeholder={field.placeholder}
                   title={field.title}
-                  className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+                  className="h-10 px-3"
                 />
               </label>
             ))}
@@ -532,12 +518,11 @@ export default async function EditScenarioPage({
           }}
         />
 
+        <span className="form-section-title">Hypothèses financières</span>
+
         <div className="grid gap-5 sm:grid-cols-2">
           {assumptionFields.map((field) => (
-            <label
-              key={field.name}
-              className="grid gap-2 text-sm font-medium text-zinc-700"
-            >
+            <label key={field.name} className="grid gap-1.5 text-sm font-medium text-zinc-700">
               {field.label}
               <input
                 name={field.name}
@@ -548,14 +533,14 @@ export default async function EditScenarioPage({
                 defaultValue={scenario[field.name]}
                 placeholder={field.placeholder}
                 title={field.title}
-                className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+                className="h-10 px-3"
               />
             </label>
           ))}
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+          <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
             Gearing maximum autorisé (%)
             <input
               name="gearingMaxPct"
@@ -563,24 +548,19 @@ export default async function EditScenarioPage({
               step="0.01"
               min="0"
               max="100"
-              defaultValue={
-                scenario.gearingMaxPct ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.gearingMax
-              }
+              defaultValue={scenario.gearingMaxPct ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.gearingMax}
               placeholder="ex. 90"
               title="Plafond de dette en % du CAPEX effectif"
-              className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+              className="h-10 px-3"
             />
           </label>
         </div>
 
-        <section className="grid gap-4 rounded-md border border-zinc-200 bg-zinc-50 p-4">
-          <h2 className="text-sm font-semibold text-zinc-950">Fiscalité & CCA</h2>
+        <section className="form-section">
+          <p className="form-section-head">Fiscalité &amp; CCA</p>
           <div className="grid gap-5 sm:grid-cols-2">
             {fiscalFields.map((field) => (
-              <label
-                key={field.name}
-                className="grid gap-2 text-sm font-medium text-zinc-700"
-              >
+              <label key={field.name} className="grid gap-1.5 text-sm font-medium text-zinc-700">
                 {field.label}
                 <input
                   name={field.name}
@@ -594,7 +574,7 @@ export default async function EditScenarioPage({
                   }
                   placeholder={field.placeholder}
                   title={field.title}
-                  className="h-10 rounded-md border border-zinc-300 px-3 text-zinc-950 outline-none focus:border-zinc-900 placeholder:text-zinc-400"
+                  className="h-10 px-3"
                 />
               </label>
             ))}
@@ -602,7 +582,9 @@ export default async function EditScenarioPage({
         </section>
 
         <div className="grid gap-2">
-          <p className="text-sm font-medium text-zinc-700">Profil DSCR cible</p>
+          <p className="text-sm font-medium" style={{ color: "var(--ps-blue-dark)" }}>
+            Profil DSCR cible
+          </p>
           <DscrSchedule
             initialValue={
               initialDscrSchedule ?? [...DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.dscrSchedule]
@@ -611,16 +593,10 @@ export default async function EditScenarioPage({
         </div>
 
         <div className="flex justify-end gap-3 pt-2">
-          <Link
-            href={`/projects/${scenario.project.id}`}
-            className="inline-flex h-10 items-center justify-center rounded-md border border-zinc-300 px-4 text-sm font-medium text-zinc-900 hover:bg-zinc-100"
-          >
+          <Link href={`/projects/${scenario.project.id}`} className="btn-secondary">
             Annuler
           </Link>
-          <button
-            type="submit"
-            className="inline-flex h-10 items-center justify-center rounded-md bg-zinc-950 px-4 text-sm font-medium text-white hover:bg-zinc-800"
-          >
+          <button type="submit" className="btn-primary">
             Enregistrer
           </button>
         </div>

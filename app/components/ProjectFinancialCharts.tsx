@@ -84,24 +84,24 @@ type ProjectFinancialChartsProps = {
 };
 
 const chartColors = {
-  debt: "#2563eb",
-  cca: "#16a34a",
-  p50: "#2563eb",
-  p90: "#f97316",
-  opex: "#dc2626",
-  spread: "#93c5fd",
-  modules: "#0f766e",
-  bos: "#7c3aed",
-  raccordement: "#f59e0b",
-  apport: "#0891b2",
-  devFees: "#64748b",
-  dscrRealized: "#2563eb",
-  dscrTarget: "#dc2626",
-  dscrAbove: "#16a34a",
-  dscrBelow: "#dc2626",
-  debtOutstanding: "#2563eb",
-  dsra: "#16a34a",
-  debtService: "#f97316",
+  debt: "#004f9f",
+  cca: "#009557",
+  p50: "#0094cd",
+  p90: "#004f9f",
+  opex: "#ed7575",
+  spread: "#0094cd",
+  modules: "#0094cd",
+  bos: "#009557",
+  raccordement: "#ffcc00",
+  apport: "#e2eef9",
+  devFees: "#ffe163",
+  dscrRealized: "#0094cd",
+  dscrTarget: "#ed7575",
+  dscrAbove: "#009557",
+  dscrBelow: "#ed7575",
+  debtOutstanding: "#004f9f",
+  dsra: "#90c685",
+  debtService: "#0094cd",
 };
 
 function formatKeuro(value: number) {
@@ -172,17 +172,16 @@ function CapexTooltip({
   const item = items[0];
 
   return (
-    <div className="rounded-md border border-zinc-200 bg-white px-3 py-2 text-xs shadow-sm">
-      <div className="flex items-center gap-2">
+    <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 10, padding: "0.5rem 0.875rem", fontSize: "0.78rem", boxShadow: "0 2px 12px rgba(0,79,159,0.1)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
         <span
-          className="h-2 w-2 rounded-full"
-          style={{ backgroundColor: item?.payload?.color ?? item?.color }}
+          style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0, background: item?.payload?.color ?? item?.color }}
         />
-        <span className="font-semibold text-zinc-950">
+        <span style={{ fontWeight: 700, color: "#004f9f" }}>
           {item?.payload?.name ?? String(item?.name ?? "CAPEX")}
         </span>
       </div>
-      <div className="mt-1 font-medium text-zinc-700">
+      <div style={{ marginTop: "0.25rem", fontFamily: "monospace", fontWeight: 600, color: "#374151" }}>
         {formatExactKeuro(toNumber(item?.value))}
       </div>
     </div>
@@ -259,8 +258,8 @@ export function ProjectFinancialCharts({
   return (
     <section className="grid gap-4 lg:grid-cols-2">
       {hasFinancingData ? (
-        <div className="rounded-md border border-zinc-200 bg-white p-5">
-          <h2 className="text-lg font-semibold text-zinc-950">
+        <div className="card">
+          <h2 className="section-title">
             Structure de financement
           </h2>
           <div className="mt-4 h-72">
@@ -285,7 +284,7 @@ export function ProjectFinancialCharts({
                   y="50%"
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  className="fill-zinc-950 text-lg font-semibold"
+                  style={{ fill: "#004f9f", fontSize: "14px", fontWeight: 700, fontFamily: "Inter, system-ui, sans-serif" }}
                 >
                   {`Gearing : ${formatPercent(gearingRealisePct)}`}
                 </text>
@@ -296,8 +295,8 @@ export function ProjectFinancialCharts({
       ) : null}
 
       {hasCapexData ? (
-        <div className="rounded-md border border-zinc-200 bg-white p-5">
-          <h2 className="text-lg font-semibold text-zinc-950">
+        <div className="card">
+          <h2 className="section-title">
             Decomposition du CAPEX
           </h2>
           <div className="mt-4 h-72">
@@ -307,17 +306,17 @@ export function ProjectFinancialCharts({
                 layout="vertical"
                 margin={{ top: 12, right: 112, left: 8, bottom: 8 }}
               >
-                <CartesianGrid stroke="#e4e4e7" horizontal={false} />
+                <CartesianGrid stroke="#f1f5f9" horizontal={false} />
                 <XAxis
                   type="number"
                   tickFormatter={formatAxisMeuro}
-                  stroke="#71717a"
+                  stroke="#9ca3af"
                   fontSize={12}
                 />
                 <YAxis
                   type="category"
                   dataKey="name"
-                  stroke="#71717a"
+                  stroke="#9ca3af"
                   fontSize={12}
                   width={110}
                 />
@@ -335,8 +334,8 @@ export function ProjectFinancialCharts({
       ) : null}
 
       {hasDscrData ? (
-        <div className="rounded-md border border-zinc-200 bg-white p-5 lg:col-span-2">
-          <h2 className="text-lg font-semibold text-zinc-950">
+        <div className="card lg:col-span-2">
+          <h2 className="section-title">
             Profil DSCR
           </h2>
           <div className="mt-4 h-80">
@@ -345,9 +344,9 @@ export function ProjectFinancialCharts({
                 data={dscrData}
                 margin={{ top: 12, right: 24, left: 8, bottom: 8 }}
               >
-                <CartesianGrid stroke="#e4e4e7" vertical={false} />
-                <XAxis dataKey="year" stroke="#71717a" fontSize={12} />
-                <YAxis stroke="#71717a" fontSize={12} width={48} />
+                <CartesianGrid stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="year" stroke="#9ca3af" fontSize={12} />
+                <YAxis stroke="#9ca3af" fontSize={12} width={48} />
                 <Tooltip formatter={formatRatio} />
                 <Area
                   dataKey="dscrGreenBase"
@@ -409,8 +408,8 @@ export function ProjectFinancialCharts({
       ) : null}
 
       {hasDebtRepaymentData ? (
-        <div className="rounded-md border border-zinc-200 bg-white p-5 lg:col-span-2">
-          <h2 className="text-lg font-semibold text-zinc-950">
+        <div className="card lg:col-span-2">
+          <h2 className="section-title">
             Remboursement dette et DSRA
           </h2>
           <div className="mt-4 h-80">
@@ -419,11 +418,11 @@ export function ProjectFinancialCharts({
                 data={debtRepaymentData}
                 margin={{ top: 12, right: 24, left: 8, bottom: 8 }}
               >
-                <CartesianGrid stroke="#e4e4e7" vertical={false} />
-                <XAxis dataKey="year" stroke="#71717a" fontSize={12} />
+                <CartesianGrid stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="year" stroke="#9ca3af" fontSize={12} />
                 <YAxis
                   tickFormatter={formatAxisRawKeuro}
-                  stroke="#71717a"
+                  stroke="#9ca3af"
                   fontSize={12}
                   width={56}
                   label={{ value: "k€", angle: -90, position: "insideLeft" }}
@@ -463,8 +462,8 @@ export function ProjectFinancialCharts({
       ) : null}
 
       {hasCashFlowData ? (
-        <div className="rounded-md border border-zinc-200 bg-white p-5 lg:col-span-2">
-          <h2 className="text-lg font-semibold text-zinc-950">
+        <div className="card lg:col-span-2">
+          <h2 className="section-title">
             Revenus et charges sur la duree du projet
           </h2>
           <div className="mt-4 h-80">
@@ -473,11 +472,11 @@ export function ProjectFinancialCharts({
                 data={cashFlowData}
                 margin={{ top: 12, right: 24, left: 8, bottom: 8 }}
               >
-                <CartesianGrid stroke="#e4e4e7" vertical={false} />
-                <XAxis dataKey="year" stroke="#71717a" fontSize={12} />
+                <CartesianGrid stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="year" stroke="#9ca3af" fontSize={12} />
                 <YAxis
                   tickFormatter={formatAxisKeuro}
-                  stroke="#71717a"
+                  stroke="#9ca3af"
                   fontSize={12}
                   width={56}
                 />
