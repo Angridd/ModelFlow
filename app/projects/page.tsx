@@ -1,14 +1,28 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import { AuroraImport } from "@/app/components/AuroraImport";
 import { DeleteProjectButton } from "@/app/projects/delete-project-button";
 import { prisma } from "@/app/lib/prisma";
+
+function formatAuroraQuarter(value: Date) {
+  return `Q${Math.floor(value.getMonth() / 3) + 1} ${value.getFullYear()}`;
+}
+
+function formatAuroraTechnology(value: string | null | undefined) {
+  return value === "tracking" ? "Tracking" : "Fixed";
+}
 
 export default async function ProjectsPage() {
   await connection();
 
-  const projects = await prisma.project.findMany({
-    orderBy: { createdAt: "desc" },
-  });
+  const [projects, latestAuroraCurve] = await Promise.all([
+    prisma.project.findMany({
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.auroraCurve.findFirst({
+      orderBy: { updatedAt: "desc" },
+    }),
+  ]);
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-10">
@@ -28,6 +42,31 @@ export default async function ProjectsPage() {
           Nouveau projet
         </Link>
       </div>
+
+      <section className="flex flex-col gap-3 rounded-md border border-zinc-200 bg-white p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-zinc-950">Courbes Aurora</h2>
+            {latestAuroraCurve ? (
+              <span className="mt-2 inline-flex rounded-md bg-emerald-100 px-3 py-1 text-sm font-medium text-emerald-800">
+                Courbes Aurora · {formatAuroraQuarter(latestAuroraCurve.updatedAt)} ·{" "}
+                {formatAuroraTechnology(latestAuroraCurve.technology)}
+              </span>
+            ) : (
+              <span className="mt-2 inline-flex rounded-md bg-amber-100 px-3 py-1 text-sm font-medium text-amber-800">
+                Aucune courbe Aurora
+              </span>
+            )}
+          </div>
+          <AuroraImport
+            auroraUpdatedAt={latestAuroraCurve?.updatedAt.toISOString() ?? null}
+            auroraTechnology={latestAuroraCurve?.technology ?? null}
+            debtSizingCentralW={null}
+            debtSizingLowW={null}
+            investorCurveW={null}
+          />
+        </div>
+      </section>
 
       <div className="overflow-hidden rounded-md border border-zinc-200 bg-white">
         <table className="w-full border-collapse text-left text-sm">

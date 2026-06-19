@@ -413,11 +413,6 @@ export async function updateProject(projectId: string, formData: FormData) {
 
 export async function deleteProject(projectId: string) {
   await prisma.$transaction([
-    prisma.auroraCurve.deleteMany({
-      where: {
-        projectId,
-      },
-    }),
     prisma.scenario.deleteMany({
       where: {
         projectId,
@@ -436,26 +431,23 @@ export async function deleteProject(projectId: string) {
 }
 
 export async function createScenario(projectId: string, formData: FormData) {
-  const project = await prisma.project.findUnique({
-    where: {
-      id: projectId,
-    },
-    select: {
-      capacityMw: true,
-      commissioningYear: true,
-      debtSizingCentralW: true,
-      debtSizingLowW: true,
-      investorCurveW: true,
-      auroraCurves: {
-        select: {
-          year: true,
-          high: true,
-          central: true,
-          low: true,
-        },
+  const [project, auroraCurves] = await Promise.all([
+    prisma.project.findUnique({
+      where: {
+        id: projectId,
       },
-    },
-  });
+      select: {
+        capacityMw: true,
+        commissioningYear: true,
+        debtSizingCentralW: true,
+        debtSizingLowW: true,
+        investorCurveW: true,
+      },
+    }),
+    prisma.auroraCurve.findMany({
+      orderBy: { year: "asc" },
+    }),
+  ]);
 
   if (!project) {
     redirect("/projects");
@@ -469,7 +461,7 @@ export async function createScenario(projectId: string, formData: FormData) {
   const calculatedMetrics = calculateScenarioMetrics({
     capacityMw: project.capacityMw,
     commissioningYear: project.commissioningYear,
-    auroraCurves: project.auroraCurves,
+    auroraCurves,
     debtSizingCentralW: project.debtSizingCentralW,
     debtSizingLowW: project.debtSizingLowW,
     investorCurveW: project.investorCurveW,
@@ -500,26 +492,23 @@ export async function updateScenario(
   scenarioId: string,
   formData: FormData,
 ) {
-  const project = await prisma.project.findUnique({
-    where: {
-      id: projectId,
-    },
-    select: {
-      capacityMw: true,
-      commissioningYear: true,
-      debtSizingCentralW: true,
-      debtSizingLowW: true,
-      investorCurveW: true,
-      auroraCurves: {
-        select: {
-          year: true,
-          high: true,
-          central: true,
-          low: true,
-        },
+  const [project, auroraCurves] = await Promise.all([
+    prisma.project.findUnique({
+      where: {
+        id: projectId,
       },
-    },
-  });
+      select: {
+        capacityMw: true,
+        commissioningYear: true,
+        debtSizingCentralW: true,
+        debtSizingLowW: true,
+        investorCurveW: true,
+      },
+    }),
+    prisma.auroraCurve.findMany({
+      orderBy: { year: "asc" },
+    }),
+  ]);
 
   if (!project) {
     redirect("/projects");
@@ -533,7 +522,7 @@ export async function updateScenario(
   const calculatedMetrics = calculateScenarioMetrics({
     capacityMw: project.capacityMw,
     commissioningYear: project.commissioningYear,
-    auroraCurves: project.auroraCurves,
+    auroraCurves,
     debtSizingCentralW: project.debtSizingCentralW,
     debtSizingLowW: project.debtSizingLowW,
     investorCurveW: project.investorCurveW,

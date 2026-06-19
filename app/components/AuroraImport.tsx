@@ -5,7 +5,6 @@ import { useRef, useState } from "react";
 type AuroraTechnology = "fixed" | "tracking";
 
 type AuroraImportProps = {
-  projectId: string;
   auroraUpdatedAt: string | null;
   auroraTechnology: string | null;
   debtSizingCentralW: number | null;
@@ -30,7 +29,6 @@ function formatQuarter(value: Date) {
 }
 
 export function AuroraImport({
-  projectId,
   auroraUpdatedAt,
   auroraTechnology,
   debtSizingCentralW,
@@ -79,7 +77,7 @@ export function AuroraImport({
     setIsImporting(true);
 
     try {
-      const response = await fetch(`/api/projects/${projectId}/aurora`, {
+      const response = await fetch("/api/aurora", {
         method: "POST",
         body: formData,
       });

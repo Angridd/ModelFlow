@@ -6,7 +6,6 @@ import {
   importScenarios,
   setReferenceScenario,
 } from "@/app/actions";
-import { AuroraImport } from "@/app/components/AuroraImport";
 import { DeleteScenarioButton } from "@/app/projects/[id]/delete-scenario-button";
 import {
   calculateAnnualCashFlows,
@@ -39,22 +38,6 @@ function formatNumber(value: number | null, suffix = "") {
 
 function formatYear(value: number) {
   return value > 0 ? String(value) : "-";
-}
-
-function formatDate(value: Date | null) {
-  if (value === null) {
-    return "-";
-  }
-
-  return value.toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-function formatAuroraTechnology(value: string | null) {
-  return value === "tracking" ? "Tracking solar PV" : "Fixed solar PV";
 }
 
 function formatMillionEuros(value: number | null) {
@@ -94,17 +77,19 @@ export default async function ProjectDetailPage({
 
   const { id } = await params;
   const { scenarioId } = await searchParams;
-  const project = await prisma.project.findUnique({
-    where: { id },
-    include: {
-      scenarios: {
-        orderBy: { name: "asc" },
+  const [project, auroraCurves] = await Promise.all([
+    prisma.project.findUnique({
+      where: { id },
+      include: {
+        scenarios: {
+          orderBy: { name: "asc" },
+        },
       },
-      auroraCurves: {
-        orderBy: { year: "asc" },
-      },
-    },
-  });
+    }),
+    prisma.auroraCurve.findMany({
+      orderBy: { year: "asc" },
+    }),
+  ]);
 
   if (!project) {
     notFound();
@@ -114,7 +99,7 @@ export default async function ProjectDetailPage({
   const buildFinanceInput = (scenario: (typeof scenarios)[number]) => ({
     capacityMw: project.capacityMw,
     commissioningYear: project.commissioningYear,
-    auroraCurves: project.auroraCurves,
+    auroraCurves,
     debtSizingCentralW: project.debtSizingCentralW,
     debtSizingLowW: project.debtSizingLowW,
     investorCurveW: project.investorCurveW,
@@ -315,15 +300,6 @@ export default async function ProjectDetailPage({
           </h1>
         </div>
         <div className="flex flex-wrap gap-3">
-          {project.auroraUpdatedAt ? (
-            <span className="inline-flex h-10 items-center rounded-md bg-emerald-100 px-3 text-sm font-medium text-emerald-800">
-              Courbes Aurora · {formatDate(project.auroraUpdatedAt)}
-            </span>
-          ) : (
-            <span className="inline-flex h-10 items-center rounded-md bg-amber-100 px-3 text-sm font-medium text-amber-800">
-              Aucune courbe Aurora
-            </span>
-          )}
           <form action={importScenariosForProject} className="flex gap-2">
             <input
               name="csv"
@@ -404,29 +380,6 @@ export default async function ProjectDetailPage({
           <p className="mt-1 text-zinc-950">
             {formatYear(project.commissioningYear)}
           </p>
-        </div>
-        <div className="sm:col-span-2 lg:col-span-3">
-          <p className="text-sm font-medium text-zinc-500">Courbes Aurora</p>
-          <div className="mt-2 rounded-md border border-zinc-200 bg-zinc-50 p-3">
-            <AuroraImport
-              projectId={project.id}
-              auroraUpdatedAt={project.auroraUpdatedAt?.toISOString() ?? null}
-              auroraTechnology={project.auroraTechnology}
-              debtSizingCentralW={project.debtSizingCentralW}
-              debtSizingLowW={project.debtSizingLowW}
-              investorCurveW={project.investorCurveW}
-            />
-            {project.auroraUpdatedAt ? (
-              <p className="mt-2 text-sm font-medium text-emerald-700">
-                Courbes Aurora · {formatDate(project.auroraUpdatedAt)} ·{" "}
-                {formatAuroraTechnology(project.auroraTechnology)}
-              </p>
-            ) : (
-              <p className="mt-2 text-sm font-medium text-amber-700">
-                Aucune courbe Aurora
-              </p>
-            )}
-          </div>
         </div>
         {cashFlowScenario ? (
           <div>

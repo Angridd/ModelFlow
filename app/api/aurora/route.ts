@@ -7,8 +7,6 @@ type AuroraTechnology = "fixed" | "tracking";
 type ScenarioName = "Central" | "High" | "Low";
 type ImportedCurve = Record<number, number>;
 
-const sheetNames: ScenarioName[] = ["Central", "High", "Low"];
-
 function normalizeCell(value: unknown) {
   return String(value ?? "")
     .normalize("NFD")
@@ -28,22 +26,6 @@ function parseNumber(value: unknown) {
 
   const number = Number(value.trim().replace(/\s|\u00a0/g, "").replace(",", "."));
   return Number.isFinite(number) ? number : null;
-}
-
-function readWeight(formData: FormData, key: string, fallback: number) {
-  const value = formData.get(key);
-
-  if (typeof value !== "string" || value.trim() === "") {
-    return fallback;
-  }
-
-  const number = Number(value);
-
-  if (!Number.isFinite(number)) {
-    throw new Error(`La ponderation ${key} doit etre un nombre.`);
-  }
-
-  return number / 100;
 }
 
 function extractYears(rows: unknown[][], sheetName: string) {
@@ -96,8 +78,7 @@ function extractSheetCurve(
     );
   }
 
-  const targetLabel =
-    technology === "fixed" ? "fixed solar pv" : "tracking solar pv";
+  const targetLabel = technology === "fixed" ? "fixed solar pv" : "tracking solar pv";
   const targetRow = rows
     .slice(sectionRowIndex + 1)
     .find((row) => row.some((cell) => normalizeCell(cell) === targetLabel));
@@ -125,12 +106,8 @@ function extractSheetCurve(
   return curve;
 }
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function POST(request: Request) {
   try {
-    const { id } = await params;
     const formData = await request.formData();
     const file = formData.get("file");
     const technology = formData.get("technology");
@@ -145,29 +122,6 @@ export async function POST(
     if (technology !== "fixed" && technology !== "tracking") {
       return NextResponse.json(
         { success: false, error: "La technologie doit etre fixed ou tracking." },
-        { status: 400 },
-      );
-    }
-
-    const project = await prisma.project.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-
-    if (!project) {
-      return NextResponse.json(
-        { success: false, error: "Projet introuvable." },
-        { status: 404 },
-      );
-    }
-
-    const debtSizingCentralW = readWeight(formData, "debtSizingCentralW", 70);
-    const debtSizingLowW = readWeight(formData, "debtSizingLowW", 30);
-    const investorCurveW = readWeight(formData, "investorCurveW", 100);
-
-    if (Math.round((debtSizingCentralW + debtSizingLowW) * 10000) !== 10000) {
-      return NextResponse.json(
-        { success: false, error: "Central + Low doit etre egal a 100 %." },
         { status: 400 },
       );
     }
@@ -193,37 +147,33 @@ export async function POST(
       );
     }
 
-    await prisma.$transaction([
-      ...years.map((year) =>
+    const updatedAt = new Date();
+
+    await prisma.$transaction(
+      years.map((year) =>
         prisma.auroraCurve.upsert({
-          where: { projectId_year: { projectId: id, year } },
+          where: { year },
           create: {
-            projectId: id,
             year,
             central: curves.Central[year],
             high: curves.High[year],
             low: curves.Low[year],
+            technology,
+            updatedAt,
           },
           update: {
             central: curves.Central[year],
             high: curves.High[year],
             low: curves.Low[year],
+            technology,
+            updatedAt,
           },
         }),
       ),
-      prisma.project.update({
-        where: { id },
-        data: {
-          auroraUpdatedAt: new Date(),
-          auroraTechnology: technology,
-          debtSizingCentralW,
-          debtSizingLowW,
-          investorCurveW,
-        },
-      }),
-    ]);
+    );
 
-    revalidatePath(`/projects/${id}`);
+    revalidatePath("/projects");
+    revalidatePath("/projects/[id]", "page");
 
     return NextResponse.json({ success: true, yearsImported: years.length });
   } catch (error) {
