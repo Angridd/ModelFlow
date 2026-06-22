@@ -25,6 +25,13 @@ const INFLATION_OM_FALLBACK = 2;
 const INFLATION_MRA_FALLBACK = 2;
 const INFLATION_BACK_OFFICE_FALLBACK = 2;
 const INFLATION_DIVERS_FALLBACK = 2;
+const METHODE_TAXES_FALLBACK = "appreciation_directe";
+const TAUX_LF_AD = 0.08;
+const TAUX_LF_COMPTA = 0.04;
+const ABATT_IMMO = 0.30;
+const COEF_NEUTRAL = 0.14632;
+const FRAIS_TF = [0.03, 0.03, 0.09, 0.03, 0.08] as const;
+const FRAIS_CFE = [0.03, 0.03, 0.09, 0.00, 0.09] as const;
 
 export type FinanceEngineInput = FinancialAssumptions & {
   capacityMw: number;
@@ -90,6 +97,18 @@ export type FinanceEngineInput = FinancialAssumptions & {
   inflationMRA?: number | null;
   inflationBackOffice?: number | null;
   inflationDivers?: number | null;
+  methodeTaxes?: string | null;
+  tauxTFCommune?: number | null;
+  tauxTFEPCI?: number | null;
+  tauxTSE?: number | null;
+  tauxGEMAPI?: number | null;
+  tauxTEOM?: number | null;
+  tauxCFECommune?: number | null;
+  tauxCFEEPCI?: number | null;
+  tauxCCI?: number | null;
+  prixTerrainHa?: number | null;
+  abattTerrain?: number | null;
+  inflationTaxes?: number | null;
 };
 
 export type FinanceEngineResult = {
@@ -105,6 +124,8 @@ export type FinanceEngineResult = {
   estimatedPltKeuro: number;
   financingFeesDetail: FinancingFeesDetail;
   contingencyKeuro: number;
+  tfAnnuelleKeuro: number;
+  cfeAnnuelleKeuro: number;
 };
 
 export type AnnualCashFlow = {
@@ -204,8 +225,19 @@ export type OpexDetails = {
   loyerKeuro: number;
   assuranceKeuro: number;
   balancingKeuro: number;
+  baseTaxesEuro: number;
+  tfKeuro: number;
+  cfeKeuro: number;
   opexTotalKeuro: number;
   opexPerMwKeuro: number;
+};
+
+export type TaxesFoncieresOpexResult = {
+  baseTaxesEuro: number;
+  tfAnnuelleKeuro: number;
+  cfeAnnuelleKeuro: number;
+  tfKeuro: number;
+  cfeKeuro: number;
 };
 
 type PreRow = {
@@ -461,8 +493,72 @@ function hasDetailedOpexInput(input: FinanceEngineInput) {
     input.inflationOM != null ||
     input.inflationMRA != null ||
     input.inflationBackOffice != null ||
-    input.inflationDivers != null
+    input.inflationDivers != null ||
+    input.methodeTaxes != null ||
+    input.tauxTFCommune != null ||
+    input.tauxTFEPCI != null ||
+    input.tauxTSE != null ||
+    input.tauxGEMAPI != null ||
+    input.tauxTEOM != null ||
+    input.tauxCFECommune != null ||
+    input.tauxCFEEPCI != null ||
+    input.tauxCCI != null ||
+    input.prixTerrainHa != null ||
+    input.abattTerrain != null ||
+    input.inflationTaxes != null
   );
+}
+
+function taxeLocale(baseEuro: number, taux: number[], frais: readonly number[]) {
+  const composantes = taux.map((tauxValue) => tauxValue / 100 * baseEuro);
+  const fraisGestion = composantes.reduce(
+    (total, composante, index) => total + composante * (frais[index] ?? 0),
+    0,
+  );
+
+  return composantes.reduce((total, composante) => total + composante, 0) + fraisGestion;
+}
+
+export function calculateTaxesFoncieres(
+  input: FinanceEngineInput,
+  capexTotalKeuro: number,
+  year = 1,
+): TaxesFoncieresOpexResult {
+  const methode = input.methodeTaxes ?? METHODE_TAXES_FALLBACK;
+  const capexTotalEuro = capexTotalKeuro * 1000;
+  const baseTaxesEuro =
+    methode === "comptable"
+      ? capexTotalEuro * TAUX_LF_COMPTA * (1 - ABATT_IMMO)
+      : capexTotalEuro * TAUX_LF_AD * (1 - ABATT_IMMO) +
+        (input.surfaceHa ?? 0) *
+          (input.prixTerrainHa ?? 5000) *
+          TAUX_LF_AD *
+          COEF_NEUTRAL *
+          (1 - (input.abattTerrain ?? 0) / 100);
+  const tauxTF = [
+    input.tauxTFCommune,
+    input.tauxTFEPCI,
+    input.tauxTSE,
+    input.tauxGEMAPI,
+    input.tauxTEOM,
+  ].map((taux) => taux ?? 0);
+  const tauxCFE = [
+    input.tauxCFECommune,
+    input.tauxCFEEPCI,
+    input.tauxGEMAPI,
+    input.tauxCCI,
+  ].map((taux) => taux ?? 0);
+  const tfAnnuelleKeuro = taxeLocale(baseTaxesEuro, tauxTF, FRAIS_TF) / 1000;
+  const cfeAnnuelleKeuro = taxeLocale(baseTaxesEuro, tauxCFE, FRAIS_CFE) / 1000;
+  const inflationFactor = (1 + asRate(input.inflationTaxes ?? 0.4)) ** year;
+
+  return {
+    baseTaxesEuro,
+    tfAnnuelleKeuro,
+    cfeAnnuelleKeuro,
+    tfKeuro: tfAnnuelleKeuro * inflationFactor,
+    cfeKeuro: cfeAnnuelleKeuro * inflationFactor,
+  };
 }
 
 export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
@@ -618,11 +714,21 @@ export function calculateOpexDetails(
     assuranceRate * revenueP50Keuro * (1 + inflationAssurance) ** year;
   const balancingKeuro = (balancingCost * productionP50Mwh) / 1000;
   const hasDetailedOpex = hasDetailedOpexInput(input);
+  const taxesLocales = calculateTaxesFoncieres(
+    input,
+    input.capex * input.capacityMw,
+    year,
+  );
 
   if (!hasDetailedOpex) {
     const legacyOpexKeuro =
       input.opex * input.capacityMw * (1 + asRate(input.opexInflationRate)) ** year;
-    const opexTotalKeuro = legacyOpexKeuro + assuranceKeuro + balancingKeuro;
+    const opexTotalKeuro =
+      legacyOpexKeuro +
+      assuranceKeuro +
+      balancingKeuro +
+      taxesLocales.tfKeuro +
+      taxesLocales.cfeKeuro;
 
     return {
       hasDetailedOpex,
@@ -633,6 +739,9 @@ export function calculateOpexDetails(
       loyerKeuro: 0,
       assuranceKeuro,
       balancingKeuro,
+      baseTaxesEuro: taxesLocales.baseTaxesEuro,
+      tfKeuro: taxesLocales.tfKeuro,
+      cfeKeuro: taxesLocales.cfeKeuro,
       opexTotalKeuro,
       opexPerMwKeuro: input.capacityMw > 0 ? opexTotalKeuro / input.capacityMw : 0,
     };
@@ -672,7 +781,9 @@ export function calculateOpexDetails(
     diversKeuro +
     loyerKeuro +
     assuranceKeuro +
-    balancingKeuro;
+    balancingKeuro +
+    taxesLocales.tfKeuro +
+    taxesLocales.cfeKeuro;
 
   return {
     hasDetailedOpex,
@@ -683,6 +794,9 @@ export function calculateOpexDetails(
     loyerKeuro,
     assuranceKeuro,
     balancingKeuro,
+    baseTaxesEuro: taxesLocales.baseTaxesEuro,
+    tfKeuro: taxesLocales.tfKeuro,
+    cfeKeuro: taxesLocales.cfeKeuro,
     opexTotalKeuro,
     opexPerMwKeuro: input.capacityMw > 0 ? opexTotalKeuro / input.capacityMw : 0,
   };
@@ -1362,6 +1476,7 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
     ...input,
     capexTotalKeuro,
   });
+  const taxesLocales = calculateTaxesFoncieres(input, input.capex * input.capacityMw);
   const initialInvestment = capexTotalKeuro + financingFees.financingFeesKeuro;
   const financing = calculateFinancing(input);
   const annualCashFlows = financing.annualCashFlows;
@@ -1467,6 +1582,8 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
       commitmentFees: round(financingFees.financingFeesDetail.commitmentFees),
     },
     contingencyKeuro: round(calculateCapexDetails(input).contingencyKeuro),
+    tfAnnuelleKeuro: round(taxesLocales.tfAnnuelleKeuro),
+    cfeAnnuelleKeuro: round(taxesLocales.cfeAnnuelleKeuro),
     sizing: sizing !== null
       ? {
           ...sizing,

@@ -468,6 +468,10 @@ export default async function NewScenarioPage({
             inflationMRA: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationMRA,
             inflationBackOffice: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationBackOffice,
             inflationDivers: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationDivers,
+            methodeTaxes: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.methodeTaxes,
+            prixTerrainHa: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.prixTerrainHa,
+            abattTerrain: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.abattTerrain,
+            inflationTaxes: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationTaxes,
           }}
         />
 

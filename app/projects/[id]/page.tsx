@@ -131,6 +131,18 @@ export default async function ProjectDetailPage({
     inflationMRA: scenario.inflationMRA,
     inflationBackOffice: scenario.inflationBackOffice,
     inflationDivers: scenario.inflationDivers,
+    methodeTaxes: scenario.methodeTaxes,
+    tauxTFCommune: scenario.tauxTFCommune,
+    tauxTFEPCI: scenario.tauxTFEPCI,
+    tauxTSE: scenario.tauxTSE,
+    tauxGEMAPI: scenario.tauxGEMAPI,
+    tauxTEOM: scenario.tauxTEOM,
+    tauxCFECommune: scenario.tauxCFECommune,
+    tauxCFEEPCI: scenario.tauxCFEEPCI,
+    tauxCCI: scenario.tauxCCI,
+    prixTerrainHa: scenario.prixTerrainHa,
+    abattTerrain: scenario.abattTerrain,
+    inflationTaxes: scenario.inflationTaxes,
     yieldMwh: scenario.yieldMwh,
     yieldP90Mwh: scenario.yieldP90Mwh,
     tariff: scenario.tariff,
@@ -587,6 +599,8 @@ export default async function ProjectDetailPage({
                 { label: "Loyer", value: formatNumber(cashFlowOpexDetails.loyerKeuro, " kEUR/an") },
                 { label: "Assurance", value: formatNumber(cashFlowOpexDetails.assuranceKeuro, " kEUR/an") },
                 { label: "Balancing", value: formatNumber(cashFlowOpexDetails.balancingKeuro, " kEUR/an") },
+                { label: "TF", value: formatNumber(cashFlowOpexDetails.tfKeuro, " kEUR/an") },
+                { label: "CFE", value: formatNumber(cashFlowOpexDetails.cfeKeuro, " kEUR/an") },
               ].map(({ label, value }) => (
                 <div key={label}>
                   <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>{label}</span>

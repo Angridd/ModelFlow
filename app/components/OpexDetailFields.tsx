@@ -24,6 +24,18 @@ type OpexDetailInitialValue = {
   inflationMRA?: number | null;
   inflationBackOffice?: number | null;
   inflationDivers?: number | null;
+  methodeTaxes?: string | null;
+  tauxTFCommune?: number | null;
+  tauxTFEPCI?: number | null;
+  tauxTSE?: number | null;
+  tauxGEMAPI?: number | null;
+  tauxTEOM?: number | null;
+  tauxCFECommune?: number | null;
+  tauxCFEEPCI?: number | null;
+  tauxCCI?: number | null;
+  prixTerrainHa?: number | null;
+  abattTerrain?: number | null;
+  inflationTaxes?: number | null;
 };
 
 type OpexDetailFieldsProps = {
@@ -49,6 +61,17 @@ function initialNumber(value: number | null | undefined, fallback = "") {
 
 function formatKeuro(value: number) {
   return `${value.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} kEUR/an`;
+}
+
+function formatKeuroDecimal(value: number) {
+  return `${value.toLocaleString("fr-FR", {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+  })} kEUR/an`;
+}
+
+function formatEuro(value: number) {
+  return `${value.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} EUR`;
 }
 
 function formatOpexPerMw(value: number) {
@@ -116,7 +139,32 @@ export function OpexDetailFields({
   const [inflationDivers, setInflationDivers] = useState(
     initialNumber(initialValue.inflationDivers, "2"),
   );
+  const [methodeTaxes, setMethodeTaxes] = useState(
+    initialValue.methodeTaxes ?? "appreciation_directe",
+  );
+  const [tauxTFCommune, setTauxTFCommune] = useState(
+    initialNumber(initialValue.tauxTFCommune),
+  );
+  const [tauxTFEPCI, setTauxTFEPCI] = useState(initialNumber(initialValue.tauxTFEPCI));
+  const [tauxTSE, setTauxTSE] = useState(initialNumber(initialValue.tauxTSE));
+  const [tauxGEMAPI, setTauxGEMAPI] = useState(initialNumber(initialValue.tauxGEMAPI));
+  const [tauxTEOM, setTauxTEOM] = useState(initialNumber(initialValue.tauxTEOM));
+  const [tauxCFECommune, setTauxCFECommune] = useState(
+    initialNumber(initialValue.tauxCFECommune),
+  );
+  const [tauxCFEEPCI, setTauxCFEEPCI] = useState(initialNumber(initialValue.tauxCFEEPCI));
+  const [tauxCCI, setTauxCCI] = useState(initialNumber(initialValue.tauxCCI));
+  const [prixTerrainHa, setPrixTerrainHa] = useState(
+    initialNumber(initialValue.prixTerrainHa, "5000"),
+  );
+  const [abattTerrain, setAbattTerrain] = useState(
+    initialNumber(initialValue.abattTerrain, "0"),
+  );
+  const [inflationTaxes, setInflationTaxes] = useState(
+    initialNumber(initialValue.inflationTaxes, "0.4"),
+  );
 
+  const capexPerMwKeuro = useSyncedFormNumber("capex", 0);
   const surfaceHa = useSyncedFormNumber(
     "surfaceHa",
     syncedInitialValue(initialValue.surfaceHa, 0),
@@ -153,13 +201,23 @@ export function OpexDetailFields({
       ? tariff * (1 + tariffInflationRate / 100)
       : 0;
   const revenueP50Keuro = productionP50Mwh * annualTariff / 1000;
+  const hasLocalTaxRate = [
+    tauxTFCommune,
+    tauxTFEPCI,
+    tauxTSE,
+    tauxGEMAPI,
+    tauxTEOM,
+    tauxCFECommune,
+    tauxCFEEPCI,
+    tauxCCI,
+  ].some((value) => parseNumber(value) !== null);
 
   const details = useMemo(
     () =>
       calculateOpexDetails(
         {
           capacityMw,
-          capex: 0,
+          capex: capexPerMwKeuro,
           opex: initialValue.opex,
           yieldMwh,
           tariff,
@@ -187,6 +245,18 @@ export function OpexDetailFields({
           inflationMRA: parseNumber(inflationMRA),
           inflationBackOffice: parseNumber(inflationBackOffice),
           inflationDivers: parseNumber(inflationDivers),
+          methodeTaxes,
+          tauxTFCommune: parseNumber(tauxTFCommune),
+          tauxTFEPCI: parseNumber(tauxTFEPCI),
+          tauxTSE: parseNumber(tauxTSE),
+          tauxGEMAPI: parseNumber(tauxGEMAPI),
+          tauxTEOM: parseNumber(tauxTEOM),
+          tauxCFECommune: parseNumber(tauxCFECommune),
+          tauxCFEEPCI: parseNumber(tauxCFEEPCI),
+          tauxCCI: parseNumber(tauxCCI),
+          prixTerrainHa: parseNumber(prixTerrainHa),
+          abattTerrain: parseNumber(abattTerrain),
+          inflationTaxes: parseNumber(inflationTaxes),
         },
         1,
         revenueP50Keuro,
@@ -196,25 +266,38 @@ export function OpexDetailFields({
       assuranceRate,
       backOfficeKeuro,
       balancingCost,
+      capexPerMwKeuro,
       capacityMw,
       contractDuration,
       diversOpexKeuro,
+      abattTerrain,
       inflationAssurance,
       inflationBackOffice,
       inflationDivers,
       inflationMRA,
       inflationOM,
+      inflationTaxes,
       initialValue.opex,
       loyerInflation,
       loyerMode,
       loyerValeur,
+      methodeTaxes,
       mraEuroKwc,
       omFixedEuroKwc,
+      prixTerrainHa,
       productionP50Mwh,
       revenueP50Keuro,
       surfaceHa,
       tariff,
       tariffInflationRate,
+      tauxCFECommune,
+      tauxCFEEPCI,
+      tauxCCI,
+      tauxGEMAPI,
+      tauxTEOM,
+      tauxTFCommune,
+      tauxTFEPCI,
+      tauxTSE,
       yieldMwh,
     ],
   );
@@ -377,6 +460,88 @@ export function OpexDetailFields({
           />
         </label>
       </div>
+      <div className="grid gap-4 border-t border-zinc-200 pt-4">
+        <h3 className="text-sm font-semibold text-zinc-950">Taxes locales (TF &amp; CFE)</h3>
+        <label className="grid gap-2 text-sm font-medium text-zinc-700">
+          <span>Méthode de calcul <span className="badge-default">Défaut</span></span>
+          <select
+            name="methodeTaxes"
+            value={methodeTaxes}
+            onChange={(event) => setMethodeTaxes(event.target.value)}
+            title="Appréciation directe : base sur valeur vénale terrain + immo (8%). Comptable : base sur valeur comptable immo (4%). LF 2021."
+            className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-zinc-950 outline-none focus:border-zinc-900"
+          >
+            <option value="appreciation_directe">Appréciation directe</option>
+            <option value="comptable">Méthode comptable</option>
+          </select>
+        </label>
+        <div className="grid gap-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            Taux communaux TFPB (%) - consulter avis TF de la commune
+          </p>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              Taux commune
+              <input name="tauxTFCommune" type="number" min="0" step="0.01" value={tauxTFCommune} onChange={(event) => setTauxTFCommune(event.target.value)} placeholder="ex. 28.5" className={numberInputClass} />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              Taux EPCI
+              <input name="tauxTFEPCI" type="number" min="0" step="0.01" value={tauxTFEPCI} onChange={(event) => setTauxTFEPCI(event.target.value)} placeholder="ex. 12.3" className={numberInputClass} />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              TSE
+              <input name="tauxTSE" type="number" min="0" step="0.01" value={tauxTSE} onChange={(event) => setTauxTSE(event.target.value)} placeholder="ex. 5.2" className={numberInputClass} />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              GEMAPI
+              <input name="tauxGEMAPI" type="number" min="0" step="0.01" value={tauxGEMAPI} onChange={(event) => setTauxGEMAPI(event.target.value)} placeholder="ex. 0.8" className={numberInputClass} />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              TEOM
+              <input name="tauxTEOM" type="number" min="0" step="0.01" value={tauxTEOM} onChange={(event) => setTauxTEOM(event.target.value)} placeholder="ex. 9.4" className={numberInputClass} />
+            </label>
+          </div>
+        </div>
+        <div className="grid gap-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            Taux CFE (%) - consulter avis CFE de la commune
+          </p>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              Taux commune
+              <input name="tauxCFECommune" type="number" min="0" step="0.01" value={tauxCFECommune} onChange={(event) => setTauxCFECommune(event.target.value)} placeholder="ex. 22.1" className={numberInputClass} />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              Taux EPCI
+              <input name="tauxCFEEPCI" type="number" min="0" step="0.01" value={tauxCFEEPCI} onChange={(event) => setTauxCFEEPCI(event.target.value)} placeholder="ex. 8.5" className={numberInputClass} />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              CCI
+              <input name="tauxCCI" type="number" min="0" step="0.01" value={tauxCCI} onChange={(event) => setTauxCCI(event.target.value)} placeholder="ex. 0.5" className={numberInputClass} />
+            </label>
+          </div>
+        </div>
+        <div className="grid gap-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Terrain</p>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              <span>Prix terrain (EUR/ha) <span className="badge-default">Défaut</span></span>
+              <input name="prixTerrainHa" type="number" min="0" step="0.01" value={prixTerrainHa} onChange={(event) => setPrixTerrainHa(event.target.value)} placeholder="ex. 5000" className={defaultInputClass(prixTerrainHa, "5000")} />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              <span>Abattement terrain (%) <span className="badge-default">Défaut</span></span>
+              <input name="abattTerrain" type="number" min="0" step="0.01" value={abattTerrain} onChange={(event) => setAbattTerrain(event.target.value)} placeholder="ex. 0" className={defaultInputClass(abattTerrain, "0")} />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              <span>Inflation taxes (%/an) <span className="badge-default">Défaut</span></span>
+              <input name="inflationTaxes" type="number" min="0" step="0.01" value={inflationTaxes} onChange={(event) => setInflationTaxes(event.target.value)} placeholder="ex. 0.4" className={defaultInputClass(inflationTaxes, "0.4")} />
+            </label>
+          </div>
+        </div>
+        {!hasLocalTaxRate ? (
+          <span className="badge badge-yellow">Taux non renseignés - TF et CFE = 0</span>
+        ) : null}
+      </div>
       <div className="grid gap-2 border-t border-zinc-200 pt-4 text-sm">
         <div className="flex justify-between gap-4">
           <span className="text-zinc-500">O&M</span>
@@ -412,6 +577,30 @@ export function OpexDetailFields({
           <span className="text-zinc-500">Balancing</span>
           <span className="font-medium text-zinc-950">
             {formatKeuro(details.balancingKeuro)}
+          </span>
+        </div>
+        <div className="mt-2 flex justify-between gap-4 border-t border-zinc-300 pt-3">
+          <span className="text-zinc-500">Base imposable calculée</span>
+          <span className="font-medium text-zinc-950">
+            {formatEuro(details.baseTaxesEuro)}
+          </span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-zinc-500">TF annuelle (an 1)</span>
+          <span className="font-medium text-zinc-950">
+            {formatKeuroDecimal(details.tfKeuro)}
+          </span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-zinc-500">CFE annuelle (an 1)</span>
+          <span className="font-medium text-zinc-950">
+            {formatKeuroDecimal(details.cfeKeuro)}
+          </span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-zinc-500">Total taxes locales</span>
+          <span className="font-medium text-zinc-950">
+            {formatKeuroDecimal(details.tfKeuro + details.cfeKeuro)}
           </span>
         </div>
         <div className="mt-2 flex justify-between gap-4 border-t border-zinc-300 pt-3 font-semibold text-zinc-950">

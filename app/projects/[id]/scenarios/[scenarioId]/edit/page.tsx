@@ -531,6 +531,22 @@ export default async function EditScenarioPage({
               DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationBackOffice,
             inflationDivers:
               scenario.inflationDivers ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationDivers,
+            methodeTaxes:
+              scenario.methodeTaxes ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.methodeTaxes,
+            tauxTFCommune: scenario.tauxTFCommune,
+            tauxTFEPCI: scenario.tauxTFEPCI,
+            tauxTSE: scenario.tauxTSE,
+            tauxGEMAPI: scenario.tauxGEMAPI,
+            tauxTEOM: scenario.tauxTEOM,
+            tauxCFECommune: scenario.tauxCFECommune,
+            tauxCFEEPCI: scenario.tauxCFEEPCI,
+            tauxCCI: scenario.tauxCCI,
+            prixTerrainHa:
+              scenario.prixTerrainHa ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.prixTerrainHa,
+            abattTerrain:
+              scenario.abattTerrain ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.abattTerrain,
+            inflationTaxes:
+              scenario.inflationTaxes ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationTaxes,
           }}
         />
 

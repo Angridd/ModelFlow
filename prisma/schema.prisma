@@ -80,6 +80,18 @@ model Scenario {
   inflationMRA             Float?
   inflationBackOffice      Float?
   inflationDivers          Float?
+  methodeTaxes             String?
+  tauxTFCommune            Float?
+  tauxTFEPCI               Float?
+  tauxTSE                  Float?
+  tauxGEMAPI               Float?
+  tauxTEOM                 Float?
+  tauxCFECommune           Float?
+  tauxCFEEPCI              Float?
+  tauxCCI                  Float?
+  prixTerrainHa            Float?
+  abattTerrain             Float?
+  inflationTaxes           Float?
   dscrTarget               Float?
   debtTenorYears           Int?
   dscrSchedule             String?

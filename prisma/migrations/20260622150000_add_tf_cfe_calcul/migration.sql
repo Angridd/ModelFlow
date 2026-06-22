@@ -1,0 +1,12 @@
+ALTER TABLE "Scenario" ADD COLUMN "methodeTaxes" TEXT;
+ALTER TABLE "Scenario" ADD COLUMN "tauxTFCommune" REAL;
+ALTER TABLE "Scenario" ADD COLUMN "tauxTFEPCI" REAL;
+ALTER TABLE "Scenario" ADD COLUMN "tauxTSE" REAL;
+ALTER TABLE "Scenario" ADD COLUMN "tauxGEMAPI" REAL;
+ALTER TABLE "Scenario" ADD COLUMN "tauxTEOM" REAL;
+ALTER TABLE "Scenario" ADD COLUMN "tauxCFECommune" REAL;
+ALTER TABLE "Scenario" ADD COLUMN "tauxCFEEPCI" REAL;
+ALTER TABLE "Scenario" ADD COLUMN "tauxCCI" REAL;
+ALTER TABLE "Scenario" ADD COLUMN "prixTerrainHa" REAL;
+ALTER TABLE "Scenario" ADD COLUMN "abattTerrain" REAL;
+ALTER TABLE "Scenario" ADD COLUMN "inflationTaxes" REAL;
