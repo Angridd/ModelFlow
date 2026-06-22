@@ -298,6 +298,13 @@ function readScenarioAssumptions(formData: FormData) {
     dsraMonths: readOptionalInteger(formData, "dsraMonths"),
     devFeesKEuroPerMW: readOptionalNumber(formData, "devFeesKEuroPerMW"),
     tauxISEntreprise: readOptionalNumber(formData, "tauxISEntreprise"),
+    legalFeesKEuro: readOptionalNumber(formData, "legalFeesK€"),
+    technicalDDKEuro: readOptionalNumber(formData, "technicalDDK€"),
+    arrangerFeesRate: readOptionalNumber(formData, "arrangerFeesRate"),
+    participantFeesRate: readOptionalNumber(formData, "participantFeesRate"),
+    bankFeesPLTKEuroPerMW: readOptionalNumber(formData, "bankFeesPLTK€PerMW"),
+    interimFinancingRate: readOptionalNumber(formData, "interimFinancingRate"),
+    commitmentFeesRate: readOptionalNumber(formData, "commitmentFeesRate"),
   };
 }
 
@@ -661,6 +668,13 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
       dsraMonths: scenario.dsraMonths,
       devFeesKEuroPerMW: scenario.devFeesKEuroPerMW,
       tauxISEntreprise: scenario.tauxISEntreprise,
+      legalFeesKEuro: scenario.legalFeesKEuro,
+      technicalDDKEuro: scenario.technicalDDKEuro,
+      arrangerFeesRate: scenario.arrangerFeesRate,
+      participantFeesRate: scenario.participantFeesRate,
+      bankFeesPLTKEuroPerMW: scenario.bankFeesPLTKEuroPerMW,
+      interimFinancingRate: scenario.interimFinancingRate,
+      commitmentFeesRate: scenario.commitmentFeesRate,
       dscr: scenario.dscr,
       npv: scenario.npv,
       irr: scenario.irr,

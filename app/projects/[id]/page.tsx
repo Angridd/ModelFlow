@@ -155,6 +155,13 @@ export default async function ProjectDetailPage({
     dsraMonths: scenario.dsraMonths,
     devFeesKEuroPerMW: scenario.devFeesKEuroPerMW,
     tauxISEntreprise: scenario.tauxISEntreprise,
+    legalFeesKEuro: scenario.legalFeesKEuro,
+    technicalDDKEuro: scenario.technicalDDKEuro,
+    arrangerFeesRate: scenario.arrangerFeesRate,
+    participantFeesRate: scenario.participantFeesRate,
+    bankFeesPLTKEuroPerMW: scenario.bankFeesPLTKEuroPerMW,
+    interimFinancingRate: scenario.interimFinancingRate,
+    commitmentFeesRate: scenario.commitmentFeesRate,
   });
   const projectReferenceScenario = scenarios.find((scenario) => scenario.isReference);
   const selectedScenarioId =
@@ -210,8 +217,11 @@ export default async function ProjectDetailPage({
   const capexInitialKeuro = cashFlowScenario
     ? (cashFlowCapexDetails?.capexTotalKeuro ?? cashFlowScenario.capex * project.capacityMw)
     : 0;
+  const financingFeesKeuro = cashFlowMetrics?.financingFeesKeuro ?? 0;
+  const financingFeesDetail = cashFlowMetrics?.financingFeesDetail ?? null;
+  const capexTotalWithFinancingFeesKeuro = capexInitialKeuro + financingFeesKeuro;
   const capexEffectifKeuro = sizing !== null
-    ? capexInitialKeuro + sizing.margeFactKeuro
+    ? capexTotalWithFinancingFeesKeuro + sizing.margeFactKeuro
     : null;
   const ccaKeuro =
     sizing !== null && capexEffectifKeuro !== null
@@ -259,6 +269,7 @@ export default async function ProjectDetailPage({
             raccordementKeuro: cashFlowCapexDetails.raccordementKeuro,
             apportAffaireKeuro: cashFlowCapexDetails.apportAffaireKeuro,
             devFeesKeuro: cashFlowCapexDetails.devFeesKeuro,
+            financingFeesKeuro,
           },
         ]
       : [];
@@ -488,12 +499,39 @@ export default async function ProjectDetailPage({
                   {formatNumber(cashFlowCapexDetails.devFeesKeuro, " kEUR")}
                 </p>
               </div>
+              <div
+                title={
+                  financingFeesDetail !== null
+                    ? [
+                        `Legal fees: ${formatNumber(financingFeesDetail.legalFees, " kEUR")}`,
+                        `Technical DD: ${formatNumber(financingFeesDetail.technicalDD, " kEUR")}`,
+                        `Arranger fees: ${formatNumber(financingFeesDetail.arrangerFees, " kEUR")}`,
+                        `Participant fees: ${formatNumber(financingFeesDetail.participantFees, " kEUR")}`,
+                        `Bank fees PLT: ${formatNumber(financingFeesDetail.bankFeesPLT, " kEUR")}`,
+                        `Interim financing: ${formatNumber(financingFeesDetail.interimFinancing, " kEUR")}`,
+                        `Commitment fees: ${formatNumber(financingFeesDetail.commitmentFees, " kEUR")}`,
+                      ].join("\n")
+                    : undefined
+                }
+              >
+                <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+                  Frais de financement
+                </span>
+                <p style={{ fontWeight: 600, color: "#0d1117" }}>
+                  {formatNumber(financingFeesKeuro, " kEUR")}
+                </p>
+              </div>
               <div>
                 <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Total</span>
                 <p style={{ fontWeight: 700, color: "var(--ps-blue-dark)" }}>
-                  {formatNumber(cashFlowCapexDetails.capexTotalKeuro, " kEUR")}{" "}
+                  {formatNumber(capexTotalWithFinancingFeesKeuro, " kEUR")}{" "}
                   <span style={{ fontWeight: 400, color: "#9ca3af" }}>
-                    {formatNumber(cashFlowCapexDetails.capexPerMwKeuro, " kEUR/MWc")}
+                    {formatNumber(
+                      project.capacityMw > 0
+                        ? capexTotalWithFinancingFeesKeuro / project.capacityMw
+                        : 0,
+                      " kEUR/MWc",
+                    )}
                   </span>
                 </p>
               </div>

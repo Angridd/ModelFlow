@@ -46,6 +46,13 @@ export type FinanceEngineInput = FinancialAssumptions & {
   dsraMonths?: number | null;
   devFeesKEuroPerMW?: number | null;
   tauxISEntreprise?: number | null;
+  legalFeesKEuro?: number | null;
+  technicalDDKEuro?: number | null;
+  arrangerFeesRate?: number | null;
+  participantFeesRate?: number | null;
+  bankFeesPLTKEuroPerMW?: number | null;
+  interimFinancingRate?: number | null;
+  commitmentFeesRate?: number | null;
   contractDuration?: number | null;
   auroraCurves?: Array<{
     year: number;
@@ -89,6 +96,8 @@ export type FinanceEngineResult = {
   sizing: SizingResult | null;
   doubleIRR: DoubleIRR | null;
   sizingIterations: number;
+  financingFeesKeuro: number;
+  financingFeesDetail: FinancingFeesDetail;
 };
 
 export type AnnualCashFlow = {
@@ -141,6 +150,35 @@ export type CapexDetails = {
   capexTotalKeuro: number;
   capexPerMwKeuro: number;
 };
+
+export type FinancingFeesDetail = {
+  legalFees: number;
+  technicalDD: number;
+  arrangerFees: number;
+  participantFees: number;
+  bankFeesPLT: number;
+  interimFinancing: number;
+  commitmentFees: number;
+};
+
+export type FinancingFeesResult = {
+  financingFeesKeuro: number;
+  financingFeesDetail: FinancingFeesDetail;
+};
+
+type FinancingFeesInput = Pick<
+  FinanceEngineInput,
+  | "capacityMw"
+  | "gearingMaxPct"
+  | "gearingMax"
+  | "legalFeesKEuro"
+  | "technicalDDKEuro"
+  | "arrangerFeesRate"
+  | "participantFeesRate"
+  | "bankFeesPLTKEuroPerMW"
+  | "interimFinancingRate"
+  | "commitmentFeesRate"
+> & { capexTotalKeuro: number };
 
 export type OpexDetails = {
   hasDetailedOpex: boolean;
@@ -461,6 +499,58 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
     devFeesKeuro,
     capexTotalKeuro,
     capexPerMwKeuro: input.capacityMw > 0 ? capexTotalKeuro / input.capacityMw : 0,
+  };
+}
+
+function hasFinancingFeesInput(input: FinancingFeesInput) {
+  return (
+    input.legalFeesKEuro != null ||
+    input.technicalDDKEuro != null ||
+    input.arrangerFeesRate != null ||
+    input.participantFeesRate != null ||
+    input.bankFeesPLTKEuroPerMW != null ||
+    input.interimFinancingRate != null ||
+    input.commitmentFeesRate != null
+  );
+}
+
+export function calculateFinancingFees(
+  input: FinancingFeesInput,
+): FinancingFeesResult {
+  if (!hasFinancingFeesInput(input)) {
+    return {
+      financingFeesKeuro: 0,
+      financingFeesDetail: {
+        legalFees: 0,
+        technicalDD: 0,
+        arrangerFees: 0,
+        participantFees: 0,
+        bankFeesPLT: 0,
+        interimFinancing: 0,
+        commitmentFees: 0,
+      },
+    };
+  }
+
+  const gearingMaxPct = input.gearingMaxPct ?? input.gearingMax ?? 95;
+  const baseKeuro = input.capexTotalKeuro * gearingMaxPct / 100;
+  const financingFeesDetail = {
+    legalFees: input.legalFeesKEuro ?? 10,
+    technicalDD: input.technicalDDKEuro ?? 5,
+    arrangerFees: baseKeuro * (input.arrangerFeesRate ?? 0.8) / 100,
+    participantFees: baseKeuro * (input.participantFeesRate ?? 0.4) / 100,
+    bankFeesPLT: (input.bankFeesPLTKEuroPerMW ?? 1.5) * input.capacityMw,
+    interimFinancing: baseKeuro * (input.interimFinancingRate ?? 2.5) / 100,
+    commitmentFees: baseKeuro * (input.commitmentFeesRate ?? 0.1) / 100,
+  };
+  const financingFeesKeuro = Object.values(financingFeesDetail).reduce(
+    (total, value) => total + value,
+    0,
+  );
+
+  return {
+    financingFeesKeuro,
+    financingFeesDetail,
   };
 }
 
@@ -1142,7 +1232,12 @@ function applyWaterfall(
 }
 
 function calculateFinancing(input: FinanceEngineInput): SizingComputation {
-  const initialInvestment = calculateCapexDetails(input).capexTotalKeuro;
+  const capexTotalKeuro = calculateCapexDetails(input).capexTotalKeuro;
+  const financingFees = calculateFinancingFees({
+    ...input,
+    capexTotalKeuro,
+  });
+  const initialInvestment = capexTotalKeuro + financingFees.financingFeesKeuro;
   const discountRate = asRate(input.discountRate);
   const effectiveSchedule = resolveSchedule(input);
   const effectiveTenor = input.debtTenorYears ?? input.debtMaturityYears;
@@ -1213,7 +1308,12 @@ export function calculateAnnualCashFlows(input: FinanceEngineInput): AnnualCashF
 
 export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngineResult {
   // Initial investment kEUR comes from detailed CAPEX when configured, else legacy capex kEUR/MW.
-  const initialInvestment = calculateCapexDetails(input).capexTotalKeuro;
+  const capexTotalKeuro = calculateCapexDetails(input).capexTotalKeuro;
+  const financingFees = calculateFinancingFees({
+    ...input,
+    capexTotalKeuro,
+  });
+  const initialInvestment = capexTotalKeuro + financingFees.financingFeesKeuro;
   const financing = calculateFinancing(input);
   const annualCashFlows = financing.annualCashFlows;
 
@@ -1306,6 +1406,16 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
     debtAmountKeuro: sizing !== null ? round(sizing.debtRetenuKeuro) : null,
     doubleIRR,
     sizingIterations: financing.iterations,
+    financingFeesKeuro: round(financingFees.financingFeesKeuro),
+    financingFeesDetail: {
+      legalFees: round(financingFees.financingFeesDetail.legalFees),
+      technicalDD: round(financingFees.financingFeesDetail.technicalDD),
+      arrangerFees: round(financingFees.financingFeesDetail.arrangerFees),
+      participantFees: round(financingFees.financingFeesDetail.participantFees),
+      bankFeesPLT: round(financingFees.financingFeesDetail.bankFeesPLT),
+      interimFinancing: round(financingFees.financingFeesDetail.interimFinancing),
+      commitmentFees: round(financingFees.financingFeesDetail.commitmentFees),
+    },
     sizing: sizing !== null
       ? {
           ...sizing,

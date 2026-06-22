@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { updateScenario } from "@/app/actions";
 import { CapexDetailFields } from "@/app/components/CapexDetailFields";
 import { DscrSchedule } from "@/app/components/DscrSchedule";
+import { FinancingFeesFields } from "@/app/components/FinancingFeesFields";
 import { OpexDetailFields } from "@/app/components/OpexDetailFields";
 import {
   DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS,
@@ -555,6 +556,35 @@ export default async function EditScenarioPage({
             />
           </label>
         </div>
+
+        <FinancingFeesFields
+          capacityMw={scenario.project.capacityMw}
+          initialValue={{
+            capexPerMwKeuro: scenario.capex,
+            gearingMaxPct:
+              scenario.gearingMaxPct ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.gearingMax,
+            legalFeesKEuro:
+              scenario.legalFeesKEuro ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.legalFeesKEuro,
+            technicalDDKEuro:
+              scenario.technicalDDKEuro ??
+              DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.technicalDDKEuro,
+            arrangerFeesRate:
+              scenario.arrangerFeesRate ??
+              DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.arrangerFeesRate,
+            participantFeesRate:
+              scenario.participantFeesRate ??
+              DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.participantFeesRate,
+            bankFeesPLTKEuroPerMW:
+              scenario.bankFeesPLTKEuroPerMW ??
+              DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.bankFeesPLTKEuroPerMW,
+            interimFinancingRate:
+              scenario.interimFinancingRate ??
+              DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.interimFinancingRate,
+            commitmentFeesRate:
+              scenario.commitmentFeesRate ??
+              DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.commitmentFeesRate,
+          }}
+        />
 
         <section className="form-section">
           <p className="form-section-head">Fiscalité &amp; CCA</p>

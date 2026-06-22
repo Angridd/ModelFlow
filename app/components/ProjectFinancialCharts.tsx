@@ -41,6 +41,7 @@ type CapexChartDatum = {
   raccordementKeuro: number;
   apportAffaireKeuro: number;
   devFeesKeuro: number;
+  financingFeesKeuro: number;
 };
 
 type CapexComponentDatum = {
@@ -95,6 +96,7 @@ const chartColors = {
   raccordement: "#ffcc00",
   apport: "#e2eef9",
   devFees: "#ffe163",
+  financingFees: "#6366f1",
   dscrRealized: "#0094cd",
   dscrTarget: "#ed7575",
   dscrAbove: "#009557",
@@ -208,7 +210,8 @@ export function ProjectFinancialCharts({
           item.boSKeuro +
           item.raccordementKeuro +
           item.apportAffaireKeuro +
-          item.devFeesKeuro >
+          item.devFeesKeuro +
+          item.financingFeesKeuro >
         0,
     );
   const capexComponentData = capexData.flatMap((item) => {
@@ -217,7 +220,8 @@ export function ProjectFinancialCharts({
       item.modulesKeuro +
       item.raccordementKeuro +
       item.devFeesKeuro +
-      item.apportAffaireKeuro;
+      item.apportAffaireKeuro +
+      item.financingFeesKeuro;
     const withLabel = (name: string, valueKeuro: number, color: string) => {
       const share = total > 0 ? valueKeuro / total * 100 : 0;
 
@@ -239,6 +243,7 @@ export function ProjectFinancialCharts({
       withLabel("Modules", item.modulesKeuro, chartColors.modules),
       withLabel("Raccordement", item.raccordementKeuro, chartColors.raccordement),
       withLabel("Dev fees", item.devFeesKeuro, chartColors.devFees),
+      withLabel("Frais de financement", item.financingFeesKeuro, chartColors.financingFees),
       withLabel("Apport d'affaire", item.apportAffaireKeuro, chartColors.apport),
     ];
   })

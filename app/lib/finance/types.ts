@@ -37,6 +37,13 @@ export const DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS = {
   inflationMRA: 2,
   inflationBackOffice: 2,
   inflationDivers: 2,
+  legalFeesKEuro: 10,
+  technicalDDKEuro: 5,
+  arrangerFeesRate: 0.8,
+  participantFeesRate: 0.4,
+  bankFeesPLTKEuroPerMW: 1.5,
+  interimFinancingRate: 2.5,
+  commitmentFeesRate: 0.1,
   dscrSchedule: [
     { yearFrom: 1, yearTo: 20, dscrValue: 1.15 },
     { yearFrom: 21, yearTo: 24, dscrValue: 1.4 },

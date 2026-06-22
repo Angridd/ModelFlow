@@ -11,24 +11,24 @@ datasource db {
 }
 
 model Project {
-  id                String     @id @default(cuid())
-  name              String
-  technology        String
-  country           String
-  capacityMw        Float
-  status            String
-  ao                String     @default("Non renseigne")
-  priority          String     @default("Medium")
-  caseType          String     @default("Base")
-  region            String     @default("Non renseignee")
-  tariff            Float      @default(0)
-  commissioningYear Int        @default(0)
+  id                 String     @id @default(cuid())
+  name               String
+  technology         String
+  country            String
+  capacityMw         Float
+  status             String
+  ao                 String     @default("Non renseigne")
+  priority           String     @default("Medium")
+  caseType           String     @default("Base")
+  region             String     @default("Non renseignee")
+  tariff             Float      @default(0)
+  commissioningYear  Int        @default(0)
   debtSizingCentralW Float?
-  debtSizingLowW    Float?
-  investorCurveW    Float?
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-  scenarios         Scenario[]
+  debtSizingLowW     Float?
+  investorCurveW     Float?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  scenarios          Scenario[]
 }
 
 model AuroraCurve {
@@ -42,62 +42,69 @@ model AuroraCurve {
 }
 
 model Scenario {
-  id                  String  @id @default(cuid())
-  name                String
-  capex               Float
-  surfaceHa           Float?
-  prixModuleUSDWc     Float?
-  tauxEURUSD          Float?
-  boSCtWc             Float?
-  raccordementOuvrageKEuro Float? @map("raccordementOuvrageK€")
-  tarifQPKEuroPerMW   Float?  @map("tarifQPk€PerMW")
-  apportAffaireMode   String?
-  apportAffaireValeur Float?
-  opex                Float
-  yieldMwh            Float
-  yieldP90Mwh         Float?
-  tariff              Float
-  debtRate            Float
-  projectLifeYears    Int     @default(30)
-  degradationRate     Float   @default(0.3)
-  discountRate        Float   @default(6)
-  debtInterestRate    Float   @default(4)
-  debtMaturityYears   Int     @default(20)
-  tariffInflationRate Float   @default(0)
-  opexInflationRate   Float   @default(2)
-  contractDuration    Int?
-  assuranceRate       Float?
-  inflationAssurance  Float?
-  balancingCost       Float?
-  omFixedEuroKwc      Float?
-  mraEuroKwc          Float?
-  backOfficeKeuro     Float?
-  diversOpexKeuro     Float?
-  loyerMode           String?
-  loyerValeur         Float?
-  loyerInflation      Float?
-  inflationOM         Float?
-  inflationMRA        Float?
-  inflationBackOffice Float?
-  inflationDivers     Float?
-  dscrTarget          Float?
-  debtTenorYears      Int?
-  dscrSchedule        String?
-  gearingMaxPct       Float?  @map("gearingMax")
-  structuringFeeRate  Float?
-  tauxIS              Float?
-  amortDuree          Int?
-  ccaApportKeuro      Float?
-  ccaRemunRate        Float?
-  dsraMonths          Int?
-  ccaBloque           Boolean?
-  devFeesKEuroPerMW   Float?
-  tauxISEntreprise    Float?
-  dscr                Float
-  npv                 Float
-  irr                 Float
-  lcoe                Float
-  isReference         Boolean @default(false)
-  projectId           String
-  project             Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id                       String   @id @default(cuid())
+  name                     String
+  capex                    Float
+  surfaceHa                Float?
+  prixModuleUSDWc          Float?
+  tauxEURUSD               Float?
+  boSCtWc                  Float?
+  raccordementOuvrageKEuro Float?   @map("raccordementOuvrageK€")
+  tarifQPKEuroPerMW        Float?   @map("tarifQPk€PerMW")
+  apportAffaireMode        String?
+  apportAffaireValeur      Float?
+  opex                     Float
+  yieldMwh                 Float
+  yieldP90Mwh              Float?
+  tariff                   Float
+  debtRate                 Float
+  projectLifeYears         Int      @default(30)
+  degradationRate          Float    @default(0.3)
+  discountRate             Float    @default(6)
+  debtInterestRate         Float    @default(4)
+  debtMaturityYears        Int      @default(20)
+  tariffInflationRate      Float    @default(0)
+  opexInflationRate        Float    @default(2)
+  contractDuration         Int?
+  assuranceRate            Float?
+  inflationAssurance       Float?
+  balancingCost            Float?
+  omFixedEuroKwc           Float?
+  mraEuroKwc               Float?
+  backOfficeKeuro          Float?
+  diversOpexKeuro          Float?
+  loyerMode                String?
+  loyerValeur              Float?
+  loyerInflation           Float?
+  inflationOM              Float?
+  inflationMRA             Float?
+  inflationBackOffice      Float?
+  inflationDivers          Float?
+  dscrTarget               Float?
+  debtTenorYears           Int?
+  dscrSchedule             String?
+  gearingMaxPct            Float?   @map("gearingMax")
+  structuringFeeRate       Float?
+  tauxIS                   Float?
+  amortDuree               Int?
+  ccaApportKeuro           Float?
+  ccaRemunRate             Float?
+  dsraMonths               Int?
+  ccaBloque                Boolean?
+  devFeesKEuroPerMW        Float?
+  tauxISEntreprise         Float?
+  legalFeesKEuro           Float?   @map("legalFeesK€")
+  technicalDDKEuro         Float?   @map("technicalDDK€")
+  arrangerFeesRate         Float?
+  participantFeesRate      Float?
+  bankFeesPLTKEuroPerMW    Float?   @map("bankFeesPLTK€PerMW")
+  interimFinancingRate     Float?
+  commitmentFeesRate       Float?
+  dscr                     Float
+  npv                      Float
+  irr                      Float
+  lcoe                     Float
+  isReference              Boolean  @default(false)
+  projectId                String
+  project                  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }

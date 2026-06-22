@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { createScenario } from "@/app/actions";
 import { CapexDetailFields } from "@/app/components/CapexDetailFields";
 import { DscrSchedule } from "@/app/components/DscrSchedule";
+import { FinancingFeesFields } from "@/app/components/FinancingFeesFields";
 import { OpexDetailFields } from "@/app/components/OpexDetailFields";
 import {
   DEFAULT_FINANCIAL_ASSUMPTIONS,
@@ -497,6 +498,22 @@ export default async function NewScenarioPage({
             />
           </label>
         </div>
+
+        <FinancingFeesFields
+          capacityMw={project.capacityMw}
+          initialValue={{
+            capexPerMwKeuro: 0,
+            gearingMaxPct: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.gearingMax,
+            legalFeesKEuro: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.legalFeesKEuro,
+            technicalDDKEuro: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.technicalDDKEuro,
+            arrangerFeesRate: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.arrangerFeesRate,
+            participantFeesRate: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.participantFeesRate,
+            bankFeesPLTKEuroPerMW:
+              DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.bankFeesPLTKEuroPerMW,
+            interimFinancingRate: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.interimFinancingRate,
+            commitmentFeesRate: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.commitmentFeesRate,
+          }}
+        />
 
         <section className="form-section">
           <p className="form-section-head">Fiscalité &amp; CCA</p>
