@@ -15,7 +15,7 @@ const CONTRACT_DURATION_FALLBACK = 20;
 const ASSURANCE_RATE_FALLBACK = 2.5;
 const INFLATION_ASSURANCE_FALLBACK = 2;
 const BALANCING_COST_FALLBACK = 2;
-const TAUX_EUR_USD_FALLBACK = 1.08;
+const TAUX_EUR_USD_FALLBACK = 1.16;
 const OM_FIXED_EURO_KWC_FALLBACK = 5.1;
 const MRA_EURO_KWC_FALLBACK = 1.1;
 const BACK_OFFICE_KEURO_FALLBACK = 22;
@@ -47,6 +47,10 @@ export type FinanceEngineInput = FinancialAssumptions & {
   devFeesKEuroPerMW?: number | null;
   tauxISEntreprise?: number | null;
   contingencyRate?: number | null;
+  longueurModule?: number | null;
+  largeurModule?: number | null;
+  txAmenagementRate?: number | null;
+  coefArcheo?: number | null;
   legalFeesKEuro?: number | null;
   technicalDDKEuro?: number | null;
   arrangerFeesRate?: number | null;
@@ -151,6 +155,11 @@ export type CapexDetails = {
   devFeesKeuro: number;
   capexBeforeContingencyKeuro: number;
   contingencyKeuro: number;
+  nbPanneaux: number;
+  m2PV: number;
+  taxeAmenagementKeuro: number;
+  taxeArcheoKeuro: number;
+  taxesFoncieresKeuro: number;
   capexTotalKeuro: number;
   capexPerMwKeuro: number;
 };
@@ -430,7 +439,11 @@ function hasDetailedCapexInput(input: FinanceEngineInput) {
     input.tarifQPKEuroPerMW != null ||
     input.apportAffaireMode != null ||
     input.apportAffaireValeur != null ||
-    input.contingencyRate != null
+    input.contingencyRate != null ||
+    input.longueurModule != null ||
+    input.largeurModule != null ||
+    input.txAmenagementRate != null ||
+    input.coefArcheo != null
   );
 }
 
@@ -466,6 +479,11 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
       devFeesKeuro: 0,
       capexBeforeContingencyKeuro: legacyCapexTotal,
       contingencyKeuro: 0,
+      nbPanneaux: 0,
+      m2PV: 0,
+      taxeAmenagementKeuro: 0,
+      taxeArcheoKeuro: 0,
+      taxesFoncieresKeuro: 0,
       capexTotalKeuro: legacyCapexTotal,
       capexPerMwKeuro: input.capacityMw > 0 ? legacyCapexTotal / input.capacityMw : 0,
     };
@@ -494,8 +512,19 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
   const devFeesKeuro = (input.devFeesKEuroPerMW ?? 0) * input.capacityMw;
   const capexBeforeContingencyKeuro =
     modulesKeuro + boSKeuro + raccordementKeuro + apportAffaireKeuro + devFeesKeuro;
-  const contingencyKeuro = capexBeforeContingencyKeuro * (input.contingencyRate ?? 2) / 100;
-  const capexTotalKeuro = capexBeforeContingencyKeuro + contingencyKeuro;
+  const contingencyKeuro = boSKeuro * (input.contingencyRate ?? 2) / 100;
+  const nbPanneaux = (input.capacityMw * 1_000_000) / 650;
+  const m2PV = nbPanneaux * (input.longueurModule ?? 2.382) * (input.largeurModule ?? 1.134);
+  const taxeAmenagementEuro =
+    (10 * m2PV + 21 * input.capacityMw * 930) *
+    (input.txAmenagementRate ?? 4.5) /
+    100;
+  const taxeArcheoEuro = (input.coefArcheo ?? 0.71) * m2PV;
+  const taxeAmenagementKeuro = taxeAmenagementEuro / 1000;
+  const taxeArcheoKeuro = taxeArcheoEuro / 1000;
+  const taxesFoncieresKeuro = taxeAmenagementKeuro + taxeArcheoKeuro;
+  const capexTotalKeuro =
+    capexBeforeContingencyKeuro + contingencyKeuro + taxesFoncieresKeuro;
 
   return {
     hasDetailedCapex,
@@ -508,6 +537,11 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
     devFeesKeuro,
     capexBeforeContingencyKeuro,
     contingencyKeuro,
+    nbPanneaux,
+    m2PV,
+    taxeAmenagementKeuro,
+    taxeArcheoKeuro,
+    taxesFoncieresKeuro,
     capexTotalKeuro,
     capexPerMwKeuro: input.capacityMw > 0 ? capexTotalKeuro / input.capacityMw : 0,
   };

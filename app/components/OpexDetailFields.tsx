@@ -55,6 +55,10 @@ function formatOpexPerMw(value: number) {
   return `${value.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} kEUR/MWc`;
 }
 
+function defaultInputClass(value: string, defaultValue: string) {
+  return `${numberInputClass} ${value === defaultValue ? "input-default" : ""}`.trim();
+}
+
 function syncedInitialValue(initialValue: number | null | undefined, fallback: number) {
   return initialValue ?? fallback;
 }
@@ -221,7 +225,7 @@ export function OpexDetailFields({
       <h2 className="text-sm font-semibold text-zinc-950">OPEX detaille</h2>
       <div className="grid gap-5 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
-          O&M fixe (EUR/kWc/an)
+          <span>O&M fixe (EUR/kWc/an) <span className="badge-default">Défaut</span></span>
           <input
             name="omFixedEuroKwc"
             type="number"
@@ -231,11 +235,11 @@ export function OpexDetailFields({
             onChange={(event) => setOmFixedEuroKwc(event.target.value)}
             placeholder="ex. 5.1"
             title="Exploitation et maintenance proportionnelle a la puissance installee"
-            className={numberInputClass}
+            className={defaultInputClass(omFixedEuroKwc, "5.1")}
           />
         </label>
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
-          MRA (EUR/kWc/an)
+          <span>MRA (EUR/kWc/an) <span className="badge-default">Défaut</span></span>
           <input
             name="mraEuroKwc"
             type="number"
@@ -245,11 +249,11 @@ export function OpexDetailFields({
             onChange={(event) => setMraEuroKwc(event.target.value)}
             placeholder="ex. 1.1"
             title="Major Replacement Allowance - provision remplacement onduleurs etc."
-            className={numberInputClass}
+            className={defaultInputClass(mraEuroKwc, "1.1")}
           />
         </label>
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
-          Back-office (kEUR/an)
+          <span>Back-office (kEUR/an) <span className="badge-default">Défaut</span></span>
           <input
             name="backOfficeKeuro"
             type="number"
@@ -259,11 +263,11 @@ export function OpexDetailFields({
             onChange={(event) => setBackOfficeKeuro(event.target.value)}
             placeholder="ex. 22"
             title="Frais de gestion administrative annuels fixes"
-            className={numberInputClass}
+            className={defaultInputClass(backOfficeKeuro, "22")}
           />
         </label>
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
-          Divers OPEX (kEUR/an)
+          <span>Divers OPEX (kEUR/an) <span className="badge-default">Défaut</span></span>
           <input
             name="diversOpexKeuro"
             type="number"
@@ -273,7 +277,7 @@ export function OpexDetailFields({
             onChange={(event) => setDiversOpexKeuro(event.target.value)}
             placeholder="ex. 35"
             title="Charges diverses forfaitaires annuelles"
-            className={numberInputClass}
+            className={defaultInputClass(diversOpexKeuro, "35")}
           />
         </label>
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
@@ -306,7 +310,7 @@ export function OpexDetailFields({
           />
         </label>
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
-          Inflation loyer (%/an)
+          <span>Inflation loyer (%/an) <span className="badge-default">Défaut</span></span>
           <input
             name="loyerInflation"
             type="number"
@@ -315,13 +319,13 @@ export function OpexDetailFields({
             value={loyerInflation}
             onChange={(event) => setLoyerInflation(event.target.value)}
             placeholder="ex. 0.4"
-            className={numberInputClass}
+            className={defaultInputClass(loyerInflation, "0.4")}
           />
         </label>
       </div>
       <div className="grid gap-5 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
-          Inflation O&M (%/an)
+          <span>Inflation O&M (%/an) <span className="badge-default">Défaut</span></span>
           <input
             name="inflationOM"
             type="number"
@@ -330,11 +334,11 @@ export function OpexDetailFields({
             value={inflationOM}
             onChange={(event) => setInflationOM(event.target.value)}
             placeholder="ex. 2"
-            className={numberInputClass}
+            className={defaultInputClass(inflationOM, "2")}
           />
         </label>
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
-          Inflation MRA (%/an)
+          <span>Inflation MRA (%/an) <span className="badge-default">Défaut</span></span>
           <input
             name="inflationMRA"
             type="number"
@@ -343,11 +347,11 @@ export function OpexDetailFields({
             value={inflationMRA}
             onChange={(event) => setInflationMRA(event.target.value)}
             placeholder="ex. 2"
-            className={numberInputClass}
+            className={defaultInputClass(inflationMRA, "2")}
           />
         </label>
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
-          Inflation back-office (%/an)
+          <span>Inflation back-office (%/an) <span className="badge-default">Défaut</span></span>
           <input
             name="inflationBackOffice"
             type="number"
@@ -356,11 +360,11 @@ export function OpexDetailFields({
             value={inflationBackOffice}
             onChange={(event) => setInflationBackOffice(event.target.value)}
             placeholder="ex. 2"
-            className={numberInputClass}
+            className={defaultInputClass(inflationBackOffice, "2")}
           />
         </label>
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
-          Inflation divers (%/an)
+          <span>Inflation divers (%/an) <span className="badge-default">Défaut</span></span>
           <input
             name="inflationDivers"
             type="number"
@@ -369,7 +373,7 @@ export function OpexDetailFields({
             value={inflationDivers}
             onChange={(event) => setInflationDivers(event.target.value)}
             placeholder="ex. 2"
-            className={numberInputClass}
+            className={defaultInputClass(inflationDivers, "2")}
           />
         </label>
       </div>

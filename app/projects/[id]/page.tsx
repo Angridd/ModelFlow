@@ -156,6 +156,10 @@ export default async function ProjectDetailPage({
     devFeesKEuroPerMW: scenario.devFeesKEuroPerMW,
     tauxISEntreprise: scenario.tauxISEntreprise,
     contingencyRate: scenario.contingencyRate,
+    longueurModule: scenario.longueurModule,
+    largeurModule: scenario.largeurModule,
+    txAmenagementRate: scenario.txAmenagementRate,
+    coefArcheo: scenario.coefArcheo,
     legalFeesKEuro: scenario.legalFeesKEuro,
     technicalDDKEuro: scenario.technicalDDKEuro,
     arrangerFeesRate: scenario.arrangerFeesRate,
@@ -221,6 +225,7 @@ export default async function ProjectDetailPage({
   const capexBeforeContingencyKeuro =
     cashFlowCapexDetails?.capexBeforeContingencyKeuro ?? capexInitialKeuro;
   const contingencyKeuro = cashFlowMetrics?.contingencyKeuro ?? 0;
+  const taxesFoncieresKeuro = cashFlowCapexDetails?.taxesFoncieresKeuro ?? 0;
   const financingFeesKeuro = cashFlowMetrics?.financingFeesKeuro ?? 0;
   const financingFeesDetail = cashFlowMetrics?.financingFeesDetail ?? null;
   const capexTotalWithFinancingFeesKeuro = capexInitialKeuro + financingFeesKeuro;
@@ -274,6 +279,7 @@ export default async function ProjectDetailPage({
             apportAffaireKeuro: cashFlowCapexDetails.apportAffaireKeuro,
             devFeesKeuro: cashFlowCapexDetails.devFeesKeuro,
             contingencyKeuro,
+            taxesFoncieresKeuro,
             financingFeesKeuro,
           },
         ]
@@ -514,6 +520,12 @@ export default async function ProjectDetailPage({
                 <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Contingency</span>
                 <p style={{ fontWeight: 600, color: "#0d1117" }}>
                   {formatNumber(contingencyKeuro, " kEUR")}
+                </p>
+              </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Taxes foncières</span>
+                <p style={{ fontWeight: 600, color: "#0d1117" }}>
+                  {formatNumber(taxesFoncieresKeuro, " kEUR")}
                 </p>
               </div>
               <div>

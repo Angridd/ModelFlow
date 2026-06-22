@@ -18,6 +18,10 @@ type CapexDetailInitialValue = {
   apportAffaireValeur?: number | null;
   devFeesKEuroPerMW?: number | null;
   contingencyRate?: number | null;
+  longueurModule?: number | null;
+  largeurModule?: number | null;
+  txAmenagementRate?: number | null;
+  coefArcheo?: number | null;
 };
 
 type CapexDetailFieldsProps = {
@@ -53,6 +57,10 @@ function formatCtWc(value: number) {
   return `${value.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ct/Wc`;
 }
 
+function defaultInputClass(value: string, defaultValue: string) {
+  return `${numberInputClass} ${value === defaultValue ? "input-default" : ""}`.trim();
+}
+
 const financingInputNames = [
   "legalFeesK€",
   "technicalDDK€",
@@ -82,7 +90,7 @@ export function CapexDetailFields({
     initialNumber(initialValue.prixModuleUSDWc),
   );
   const [tauxEURUSD, setTauxEURUSD] = useState(
-    initialNumber(initialValue.tauxEURUSD, "1.08"),
+    initialNumber(initialValue.tauxEURUSD, "1.16"),
   );
   const [boSCtWc, setBoSCtWc] = useState(initialNumber(initialValue.boSCtWc));
   const [raccordementOuvrageKEuro, setRaccordementOuvrageKEuro] = useState(
@@ -102,6 +110,18 @@ export function CapexDetailFields({
   );
   const [contingencyRate, setContingencyRate] = useState(
     initialNumber(initialValue.contingencyRate, "2"),
+  );
+  const [longueurModule, setLongueurModule] = useState(
+    initialNumber(initialValue.longueurModule, "2.382"),
+  );
+  const [largeurModule, setLargeurModule] = useState(
+    initialNumber(initialValue.largeurModule, "1.134"),
+  );
+  const [txAmenagementRate, setTxAmenagementRate] = useState(
+    initialNumber(initialValue.txAmenagementRate, "4.5"),
+  );
+  const [coefArcheo, setCoefArcheo] = useState(
+    initialNumber(initialValue.coefArcheo, "0.71"),
   );
   const [gearingMaxPct, setGearingMaxPct] = useState<number | null>(null);
   const [financingValues, setFinancingValues] = useState<FinancingInputValues>({
@@ -182,6 +202,10 @@ export function CapexDetailFields({
         apportAffaireValeur: parseNumber(apportAffaireValeur),
         devFeesKEuroPerMW,
         contingencyRate: parseNumber(contingencyRate),
+        longueurModule: parseNumber(longueurModule),
+        largeurModule: parseNumber(largeurModule),
+        txAmenagementRate: parseNumber(txAmenagementRate),
+        coefArcheo: parseNumber(coefArcheo),
       }),
     [
       apportAffaireMode,
@@ -190,12 +214,16 @@ export function CapexDetailFields({
       capacityMw,
       devFeesKEuroPerMW,
       initialValue.capex,
+      coefArcheo,
+      largeurModule,
+      longueurModule,
       prixModuleUSDWc,
       raccordementOuvrageKEuro,
       surfaceHa,
       tarifQPKEuroPerMW,
       tauxEURUSD,
       contingencyRate,
+      txAmenagementRate,
     ],
   );
   const financingFees = useMemo(
@@ -240,7 +268,7 @@ export function CapexDetailFields({
           />
         </label>
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
-          Taux EUR/USD
+          <span>Taux EUR/USD <span className="badge-default">Défaut</span></span>
           <input
             name="tauxEURUSD"
             type="number"
@@ -248,9 +276,9 @@ export function CapexDetailFields({
             step="0.0001"
             value={tauxEURUSD}
             onChange={(event) => setTauxEURUSD(event.target.value)}
-            placeholder="ex. 1.08"
+            placeholder="ex. 1.16"
             title="Taux de change spot EUR/USD pour conversion prix module"
-            className={numberInputClass}
+            className={defaultInputClass(tauxEURUSD, "1.16")}
           />
         </label>
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
@@ -338,7 +366,7 @@ export function CapexDetailFields({
           />
         </label>
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
-          Contingency (%)
+          <span>Contingency (%) <span className="badge-default">Défaut</span></span>
           <input
             name="contingencyRate"
             type="number"
@@ -348,9 +376,70 @@ export function CapexDetailFields({
             onChange={(event) => setContingencyRate(event.target.value)}
             placeholder="ex. 2"
             title="Provision pour aléas sur le CAPEX - appliquée sur le CAPEX avant frais de financement"
-            className={numberInputClass}
+            className={defaultInputClass(contingencyRate, "2")}
           />
         </label>
+      </div>
+      <div className="grid gap-3 border-t border-zinc-200 pt-4">
+        <h3 className="text-sm font-semibold text-zinc-950">Taxes foncières</h3>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            <span>Longueur module (m) <span className="badge-default">Défaut</span></span>
+            <input
+              name="longueurModule"
+              type="number"
+              min="0"
+              step="0.001"
+              value={longueurModule}
+              onChange={(event) => setLongueurModule(event.target.value)}
+              placeholder="ex. 2.382"
+              title="Longueur unitaire des modules PV pour le calcul de surface taxable"
+              className={defaultInputClass(longueurModule, "2.382")}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            <span>Largeur module (m) <span className="badge-default">Défaut</span></span>
+            <input
+              name="largeurModule"
+              type="number"
+              min="0"
+              step="0.001"
+              value={largeurModule}
+              onChange={(event) => setLargeurModule(event.target.value)}
+              placeholder="ex. 1.134"
+              title="Largeur unitaire des modules PV pour le calcul de surface taxable"
+              className={defaultInputClass(largeurModule, "1.134")}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            <span>Taux taxe aménagement (%) <span className="badge-default">Défaut</span></span>
+            <input
+              name="txAmenagementRate"
+              type="number"
+              min="0"
+              step="0.01"
+              value={txAmenagementRate}
+              onChange={(event) => setTxAmenagementRate(event.target.value)}
+              placeholder="ex. 4.5"
+              title="Taux appliqué à la base de taxe d'aménagement"
+              className={defaultInputClass(txAmenagementRate, "4.5")}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            <span>Coef. taxe archéologique <span className="badge-default">Défaut</span></span>
+            <input
+              name="coefArcheo"
+              type="number"
+              min="0"
+              step="0.01"
+              value={coefArcheo}
+              onChange={(event) => setCoefArcheo(event.target.value)}
+              placeholder="ex. 0.71"
+              title="Coefficient de taxe archéologique appliqué à la surface PV"
+              className={defaultInputClass(coefArcheo, "0.71")}
+            />
+          </label>
+        </div>
       </div>
       <div className="grid gap-2 border-t border-zinc-200 pt-4 text-sm">
         <div className="flex justify-between gap-4">
@@ -386,6 +475,12 @@ export function CapexDetailFields({
         <div className="flex justify-between gap-4">
           <span className="text-zinc-500">Contingency ({parseNumber(contingencyRate) ?? 2}%)</span>
           <span className="font-medium text-zinc-950">{formatKeuro(details.contingencyKeuro)}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-zinc-500">Taxes foncières</span>
+          <span className="font-medium text-zinc-950">
+            {formatKeuro(details.taxesFoncieresKeuro)}
+          </span>
         </div>
         <div className="mt-2 flex justify-between gap-4 border-t border-zinc-300 pt-3 font-semibold text-zinc-950">
           <span>CAPEX total</span>

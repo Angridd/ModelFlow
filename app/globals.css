@@ -614,3 +614,28 @@ textarea:focus {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Champ avec valeur par défaut */
+.input-default {
+  background: #e2eef9 !important;
+  border-color: #0094cd !important;
+}
+.input-default:focus {
+  background: white !important;
+  border-color: #004f9f !important;
+}
+
+/* Badge "Défaut" */
+.badge-default {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: #ffcc00;
+  color: #004f9f;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}

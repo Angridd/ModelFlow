@@ -116,6 +116,10 @@ function formatPercent(value: number) {
   })} %`;
 }
 
+function defaultInputClass(value: string, defaultValue: number) {
+  return `${numberInputClass} ${value === String(defaultValue) ? "input-default" : ""}`.trim();
+}
+
 export function FinancingFeesFields({
   capacityMw,
   initialValue,
@@ -184,7 +188,7 @@ export function FinancingFeesFields({
       <div className="grid gap-5 sm:grid-cols-2">
         {financingFeeFields.map((field) => (
           <label key={field.name} className="grid gap-2 text-sm font-medium text-zinc-700">
-            {field.label}
+            <span>{field.label} <span className="badge-default">Défaut</span></span>
             <input
               name={field.name}
               type="number"
@@ -199,7 +203,7 @@ export function FinancingFeesFields({
               }
               placeholder={field.placeholder}
               title={field.title}
-              className={numberInputClass}
+              className={defaultInputClass(values[field.stateKey], field.fallback)}
             />
           </label>
         ))}

@@ -94,6 +94,10 @@ model Scenario {
   devFeesKEuroPerMW        Float?
   tauxISEntreprise         Float?
   contingencyRate          Float?
+  longueurModule           Float?
+  largeurModule            Float?
+  txAmenagementRate        Float?
+  coefArcheo               Float?
   legalFeesKEuro           Float?   @map("legalFeesK€")
   technicalDDKEuro         Float?   @map("technicalDDK€")
   arrangerFeesRate         Float?

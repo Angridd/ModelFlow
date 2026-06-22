@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { headers } from "next/headers";
 import { updateScenario } from "@/app/actions";
 import { CapexDetailFields } from "@/app/components/CapexDetailFields";
+import { DefaultNumberInput } from "@/app/components/DefaultNumberInput";
 import { DscrSchedule } from "@/app/components/DscrSchedule";
 import { FinancingFeesFields } from "@/app/components/FinancingFeesFields";
 import { OpexDetailFields } from "@/app/components/OpexDetailFields";
@@ -220,6 +221,10 @@ function AuroraPriceCurveFields({
   debtSizingCentralW?: number | null;
   debtSizingLowW?: number | null;
 }) {
+  const investorCurveDefault = (investorCurveW ?? 1) * 100;
+  const debtSizingCentralDefault = (debtSizingCentralW ?? 0.7) * 100;
+  const debtSizingLowDefault = (debtSizingLowW ?? 0.3) * 100;
+
   return (
     <section className="form-section">
       <p className="form-section-head">Courbes de prix post-contrat (Aurora)</p>
@@ -231,37 +236,37 @@ function AuroraPriceCurveFields({
           <div className="grid gap-5 sm:grid-cols-2">
             <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
               Pondération Investor Curve - Central (%)
-              <input
+              <DefaultNumberInput
                 name="investorCurveW"
                 type="number"
                 min="0"
                 step="0.01"
-                defaultValue={(investorCurveW ?? 1) * 100}
+                defaultValue={investorCurveDefault}
                 title="100% = courbe Central Aurora pour le TRI investisseur"
                 className="h-10 px-3"
               />
             </label>
             <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
               Pondération Debt Sizing - Central (%)
-              <input
+              <DefaultNumberInput
                 name="debtSizingCentralW"
                 type="number"
                 min="0"
                 max="100"
                 step="0.01"
-                defaultValue={(debtSizingCentralW ?? 0.7) * 100}
+                defaultValue={debtSizingCentralDefault}
                 className="h-10 px-3"
               />
             </label>
             <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
               Pondération Debt Sizing - Low (%)
-              <input
+              <DefaultNumberInput
                 name="debtSizingLowW"
                 type="number"
                 min="0"
                 max="100"
                 step="0.01"
-                defaultValue={(debtSizingLowW ?? 0.3) * 100}
+                defaultValue={debtSizingLowDefault}
                 title="Central + Low doit etre egal a 100 %."
                 className="h-10 px-3"
               />
@@ -370,7 +375,7 @@ export default async function EditScenarioPage({
             capex: scenario.capex,
             surfaceHa: scenario.surfaceHa,
             prixModuleUSDWc: scenario.prixModuleUSDWc,
-            tauxEURUSD: scenario.tauxEURUSD ?? 1.08,
+            tauxEURUSD: scenario.tauxEURUSD ?? 1.16,
             boSCtWc: scenario.boSCtWc,
             raccordementOuvrageKEuro: scenario.raccordementOuvrageKEuro,
             tarifQPKEuroPerMW: scenario.tarifQPKEuroPerMW,
@@ -381,6 +386,14 @@ export default async function EditScenarioPage({
               DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.devFeesKEuroPerMW,
             contingencyRate:
               scenario.contingencyRate ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.contingencyRate,
+            longueurModule:
+              scenario.longueurModule ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.longueurModule,
+            largeurModule:
+              scenario.largeurModule ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.largeurModule,
+            txAmenagementRate:
+              scenario.txAmenagementRate ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.txAmenagementRate,
+            coefArcheo:
+              scenario.coefArcheo ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.coefArcheo,
           }}
         />
 
@@ -437,8 +450,8 @@ export default async function EditScenarioPage({
           <div className="grid gap-5 sm:grid-cols-2">
             {revenueFields.map((field) => (
               <label key={field.name} className="grid gap-1.5 text-sm font-medium text-zinc-700">
-                {field.label}
-                <input
+                <span>{field.label} <span className="badge-default">Défaut</span></span>
+                <DefaultNumberInput
                   name={field.name}
                   type="number"
                   min="0"
@@ -465,8 +478,8 @@ export default async function EditScenarioPage({
           <div className="grid gap-5 sm:grid-cols-2">
             {opexExtraFields.map((field) => (
               <label key={field.name} className="grid gap-1.5 text-sm font-medium text-zinc-700">
-                {field.label}
-                <input
+                <span>{field.label} <span className="badge-default">Défaut</span></span>
+                <DefaultNumberInput
                   name={field.name}
                   type="number"
                   min="0"
@@ -544,8 +557,8 @@ export default async function EditScenarioPage({
 
         <div className="grid gap-5 sm:grid-cols-2">
           <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
-            Gearing maximum autorisé (%)
-            <input
+            Gearing maximum autorisé (%) <span className="badge-default">Défaut</span>
+            <DefaultNumberInput
               name="gearingMaxPct"
               type="number"
               step="0.01"
@@ -593,21 +606,33 @@ export default async function EditScenarioPage({
           <div className="grid gap-5 sm:grid-cols-2">
             {fiscalFields.map((field) => (
               <label key={field.name} className="grid gap-1.5 text-sm font-medium text-zinc-700">
-                {field.label}
-                <input
-                  name={field.name}
-                  type="number"
-                  min="0"
-                  step={field.step}
-                  defaultValue={
-                    "defaultValue" in field
-                      ? (scenario[field.name] ?? field.defaultValue)
-                      : (scenario[field.name] ?? "")
-                  }
-                  placeholder={field.placeholder}
-                  title={field.title}
-                  className="h-10 px-3"
-                />
+                <span>
+                  {field.label}
+                  {"defaultValue" in field ? <span className="badge-default">Défaut</span> : null}
+                </span>
+                {"defaultValue" in field ? (
+                  <DefaultNumberInput
+                    name={field.name}
+                    type="number"
+                    min="0"
+                    step={field.step}
+                    defaultValue={scenario[field.name] ?? field.defaultValue}
+                    placeholder={field.placeholder}
+                    title={field.title}
+                    className="h-10 px-3"
+                  />
+                ) : (
+                  <input
+                    name={field.name}
+                    type="number"
+                    min="0"
+                    step={field.step}
+                    defaultValue={scenario[field.name] ?? ""}
+                    placeholder={field.placeholder}
+                    title={field.title}
+                    className="h-10 px-3"
+                  />
+                )}
               </label>
             ))}
           </div>
