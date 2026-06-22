@@ -225,7 +225,7 @@ export type OpexDetails = {
   loyerKeuro: number;
   assuranceKeuro: number;
   balancingKeuro: number;
-  baseTaxesEuro: number;
+  baseTaxesKeuro: number;
   tfKeuro: number;
   cfeKeuro: number;
   opexTotalKeuro: number;
@@ -233,7 +233,7 @@ export type OpexDetails = {
 };
 
 export type TaxesFoncieresOpexResult = {
-  baseTaxesEuro: number;
+  baseTaxesKeuro: number;
   tfAnnuelleKeuro: number;
   cfeAnnuelleKeuro: number;
   tfKeuro: number;
@@ -525,13 +525,12 @@ export function calculateTaxesFoncieres(
   year = 1,
 ): TaxesFoncieresOpexResult {
   const methode = input.methodeTaxes ?? METHODE_TAXES_FALLBACK;
-  const capexTotalEuro = capexTotalKeuro * 1000;
-  const baseTaxesEuro =
+  const baseTaxesKeuro =
     methode === "comptable"
-      ? capexTotalEuro * TAUX_LF_COMPTA * (1 - ABATT_IMMO)
-      : capexTotalEuro * TAUX_LF_AD * (1 - ABATT_IMMO) +
+      ? capexTotalKeuro * TAUX_LF_COMPTA * (1 - ABATT_IMMO)
+      : capexTotalKeuro * TAUX_LF_AD * (1 - ABATT_IMMO) +
         (input.surfaceHa ?? 0) *
-          (input.prixTerrainHa ?? 5000) *
+          ((input.prixTerrainHa ?? 5000) / 1000) *
           TAUX_LF_AD *
           COEF_NEUTRAL *
           (1 - (input.abattTerrain ?? 0) / 100);
@@ -548,12 +547,12 @@ export function calculateTaxesFoncieres(
     input.tauxGEMAPI,
     input.tauxCCI,
   ].map((taux) => taux ?? 0);
-  const tfAnnuelleKeuro = taxeLocale(baseTaxesEuro, tauxTF, FRAIS_TF) / 1000;
-  const cfeAnnuelleKeuro = taxeLocale(baseTaxesEuro, tauxCFE, FRAIS_CFE) / 1000;
+  const tfAnnuelleKeuro = taxeLocale(baseTaxesKeuro, tauxTF, FRAIS_TF);
+  const cfeAnnuelleKeuro = taxeLocale(baseTaxesKeuro, tauxCFE, FRAIS_CFE);
   const inflationFactor = (1 + asRate(input.inflationTaxes ?? 0.4)) ** year;
 
   return {
-    baseTaxesEuro,
+    baseTaxesKeuro,
     tfAnnuelleKeuro,
     cfeAnnuelleKeuro,
     tfKeuro: tfAnnuelleKeuro * inflationFactor,
@@ -739,7 +738,7 @@ export function calculateOpexDetails(
       loyerKeuro: 0,
       assuranceKeuro,
       balancingKeuro,
-      baseTaxesEuro: taxesLocales.baseTaxesEuro,
+      baseTaxesKeuro: taxesLocales.baseTaxesKeuro,
       tfKeuro: taxesLocales.tfKeuro,
       cfeKeuro: taxesLocales.cfeKeuro,
       opexTotalKeuro,
@@ -794,7 +793,7 @@ export function calculateOpexDetails(
     loyerKeuro,
     assuranceKeuro,
     balancingKeuro,
-    baseTaxesEuro: taxesLocales.baseTaxesEuro,
+    baseTaxesKeuro: taxesLocales.baseTaxesKeuro,
     tfKeuro: taxesLocales.tfKeuro,
     cfeKeuro: taxesLocales.cfeKeuro,
     opexTotalKeuro,

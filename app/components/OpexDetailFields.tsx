@@ -582,7 +582,7 @@ export function OpexDetailFields({
         <div className="mt-2 flex justify-between gap-4 border-t border-zinc-300 pt-3">
           <span className="text-zinc-500">Base imposable calculée</span>
           <span className="font-medium text-zinc-950">
-            {formatEuro(details.baseTaxesEuro)}
+            {`${details.baseTaxesKeuro.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} kEUR`}
           </span>
         </div>
         <div className="flex justify-between gap-4">
