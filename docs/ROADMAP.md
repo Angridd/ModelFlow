@@ -13,6 +13,10 @@
 - Marge développeur (structuringFeeRate % du headroom)
 - Bloc "Structuration dette" page projet
 - Tableau cash-flows 17 colonnes
+[ ] Nettoyer l'historique des migrations Prisma
+    → migrate reset sur un env de dev propre
+    → repartir avec une seule migration initiale propre
+    → plus jamais de shadow DB conflict
 
 ## 🟡 Priorité 3 — Fiscalité & double TRI (en cours)
 - [x] Champs Prisma : tauxIS, amortDuree, ccaApportKeuro, ccaRemunRate

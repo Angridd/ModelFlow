@@ -162,7 +162,6 @@ export function FinancingFeesFields({
   }, []);
 
   const capexTotalKeuro = capexPerMwKeuro * capacityMw;
-  const estimatedPltKeuro = capexTotalKeuro * gearingMaxPct / 100;
   const fees = useMemo(
     () =>
       calculateFinancingFees({
@@ -262,7 +261,7 @@ export function FinancingFeesFields({
           <span>{formatPercent(capexShare)}</span>
         </div>
         <p className="text-xs text-zinc-400">
-          PLT estimé : {formatKeuro(estimatedPltKeuro)}
+          PLT estimé : {formatKeuro(fees.estimatedPltKeuro)}
         </p>
       </div>
     </section>

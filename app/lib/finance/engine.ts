@@ -102,6 +102,7 @@ export type FinanceEngineResult = {
   doubleIRR: DoubleIRR | null;
   sizingIterations: number;
   financingFeesKeuro: number;
+  estimatedPltKeuro: number;
   financingFeesDetail: FinancingFeesDetail;
   contingencyKeuro: number;
 };
@@ -176,6 +177,7 @@ export type FinancingFeesDetail = {
 
 export type FinancingFeesResult = {
   financingFeesKeuro: number;
+  estimatedPltKeuro: number;
   financingFeesDetail: FinancingFeesDetail;
 };
 
@@ -565,6 +567,7 @@ export function calculateFinancingFees(
   if (!hasFinancingFeesInput(input)) {
     return {
       financingFeesKeuro: 0,
+      estimatedPltKeuro: 0,
       financingFeesDetail: {
         legalFees: 0,
         technicalDD: 0,
@@ -578,15 +581,15 @@ export function calculateFinancingFees(
   }
 
   const gearingMaxPct = input.gearingMaxPct ?? input.gearingMax ?? 95;
-  const baseKeuro = input.capexTotalKeuro * gearingMaxPct / 100;
+  const estimatedPltKeuro = input.capexTotalKeuro * 1.04 * gearingMaxPct / 100;
   const financingFeesDetail = {
     legalFees: input.legalFeesKEuro ?? 10,
     technicalDD: input.technicalDDKEuro ?? 5,
-    arrangerFees: baseKeuro * (input.arrangerFeesRate ?? 0.8) / 100,
-    participantFees: baseKeuro * (input.participantFeesRate ?? 0.4) / 100,
+    arrangerFees: estimatedPltKeuro * (input.arrangerFeesRate ?? 0.8) / 100,
+    participantFees: estimatedPltKeuro * (input.participantFeesRate ?? 0.4) / 100,
     bankFeesPLT: (input.bankFeesPLTKEuroPerMW ?? 1.5) * input.capacityMw,
-    interimFinancing: baseKeuro * (input.interimFinancingRate ?? 2.5) / 100,
-    commitmentFees: baseKeuro * (input.commitmentFeesRate ?? 0.1) / 100,
+    interimFinancing: estimatedPltKeuro * (input.interimFinancingRate ?? 2.5) / 100,
+    commitmentFees: estimatedPltKeuro * (input.commitmentFeesRate ?? 0.1) / 100,
   };
   const financingFeesKeuro = Object.values(financingFeesDetail).reduce(
     (total, value) => total + value,
@@ -595,6 +598,7 @@ export function calculateFinancingFees(
 
   return {
     financingFeesKeuro,
+    estimatedPltKeuro,
     financingFeesDetail,
   };
 }
@@ -1452,6 +1456,7 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
     doubleIRR,
     sizingIterations: financing.iterations,
     financingFeesKeuro: round(financingFees.financingFeesKeuro),
+    estimatedPltKeuro: round(financingFees.estimatedPltKeuro),
     financingFeesDetail: {
       legalFees: round(financingFees.financingFeesDetail.legalFees),
       technicalDD: round(financingFees.financingFeesDetail.technicalDD),

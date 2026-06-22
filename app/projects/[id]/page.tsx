@@ -227,6 +227,7 @@ export default async function ProjectDetailPage({
   const contingencyKeuro = cashFlowMetrics?.contingencyKeuro ?? 0;
   const taxesFoncieresKeuro = cashFlowCapexDetails?.taxesFoncieresKeuro ?? 0;
   const financingFeesKeuro = cashFlowMetrics?.financingFeesKeuro ?? 0;
+  const estimatedPltKeuro = cashFlowMetrics?.estimatedPltKeuro ?? 0;
   const financingFeesDetail = cashFlowMetrics?.financingFeesDetail ?? null;
   const capexTotalWithFinancingFeesKeuro = capexInitialKeuro + financingFeesKeuro;
   const capexEffectifKeuro = sizing !== null
@@ -538,6 +539,7 @@ export default async function ProjectDetailPage({
                 title={
                   financingFeesDetail !== null
                     ? [
+                        `PLT estimé: ${formatNumber(estimatedPltKeuro, " kEUR")}`,
                         `Legal fees: ${formatNumber(financingFeesDetail.legalFees, " kEUR")}`,
                         `Technical DD: ${formatNumber(financingFeesDetail.technicalDD, " kEUR")}`,
                         `Arranger fees: ${formatNumber(financingFeesDetail.arrangerFees, " kEUR")}`,
