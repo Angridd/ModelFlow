@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { calculateCapexDetails } from "@/app/lib/finance/engine";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  calculateCapexDetails,
+  calculateFinancingFees,
+} from "@/app/lib/finance/engine";
 
 type CapexDetailInitialValue = {
   capex: number;
@@ -14,6 +17,7 @@ type CapexDetailInitialValue = {
   apportAffaireMode?: string | null;
   apportAffaireValeur?: number | null;
   devFeesKEuroPerMW?: number | null;
+  contingencyRate?: number | null;
 };
 
 type CapexDetailFieldsProps = {
@@ -49,10 +53,30 @@ function formatCtWc(value: number) {
   return `${value.toLocaleString("fr-FR", { maximumFractionDigits: 2 })} ct/Wc`;
 }
 
+const financingInputNames = [
+  "legalFeesK€",
+  "technicalDDK€",
+  "arrangerFeesRate",
+  "participantFeesRate",
+  "bankFeesPLTK€PerMW",
+  "interimFinancingRate",
+  "commitmentFeesRate",
+] as const;
+
+type FinancingInputName = (typeof financingInputNames)[number];
+type FinancingInputValues = Record<FinancingInputName, number | null>;
+
+function readNamedNumber(name: string) {
+  const input = document.getElementsByName(name)[0];
+
+  return input instanceof HTMLInputElement ? parseNumber(input.value) : null;
+}
+
 export function CapexDetailFields({
   capacityMw,
   initialValue,
 }: CapexDetailFieldsProps) {
+  const capexInputRef = useRef<HTMLInputElement>(null);
   const [surfaceHa, setSurfaceHa] = useState(initialNumber(initialValue.surfaceHa));
   const [prixModuleUSDWc, setPrixModuleUSDWc] = useState(
     initialNumber(initialValue.prixModuleUSDWc),
@@ -76,6 +100,19 @@ export function CapexDetailFields({
   const [devFeesKEuroPerMW, setDevFeesKEuroPerMW] = useState(
     initialValue.devFeesKEuroPerMW ?? 0,
   );
+  const [contingencyRate, setContingencyRate] = useState(
+    initialNumber(initialValue.contingencyRate, "2"),
+  );
+  const [gearingMaxPct, setGearingMaxPct] = useState<number | null>(null);
+  const [financingValues, setFinancingValues] = useState<FinancingInputValues>({
+    "legalFeesK€": null,
+    "technicalDDK€": null,
+    arrangerFeesRate: null,
+    participantFeesRate: null,
+    "bankFeesPLTK€PerMW": null,
+    interimFinancingRate: null,
+    commitmentFeesRate: null,
+  });
 
   useEffect(() => {
     const input = document.querySelector<HTMLInputElement>(
@@ -91,6 +128,32 @@ export function CapexDetailFields({
     input.addEventListener("input", sync);
 
     return () => input.removeEventListener("input", sync);
+  }, []);
+
+  useEffect(() => {
+    const sync = () => {
+      setGearingMaxPct(readNamedNumber("gearingMaxPct"));
+      setFinancingValues({
+        "legalFeesK€": readNamedNumber("legalFeesK€"),
+        "technicalDDK€": readNamedNumber("technicalDDK€"),
+        arrangerFeesRate: readNamedNumber("arrangerFeesRate"),
+        participantFeesRate: readNamedNumber("participantFeesRate"),
+        "bankFeesPLTK€PerMW": readNamedNumber("bankFeesPLTK€PerMW"),
+        interimFinancingRate: readNamedNumber("interimFinancingRate"),
+        commitmentFeesRate: readNamedNumber("commitmentFeesRate"),
+      });
+    };
+    const inputs = [
+      document.getElementsByName("gearingMaxPct")[0],
+      ...financingInputNames.map((name) => document.getElementsByName(name)[0]),
+    ].filter((input): input is HTMLInputElement => input instanceof HTMLInputElement);
+
+    sync();
+    inputs.forEach((input) => input.addEventListener("input", sync));
+
+    return () => {
+      inputs.forEach((input) => input.removeEventListener("input", sync));
+    };
   }, []);
 
   const details = useMemo(
@@ -118,6 +181,7 @@ export function CapexDetailFields({
         apportAffaireMode,
         apportAffaireValeur: parseNumber(apportAffaireValeur),
         devFeesKEuroPerMW,
+        contingencyRate: parseNumber(contingencyRate),
       }),
     [
       apportAffaireMode,
@@ -131,12 +195,34 @@ export function CapexDetailFields({
       surfaceHa,
       tarifQPKEuroPerMW,
       tauxEURUSD,
+      contingencyRate,
     ],
   );
+  const financingFees = useMemo(
+    () =>
+      calculateFinancingFees({
+        capacityMw,
+        capexTotalKeuro: details.capexTotalKeuro,
+        gearingMaxPct,
+        legalFeesKEuro: financingValues["legalFeesK€"],
+        technicalDDKEuro: financingValues["technicalDDK€"],
+        arrangerFeesRate: financingValues.arrangerFeesRate,
+        participantFeesRate: financingValues.participantFeesRate,
+        bankFeesPLTKEuroPerMW: financingValues["bankFeesPLTK€PerMW"],
+        interimFinancingRate: financingValues.interimFinancingRate,
+        commitmentFeesRate: financingValues.commitmentFeesRate,
+      }),
+    [capacityMw, details.capexTotalKeuro, financingValues, gearingMaxPct],
+  );
+  const capexEffectifKeuro = details.capexTotalKeuro + financingFees.financingFeesKeuro;
+
+  useEffect(() => {
+    capexInputRef.current?.dispatchEvent(new Event("input", { bubbles: true }));
+  }, [details.capexPerMwKeuro]);
 
   return (
     <section className="grid gap-4 rounded-md border border-zinc-200 bg-zinc-50 p-4">
-      <input type="hidden" name="capex" value={details.capexPerMwKeuro} />
+      <input ref={capexInputRef} type="hidden" name="capex" value={details.capexPerMwKeuro} />
       <h2 className="text-sm font-semibold text-zinc-950">CAPEX detaille</h2>
       <div className="grid gap-5 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
@@ -251,6 +337,20 @@ export function CapexDetailFields({
             className={numberInputClass}
           />
         </label>
+        <label className="grid gap-2 text-sm font-medium text-zinc-700">
+          Contingency (%)
+          <input
+            name="contingencyRate"
+            type="number"
+            min="0"
+            step="0.01"
+            value={contingencyRate}
+            onChange={(event) => setContingencyRate(event.target.value)}
+            placeholder="ex. 2"
+            title="Provision pour aléas sur le CAPEX - appliquée sur le CAPEX avant frais de financement"
+            className={numberInputClass}
+          />
+        </label>
       </div>
       <div className="grid gap-2 border-t border-zinc-200 pt-4 text-sm">
         <div className="flex justify-between gap-4">
@@ -277,13 +377,35 @@ export function CapexDetailFields({
           <span className="text-zinc-500">Dev fees</span>
           <span className="font-medium text-zinc-950">{formatKeuro(details.devFeesKeuro)}</span>
         </div>
+        <div className="mt-2 flex justify-between gap-4 border-t border-zinc-300 pt-3">
+          <span className="text-zinc-500">Sous-total</span>
+          <span className="font-medium text-zinc-950">
+            {formatKeuro(details.capexBeforeContingencyKeuro)}
+          </span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-zinc-500">Contingency ({parseNumber(contingencyRate) ?? 2}%)</span>
+          <span className="font-medium text-zinc-950">{formatKeuro(details.contingencyKeuro)}</span>
+        </div>
         <div className="mt-2 flex justify-between gap-4 border-t border-zinc-300 pt-3 font-semibold text-zinc-950">
-          <span>CAPEX TOTAL</span>
+          <span>CAPEX total</span>
           <span>{formatKeuro(details.capexTotalKeuro)}</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-zinc-500">Frais financement</span>
+          <span className="font-medium text-zinc-950">
+            {formatKeuro(financingFees.financingFeesKeuro)}
+          </span>
+        </div>
+        <div className="mt-2 flex justify-between gap-4 border-t border-zinc-300 pt-3 font-semibold" style={{ color: "var(--ps-blue-dark)" }}>
+          <span>CAPEX effectif</span>
+          <span>{formatKeuro(capexEffectifKeuro)}</span>
         </div>
         <div className="flex justify-between gap-4 font-semibold text-zinc-950">
           <span>CAPEX/MWc</span>
-          <span>{formatCapexPerMw(details.capexPerMwKeuro)}</span>
+          <span>
+            {formatCapexPerMw(capacityMw > 0 ? capexEffectifKeuro / capacityMw : 0)}
+          </span>
         </div>
         <p className="text-xs text-zinc-400">
           Modules equivalents : {formatCtWc(details.modulesCtWc)}

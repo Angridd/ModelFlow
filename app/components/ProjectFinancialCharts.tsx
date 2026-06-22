@@ -41,6 +41,7 @@ type CapexChartDatum = {
   raccordementKeuro: number;
   apportAffaireKeuro: number;
   devFeesKeuro: number;
+  contingencyKeuro: number;
   financingFeesKeuro: number;
 };
 
@@ -96,6 +97,7 @@ const chartColors = {
   raccordement: "#ffcc00",
   apport: "#e2eef9",
   devFees: "#ffe163",
+  contingency: "#f59e0b",
   financingFees: "#6366f1",
   dscrRealized: "#0094cd",
   dscrTarget: "#ed7575",
@@ -211,6 +213,7 @@ export function ProjectFinancialCharts({
           item.raccordementKeuro +
           item.apportAffaireKeuro +
           item.devFeesKeuro +
+          item.contingencyKeuro +
           item.financingFeesKeuro >
         0,
     );
@@ -221,6 +224,7 @@ export function ProjectFinancialCharts({
       item.raccordementKeuro +
       item.devFeesKeuro +
       item.apportAffaireKeuro +
+      item.contingencyKeuro +
       item.financingFeesKeuro;
     const withLabel = (name: string, valueKeuro: number, color: string) => {
       const share = total > 0 ? valueKeuro / total * 100 : 0;
@@ -243,6 +247,7 @@ export function ProjectFinancialCharts({
       withLabel("Modules", item.modulesKeuro, chartColors.modules),
       withLabel("Raccordement", item.raccordementKeuro, chartColors.raccordement),
       withLabel("Dev fees", item.devFeesKeuro, chartColors.devFees),
+      withLabel("Contingency", item.contingencyKeuro, chartColors.contingency),
       withLabel("Frais de financement", item.financingFeesKeuro, chartColors.financingFees),
       withLabel("Apport d'affaire", item.apportAffaireKeuro, chartColors.apport),
     ];

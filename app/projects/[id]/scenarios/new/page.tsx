@@ -340,6 +340,7 @@ export default async function NewScenarioPage({
             capex: 0,
             tauxEURUSD: 1.08,
             devFeesKEuroPerMW: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.devFeesKEuroPerMW,
+            contingencyRate: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.contingencyRate,
           }}
         />
 

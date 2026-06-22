@@ -23,6 +23,7 @@ export const DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS = {
   tauxISEntreprise: 25,
   dsraMonths: 6,
   devFeesKEuroPerMW: 110,
+  contingencyRate: 2,
   gearingMax: 95,
   contractDuration: 20,
   assuranceRate: 2.5,

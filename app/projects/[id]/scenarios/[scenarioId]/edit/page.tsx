@@ -379,6 +379,8 @@ export default async function EditScenarioPage({
             devFeesKEuroPerMW:
               scenario.devFeesKEuroPerMW ??
               DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.devFeesKEuroPerMW,
+            contingencyRate:
+              scenario.contingencyRate ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.contingencyRate,
           }}
         />
 

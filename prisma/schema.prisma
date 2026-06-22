@@ -93,6 +93,7 @@ model Scenario {
   ccaBloque                Boolean?
   devFeesKEuroPerMW        Float?
   tauxISEntreprise         Float?
+  contingencyRate          Float?
   legalFeesKEuro           Float?   @map("legalFeesK€")
   technicalDDKEuro         Float?   @map("technicalDDK€")
   arrangerFeesRate         Float?

@@ -46,6 +46,7 @@ export type FinanceEngineInput = FinancialAssumptions & {
   dsraMonths?: number | null;
   devFeesKEuroPerMW?: number | null;
   tauxISEntreprise?: number | null;
+  contingencyRate?: number | null;
   legalFeesKEuro?: number | null;
   technicalDDKEuro?: number | null;
   arrangerFeesRate?: number | null;
@@ -98,6 +99,7 @@ export type FinanceEngineResult = {
   sizingIterations: number;
   financingFeesKeuro: number;
   financingFeesDetail: FinancingFeesDetail;
+  contingencyKeuro: number;
 };
 
 export type AnnualCashFlow = {
@@ -147,6 +149,8 @@ export type CapexDetails = {
   raccordementKeuro: number;
   apportAffaireKeuro: number;
   devFeesKeuro: number;
+  capexBeforeContingencyKeuro: number;
+  contingencyKeuro: number;
   capexTotalKeuro: number;
   capexPerMwKeuro: number;
 };
@@ -425,7 +429,8 @@ function hasDetailedCapexInput(input: FinanceEngineInput) {
     input.raccordementOuvrageKEuro != null ||
     input.tarifQPKEuroPerMW != null ||
     input.apportAffaireMode != null ||
-    input.apportAffaireValeur != null
+    input.apportAffaireValeur != null ||
+    input.contingencyRate != null
   );
 }
 
@@ -459,6 +464,8 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
       raccordementKeuro: 0,
       apportAffaireKeuro: 0,
       devFeesKeuro: 0,
+      capexBeforeContingencyKeuro: legacyCapexTotal,
+      contingencyKeuro: 0,
       capexTotalKeuro: legacyCapexTotal,
       capexPerMwKeuro: input.capacityMw > 0 ? legacyCapexTotal / input.capacityMw : 0,
     };
@@ -485,8 +492,10 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
           ? apportAffaireValeur * (input.surfaceHa ?? 0)
           : 0;
   const devFeesKeuro = (input.devFeesKEuroPerMW ?? 0) * input.capacityMw;
-  const capexTotalKeuro =
+  const capexBeforeContingencyKeuro =
     modulesKeuro + boSKeuro + raccordementKeuro + apportAffaireKeuro + devFeesKeuro;
+  const contingencyKeuro = capexBeforeContingencyKeuro * (input.contingencyRate ?? 2) / 100;
+  const capexTotalKeuro = capexBeforeContingencyKeuro + contingencyKeuro;
 
   return {
     hasDetailedCapex,
@@ -497,6 +506,8 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
     raccordementKeuro,
     apportAffaireKeuro,
     devFeesKeuro,
+    capexBeforeContingencyKeuro,
+    contingencyKeuro,
     capexTotalKeuro,
     capexPerMwKeuro: input.capacityMw > 0 ? capexTotalKeuro / input.capacityMw : 0,
   };
@@ -1247,7 +1258,7 @@ function calculateFinancing(input: FinanceEngineInput): SizingComputation {
   if (!hasSculpting) {
     const retainedDebt = initialInvestment * input.debtRate / 100;
     const annualCashFlows = applyWaterfall(
-      buildPreRows(input),
+      buildPreRows(input, initialInvestment),
       new Map(),
       input,
       discountRate,
@@ -1416,6 +1427,7 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
       interimFinancing: round(financingFees.financingFeesDetail.interimFinancing),
       commitmentFees: round(financingFees.financingFeesDetail.commitmentFees),
     },
+    contingencyKeuro: round(calculateCapexDetails(input).contingencyKeuro),
     sizing: sizing !== null
       ? {
           ...sizing,

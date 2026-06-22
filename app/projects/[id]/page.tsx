@@ -155,6 +155,7 @@ export default async function ProjectDetailPage({
     dsraMonths: scenario.dsraMonths,
     devFeesKEuroPerMW: scenario.devFeesKEuroPerMW,
     tauxISEntreprise: scenario.tauxISEntreprise,
+    contingencyRate: scenario.contingencyRate,
     legalFeesKEuro: scenario.legalFeesKEuro,
     technicalDDKEuro: scenario.technicalDDKEuro,
     arrangerFeesRate: scenario.arrangerFeesRate,
@@ -217,6 +218,9 @@ export default async function ProjectDetailPage({
   const capexInitialKeuro = cashFlowScenario
     ? (cashFlowCapexDetails?.capexTotalKeuro ?? cashFlowScenario.capex * project.capacityMw)
     : 0;
+  const capexBeforeContingencyKeuro =
+    cashFlowCapexDetails?.capexBeforeContingencyKeuro ?? capexInitialKeuro;
+  const contingencyKeuro = cashFlowMetrics?.contingencyKeuro ?? 0;
   const financingFeesKeuro = cashFlowMetrics?.financingFeesKeuro ?? 0;
   const financingFeesDetail = cashFlowMetrics?.financingFeesDetail ?? null;
   const capexTotalWithFinancingFeesKeuro = capexInitialKeuro + financingFeesKeuro;
@@ -269,6 +273,7 @@ export default async function ProjectDetailPage({
             raccordementKeuro: cashFlowCapexDetails.raccordementKeuro,
             apportAffaireKeuro: cashFlowCapexDetails.apportAffaireKeuro,
             devFeesKeuro: cashFlowCapexDetails.devFeesKeuro,
+            contingencyKeuro,
             financingFeesKeuro,
           },
         ]
@@ -499,6 +504,24 @@ export default async function ProjectDetailPage({
                   {formatNumber(cashFlowCapexDetails.devFeesKeuro, " kEUR")}
                 </p>
               </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Sous-total</span>
+                <p style={{ fontWeight: 600, color: "#0d1117" }}>
+                  {formatNumber(capexBeforeContingencyKeuro, " kEUR")}
+                </p>
+              </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Contingency</span>
+                <p style={{ fontWeight: 600, color: "#0d1117" }}>
+                  {formatNumber(contingencyKeuro, " kEUR")}
+                </p>
+              </div>
+              <div>
+                <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>CAPEX total</span>
+                <p style={{ fontWeight: 700, color: "#0d1117" }}>
+                  {formatNumber(capexInitialKeuro, " kEUR")}
+                </p>
+              </div>
               <div
                 title={
                   financingFeesDetail !== null
@@ -522,13 +545,13 @@ export default async function ProjectDetailPage({
                 </p>
               </div>
               <div>
-                <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>Total</span>
+                <span style={{ fontSize: "0.75rem", color: "#6b7280" }}>CAPEX effectif</span>
                 <p style={{ fontWeight: 700, color: "var(--ps-blue-dark)" }}>
-                  {formatNumber(capexTotalWithFinancingFeesKeuro, " kEUR")}{" "}
+                  {formatNumber(capexEffectifKeuro ?? capexTotalWithFinancingFeesKeuro, " kEUR")}{" "}
                   <span style={{ fontWeight: 400, color: "#9ca3af" }}>
                     {formatNumber(
                       project.capacityMw > 0
-                        ? capexTotalWithFinancingFeesKeuro / project.capacityMw
+                        ? (capexEffectifKeuro ?? capexTotalWithFinancingFeesKeuro) / project.capacityMw
                         : 0,
                       " kEUR/MWc",
                     )}
