@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { sculptDebt } from "@/app/lib/finance/engine";
+import {
+  calculateAnnualCashFlows,
+  sculptDebt,
+} from "@/app/lib/finance/engine";
+import type { FinanceEngineInput } from "@/app/lib/finance/engine";
 import type { DscrTranche } from "@/app/lib/finance/types";
 
 // Helpers to build minimal cash-flow rows for testing.
@@ -12,6 +16,116 @@ function makeFlows(cfadsP90PerYear: number[], startYear = 1) {
 
 function tranche(yearFrom: number, yearTo: number, dscrValue: number): DscrTranche {
   return { yearFrom, yearTo, dscrValue };
+}
+
+type BpComparisonRow = {
+  year: number;
+  bpRevenueEuro: number;
+  modelRevenueEuro: number;
+  revenueGapPct: number;
+  bpOpexEuro: number;
+  modelOpexEuro: number;
+  opexGapPct: number;
+};
+
+const bpSigoulesRows = [
+  { year: 1, revenueEuro: 1_260_718, opexEuro: -235_945 },
+  { year: 2, revenueEuro: 1_260_706, opexEuro: -240_278 },
+  { year: 3, revenueEuro: 1_260_641, opexEuro: -244_694 },
+  { year: 4, revenueEuro: 1_261_337, opexEuro: -249_194 },
+  { year: 5, revenueEuro: 1_261_509, opexEuro: -253_779 },
+] as const;
+
+function relativeGap(modelValue: number, bpValue: number) {
+  return Math.abs(modelValue - bpValue) / Math.abs(bpValue);
+}
+
+function compareWithBP() {
+  it("compare Sigoules P50 years 1-5 with BP within 2%", () => {
+    const capacityMw = 15;
+    const capexTotalKeuro = 12_395;
+    const opexInflation = 2;
+    const loyerInflation = 0.4;
+    const assuranceInflation = 3;
+    const revenueYear1Keuro = bpSigoulesRows[0].revenueEuro / 1000;
+    const taxesCapexBaseEuro = capexTotalKeuro * 1000 * 0.04 * (1 - 0.3);
+    const tfRate =
+      (5_272 / (taxesCapexBaseEuro * 1.03)) * 100 /
+      (1 + loyerInflation / 100);
+    const cfeRate =
+      (4_342 / (taxesCapexBaseEuro * 1.03)) * 100 /
+      (1 + loyerInflation / 100);
+
+    const input: FinanceEngineInput = {
+      capacityMw,
+      capex: capexTotalKeuro / capacityMw,
+      opex: 0,
+      yieldMwh: 1_188,
+      yieldP90Mwh: 1_188,
+      tariff: 70,
+      debtRate: 0,
+      projectLifeYears: 35,
+      degradationRate: 0.4,
+      discountRate: 7.5,
+      debtInterestRate: 4,
+      debtMaturityYears: 20,
+      tariffInflationRate: 0.4,
+      opexInflationRate: opexInflation,
+      contractDuration: 35,
+      loyerMode: "fixe",
+      loyerValeur: 15 / (1 + loyerInflation / 100),
+      loyerInflation,
+      backOfficeKeuro: 22.5 / (1 + opexInflation / 100),
+      omFixedEuroKwc: 61.522 / capacityMw / (1 + opexInflation / 100),
+      mraEuroKwc: 14.345 / capacityMw / (1 + opexInflation / 100),
+      diversOpexKeuro: (12.167 + 6.304) / (1 + 3.5 / 100),
+      inflationOM: opexInflation,
+      inflationMRA: opexInflation,
+      inflationBackOffice: opexInflation,
+      inflationDivers: 3.5,
+      assuranceRate:
+        (18.711 / (revenueYear1Keuro * (1 + assuranceInflation / 100))) * 100,
+      inflationAssurance: assuranceInflation,
+      balancingCost: 2,
+      iferRpn: 1.35,
+      iferRate1: 40.143 / (capacityMw / 1.35),
+      iferRate2: 40.143 / (capacityMw / 1.35),
+      methodeTaxes: "comptable",
+      tauxTFCommune: tfRate,
+      tauxCFECommune: cfeRate,
+      inflationTaxes: opexInflation,
+      tauxTFEPCI: 0,
+      tauxTSE: 0,
+      tauxGEMAPI: 0,
+      tauxTEOM: 0,
+      tauxCFEEPCI: 0,
+      tauxCCI: 0,
+    };
+
+    const rows = calculateAnnualCashFlows(input);
+    const comparisonRows: BpComparisonRow[] = bpSigoulesRows.map((bpRow) => {
+      const modelRow = rows[bpRow.year - 1];
+      const modelRevenueEuro = modelRow.revenueP50Keuro * 1000;
+      const modelOpexEuro = -modelRow.opexKeuro * 1000;
+
+      return {
+        year: bpRow.year,
+        bpRevenueEuro: Math.round(bpRow.revenueEuro),
+        modelRevenueEuro: Math.round(modelRevenueEuro),
+        revenueGapPct: Number((relativeGap(modelRevenueEuro, bpRow.revenueEuro) * 100).toFixed(2)),
+        bpOpexEuro: Math.round(bpRow.opexEuro),
+        modelOpexEuro: Math.round(modelOpexEuro),
+        opexGapPct: Number((relativeGap(modelOpexEuro, bpRow.opexEuro) * 100).toFixed(2)),
+      };
+    });
+
+    console.table(comparisonRows);
+
+    for (const row of comparisonRows) {
+      expect(row.revenueGapPct).toBeLessThan(2);
+      expect(row.opexGapPct).toBeLessThan(2);
+    }
+  });
 }
 
 describe("sculptDebt", () => {
@@ -94,6 +208,10 @@ describe("sculptDebt", () => {
     expect(result!.debtAmountKeuro).toBe(0);
     expect(result!.schedule).toHaveLength(0);
   });
+});
+
+describe("compareWithBP", () => {
+  compareWithBP();
 });
 
 function lastOutstanding(schedule: { outstanding: number }[]) {
