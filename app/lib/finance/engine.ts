@@ -525,12 +525,13 @@ export function calculateTaxesFoncieres(
   year = 1,
 ): TaxesFoncieresOpexResult {
   const methode = input.methodeTaxes ?? METHODE_TAXES_FALLBACK;
-  const baseTaxesKeuro =
+  const capexTotalEuro = capexTotalKeuro * 1000;
+  const baseTaxesEuro =
     methode === "comptable"
-      ? capexTotalKeuro * TAUX_LF_COMPTA * (1 - ABATT_IMMO)
-      : capexTotalKeuro * TAUX_LF_AD * (1 - ABATT_IMMO) +
+      ? capexTotalEuro * TAUX_LF_COMPTA * (1 - ABATT_IMMO)
+      : capexTotalEuro * TAUX_LF_AD * (1 - ABATT_IMMO) +
         (input.surfaceHa ?? 0) *
-          ((input.prixTerrainHa ?? 5000) / 1000) *
+          (input.prixTerrainHa ?? 5000) *
           TAUX_LF_AD *
           COEF_NEUTRAL *
           (1 - (input.abattTerrain ?? 0) / 100);
@@ -547,12 +548,12 @@ export function calculateTaxesFoncieres(
     input.tauxGEMAPI,
     input.tauxCCI,
   ].map((taux) => taux ?? 0);
-  const tfAnnuelleKeuro = taxeLocale(baseTaxesKeuro, tauxTF, FRAIS_TF);
-  const cfeAnnuelleKeuro = taxeLocale(baseTaxesKeuro, tauxCFE, FRAIS_CFE);
+  const tfAnnuelleKeuro = taxeLocale(baseTaxesEuro, tauxTF, FRAIS_TF) / 1000;
+  const cfeAnnuelleKeuro = taxeLocale(baseTaxesEuro, tauxCFE, FRAIS_CFE) / 1000;
   const inflationFactor = (1 + asRate(input.inflationTaxes ?? 0.4)) ** year;
 
   return {
-    baseTaxesKeuro,
+    baseTaxesKeuro: baseTaxesEuro / 1000,
     tfAnnuelleKeuro,
     cfeAnnuelleKeuro,
     tfKeuro: tfAnnuelleKeuro * inflationFactor,

@@ -143,17 +143,17 @@ export function OpexDetailFields({
     initialValue.methodeTaxes ?? "appreciation_directe",
   );
   const [tauxTFCommune, setTauxTFCommune] = useState(
-    initialNumber(initialValue.tauxTFCommune),
+    initialNumber(initialValue.tauxTFCommune, "0.28"),
   );
-  const [tauxTFEPCI, setTauxTFEPCI] = useState(initialNumber(initialValue.tauxTFEPCI));
-  const [tauxTSE, setTauxTSE] = useState(initialNumber(initialValue.tauxTSE));
-  const [tauxGEMAPI, setTauxGEMAPI] = useState(initialNumber(initialValue.tauxGEMAPI));
-  const [tauxTEOM, setTauxTEOM] = useState(initialNumber(initialValue.tauxTEOM));
+  const [tauxTFEPCI, setTauxTFEPCI] = useState(initialNumber(initialValue.tauxTFEPCI, "0.12"));
+  const [tauxTSE, setTauxTSE] = useState(initialNumber(initialValue.tauxTSE, "0.05"));
+  const [tauxGEMAPI, setTauxGEMAPI] = useState(initialNumber(initialValue.tauxGEMAPI, "0.005"));
+  const [tauxTEOM, setTauxTEOM] = useState(initialNumber(initialValue.tauxTEOM, "0"));
   const [tauxCFECommune, setTauxCFECommune] = useState(
-    initialNumber(initialValue.tauxCFECommune),
+    initialNumber(initialValue.tauxCFECommune, "0.22"),
   );
-  const [tauxCFEEPCI, setTauxCFEEPCI] = useState(initialNumber(initialValue.tauxCFEEPCI));
-  const [tauxCCI, setTauxCCI] = useState(initialNumber(initialValue.tauxCCI));
+  const [tauxCFEEPCI, setTauxCFEEPCI] = useState(initialNumber(initialValue.tauxCFEEPCI, "0.08"));
+  const [tauxCCI, setTauxCCI] = useState(initialNumber(initialValue.tauxCCI, "0.005"));
   const [prixTerrainHa, setPrixTerrainHa] = useState(
     initialNumber(initialValue.prixTerrainHa, "5000"),
   );
@@ -477,28 +477,28 @@ export function OpexDetailFields({
         </label>
         <div className="grid gap-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            Taux communaux TFPB (%) - consulter avis TF de la commune
+            TAUX COMMUNAUX TFPB — consulter avis TF de la commune (format décimal : 28% → 0,28)
           </p>
           <div className="grid gap-5 sm:grid-cols-2">
             <label className="grid gap-2 text-sm font-medium text-zinc-700">
               Taux commune
-              <input name="tauxTFCommune" type="number" min="0" step="0.01" value={tauxTFCommune} onChange={(event) => setTauxTFCommune(event.target.value)} placeholder="ex. 28.5" className={numberInputClass} />
+              <input name="tauxTFCommune" type="number" min="0" step="0.01" value={tauxTFCommune} onChange={(event) => setTauxTFCommune(event.target.value)} placeholder="ex. 0.28" className={defaultInputClass(tauxTFCommune, "0.28")} />
             </label>
             <label className="grid gap-2 text-sm font-medium text-zinc-700">
               Taux EPCI
-              <input name="tauxTFEPCI" type="number" min="0" step="0.01" value={tauxTFEPCI} onChange={(event) => setTauxTFEPCI(event.target.value)} placeholder="ex. 12.3" className={numberInputClass} />
+              <input name="tauxTFEPCI" type="number" min="0" step="0.01" value={tauxTFEPCI} onChange={(event) => setTauxTFEPCI(event.target.value)} placeholder="ex. 0.12" className={defaultInputClass(tauxTFEPCI, "0.12")} />
             </label>
             <label className="grid gap-2 text-sm font-medium text-zinc-700">
               TSE
-              <input name="tauxTSE" type="number" min="0" step="0.01" value={tauxTSE} onChange={(event) => setTauxTSE(event.target.value)} placeholder="ex. 5.2" className={numberInputClass} />
+              <input name="tauxTSE" type="number" min="0" step="0.01" value={tauxTSE} onChange={(event) => setTauxTSE(event.target.value)} placeholder="ex. 0.05" className={defaultInputClass(tauxTSE, "0.05")} />
             </label>
             <label className="grid gap-2 text-sm font-medium text-zinc-700">
               GEMAPI
-              <input name="tauxGEMAPI" type="number" min="0" step="0.01" value={tauxGEMAPI} onChange={(event) => setTauxGEMAPI(event.target.value)} placeholder="ex. 0.8" className={numberInputClass} />
+              <input name="tauxGEMAPI" type="number" min="0" step="0.01" value={tauxGEMAPI} onChange={(event) => setTauxGEMAPI(event.target.value)} placeholder="ex. 0.005" className={defaultInputClass(tauxGEMAPI, "0.005")} />
             </label>
             <label className="grid gap-2 text-sm font-medium text-zinc-700">
               TEOM
-              <input name="tauxTEOM" type="number" min="0" step="0.01" value={tauxTEOM} onChange={(event) => setTauxTEOM(event.target.value)} placeholder="ex. 9.4" className={numberInputClass} />
+              <input name="tauxTEOM" type="number" min="0" step="0.01" value={tauxTEOM} onChange={(event) => setTauxTEOM(event.target.value)} placeholder="ex. 0" className={defaultInputClass(tauxTEOM, "0")} />
             </label>
           </div>
         </div>
@@ -509,15 +509,15 @@ export function OpexDetailFields({
           <div className="grid gap-5 sm:grid-cols-2">
             <label className="grid gap-2 text-sm font-medium text-zinc-700">
               Taux commune
-              <input name="tauxCFECommune" type="number" min="0" step="0.01" value={tauxCFECommune} onChange={(event) => setTauxCFECommune(event.target.value)} placeholder="ex. 22.1" className={numberInputClass} />
+              <input name="tauxCFECommune" type="number" min="0" step="0.01" value={tauxCFECommune} onChange={(event) => setTauxCFECommune(event.target.value)} placeholder="ex. 0.22" className={defaultInputClass(tauxCFECommune, "0.22")} />
             </label>
             <label className="grid gap-2 text-sm font-medium text-zinc-700">
               Taux EPCI
-              <input name="tauxCFEEPCI" type="number" min="0" step="0.01" value={tauxCFEEPCI} onChange={(event) => setTauxCFEEPCI(event.target.value)} placeholder="ex. 8.5" className={numberInputClass} />
+              <input name="tauxCFEEPCI" type="number" min="0" step="0.01" value={tauxCFEEPCI} onChange={(event) => setTauxCFEEPCI(event.target.value)} placeholder="ex. 0.08" className={defaultInputClass(tauxCFEEPCI, "0.08")} />
             </label>
             <label className="grid gap-2 text-sm font-medium text-zinc-700">
               CCI
-              <input name="tauxCCI" type="number" min="0" step="0.01" value={tauxCCI} onChange={(event) => setTauxCCI(event.target.value)} placeholder="ex. 0.5" className={numberInputClass} />
+              <input name="tauxCCI" type="number" min="0" step="0.01" value={tauxCCI} onChange={(event) => setTauxCCI(event.target.value)} placeholder="ex. 0.005" className={defaultInputClass(tauxCCI, "0.005")} />
             </label>
           </div>
         </div>
