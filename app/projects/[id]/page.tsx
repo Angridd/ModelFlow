@@ -13,6 +13,7 @@ import {
   calculateOpexDetails,
   calculateScenarioMetrics,
 } from "@/app/lib/finance/engine";
+import { AnimatedKpiCards } from "@/app/components/AnimatedKpiCards";
 import { ProjectFinancialCharts } from "@/app/components/ProjectFinancialCharts";
 import type { DscrTranche } from "@/app/lib/finance/types";
 import { generateSensitivityRows } from "@/app/lib/sensitivity";
@@ -274,7 +275,7 @@ export default async function ProjectDetailPage({
           { name: "CCA" as const, value: ccaKeuro, color: "#16a34a" },
         ]
       : [];
-  const cashFlowChartData = annualCashFlows.map((row) => {
+  const cashFlowChartData = annualCashFlows.filter((row) => row.year >= 1).map((row) => {
     const areaBaseKeuro = Math.min(row.revenueP50Keuro, row.revenueP90Keuro);
 
     return {
@@ -338,6 +339,7 @@ export default async function ProjectDetailPage({
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-10">
       {/* ── Hero ── */}
       <div className="project-hero">
+        <div className="project-hero-particles" aria-hidden="true" />
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
           <div>
             <Link href="/projects" className="page-breadcrumb" style={{ color: "rgba(255,255,255,0.55)" }}>
@@ -345,6 +347,9 @@ export default async function ProjectDetailPage({
             </Link>
             <h1 className="project-hero-title">{project.name}</h1>
             <div className="project-hero-badges">
+              {projectReferenceScenario ? (
+                <span className="badge badge-base-case">Base Case</span>
+              ) : null}
               <span className={getStatusBadgeClass(project.status)}>{project.status}</span>
               <span className="badge badge-ghost">{project.technology}</span>
               {project.region ? <span className="badge badge-ghost">{project.region}</span> : null}
@@ -395,8 +400,38 @@ export default async function ProjectDetailPage({
       </div>
 
       {/* ── KPI Cards (float over hero bottom) ── */}
+      <AnimatedKpiCards
+        cards={[
+          {
+            label: projectReferenceScenario ? "VAN rÃ©fÃ©rence" : "Meilleure VAN",
+            value: kpiNpv,
+            suffix: " Mâ‚¬",
+            scale: 1000,
+            decimals: 2,
+            tone: kpiNpv !== null && kpiNpv < 0 ? "negative" : "positive",
+          },
+          {
+            label: projectReferenceScenario ? "TRI rÃ©fÃ©rence" : "Meilleur TRI",
+            value: kpiIrr,
+            suffix: " %",
+            decimals: 2,
+            tone: "positive",
+          },
+          {
+            label: projectReferenceScenario ? "DSCR rÃ©fÃ©rence" : "DSCR minimum",
+            value: kpiDscr,
+            decimals: 2,
+          },
+          {
+            label: projectReferenceScenario ? "LCOE rÃ©fÃ©rence" : "LCOE minimum",
+            value: kpiLcoe,
+            suffix: " â‚¬/MWh",
+            decimals: 2,
+          },
+        ]}
+      />
       <div
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        className="hidden"
         style={{ marginTop: "-3rem", position: "relative", zIndex: 10 }}
       >
         <div className="kpi-card fade-up delay-1">
@@ -643,6 +678,7 @@ export default async function ProjectDetailPage({
         financingData={financingChartData}
         gearingRealisePct={gearingRealisePct}
         cashFlowData={cashFlowChartData}
+        contractDuration={cashFlowScenario?.contractDuration ?? null}
         capexData={capexChartData}
         dscrData={dscrChartData}
         debtRepaymentData={debtRepaymentChartData}

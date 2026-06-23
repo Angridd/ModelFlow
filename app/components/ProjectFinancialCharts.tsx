@@ -2,16 +2,14 @@
 
 import {
   Area,
-  Bar,
-  BarChart,
   CartesianGrid,
   Cell,
   ComposedChart,
-  LabelList,
   Legend,
   Line,
   Pie,
   PieChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -77,10 +75,18 @@ type TooltipPayloadItem = {
   payload?: CapexComponentDatum;
 };
 
+type ChartTooltipPayloadItem = {
+  name?: NameType;
+  value?: ValueType;
+  color?: string;
+  dataKey?: string | number;
+};
+
 type ProjectFinancialChartsProps = {
   financingData: FinancingChartDatum[];
   gearingRealisePct: number | null;
   cashFlowData: CashFlowChartDatum[];
+  contractDuration: number | null;
   capexData: CapexChartDatum[];
   dscrData: DscrChartDatum[];
   debtRepaymentData: DebtRepaymentChartDatum[];
@@ -101,7 +107,7 @@ const chartColors = {
   contingency: "#f59e0b",
   taxesFoncieres: "#14b8a6",
   financingFees: "#6366f1",
-  dscrRealized: "#0094cd",
+  dscrRealized: "#009557",
   dscrTarget: "#ed7575",
   dscrAbove: "#009557",
   dscrBelow: "#ed7575",
@@ -163,6 +169,48 @@ function isTooltipPayloadItem(value: unknown): value is TooltipPayloadItem {
   return typeof value === "object" && value !== null && "value" in value;
 }
 
+function isChartTooltipPayloadItem(value: unknown): value is ChartTooltipPayloadItem {
+  return typeof value === "object" && value !== null && "value" in value;
+}
+
+function ChartTooltip({
+  active,
+  label,
+  payload,
+  formatter = formatTooltipValue,
+}: {
+  active?: boolean;
+  label?: string | number;
+  payload?: unknown[];
+  formatter?: (value: unknown) => string;
+}) {
+  if (!active || !payload || payload.length === 0) {
+    return null;
+  }
+
+  const items = payload
+    .filter(isChartTooltipPayloadItem)
+    .filter((item) => item.value !== undefined && item.color !== "transparent");
+
+  return (
+    <div className="chart-tooltip">
+      <div className="chart-tooltip-title">Annee {label}</div>
+      <div className="chart-tooltip-items">
+        {items.map((item) => (
+          <div key={`${String(item.dataKey ?? item.name)}-${String(item.name)}`} className="chart-tooltip-row">
+            <span
+              className="chart-tooltip-dot"
+              style={{ background: item.color ?? chartColors.p50 }}
+            />
+            <span>{String(item.name ?? "")}</span>
+            <strong>{formatter(item.value)}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function CapexTooltip({
   active,
   payload,
@@ -198,6 +246,7 @@ export function ProjectFinancialCharts({
   financingData,
   gearingRealisePct,
   cashFlowData,
+  contractDuration,
   capexData,
   dscrData,
   debtRepaymentData,
@@ -259,6 +308,10 @@ export function ProjectFinancialCharts({
   })
     .filter((item) => item.valueKeuro > 0)
     .sort((a, b) => b.valueKeuro - a.valueKeuro);
+  const capexComponentMax = Math.max(
+    ...capexComponentData.map((item) => item.valueKeuro),
+    0,
+  );
 
   if (
     !hasFinancingData &&
@@ -292,7 +345,7 @@ export function ProjectFinancialCharts({
                     <Cell key={entry.name} fill={entry.color} />
                   ))}
                 </Pie>
-                <Tooltip formatter={formatTooltipValue} />
+                <Tooltip content={<ChartTooltip />} />
                 <Legend />
                 <text
                   x="50%"
@@ -314,36 +367,28 @@ export function ProjectFinancialCharts({
           <h2 className="section-title">
             Decomposition du CAPEX
           </h2>
-          <div className="mt-4 h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={capexComponentData}
-                layout="vertical"
-                margin={{ top: 12, right: 112, left: 8, bottom: 8 }}
-              >
-                <CartesianGrid stroke="#f1f5f9" horizontal={false} />
-                <XAxis
-                  type="number"
-                  tickFormatter={formatAxisMeuro}
-                  stroke="#9ca3af"
-                  fontSize={12}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  stroke="#9ca3af"
-                  fontSize={12}
-                  width={110}
-                />
-                <Tooltip content={<CapexTooltip />} />
-                <Bar dataKey="valueKeuro" name="CAPEX" radius={[0, 4, 4, 0]}>
-                  {capexComponentData.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                  <LabelList dataKey="label" position="right" />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="capex-waterfall mt-4">
+            {capexComponentData.map((entry, index) => {
+              const widthPct =
+                capexComponentMax > 0 ? entry.valueKeuro / capexComponentMax * 100 : 0;
+
+              return (
+                <div key={entry.name} className="capex-waterfall-row">
+                  <div className="capex-waterfall-name">{entry.name}</div>
+                  <div className="capex-waterfall-track">
+                    <div
+                      className="capex-waterfall-bar"
+                      style={{
+                        background: entry.color,
+                        animationDelay: `${index * 100}ms`,
+                        width: `${widthPct}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="capex-waterfall-label">{entry.label}</div>
+                </div>
+              );
+            })}
           </div>
         </div>
       ) : null}
@@ -361,8 +406,8 @@ export function ProjectFinancialCharts({
               >
                 <CartesianGrid stroke="#f1f5f9" vertical={false} />
                 <XAxis dataKey="year" stroke="#9ca3af" fontSize={12} />
-                <YAxis stroke="#9ca3af" fontSize={12} width={48} />
-                <Tooltip formatter={formatRatio} />
+                <YAxis stroke="#9ca3af" fontSize={12} width={48} domain={[0.8, "auto"]} />
+                <Tooltip content={<ChartTooltip formatter={formatRatio} />} />
                 <Area
                   dataKey="dscrGreenBase"
                   stackId="dscr-green"
@@ -442,7 +487,7 @@ export function ProjectFinancialCharts({
                   width={56}
                   label={{ value: "k€", angle: -90, position: "insideLeft" }}
                 />
-                <Tooltip formatter={formatTooltipValue} />
+                <Tooltip content={<ChartTooltip />} />
                 <Legend />
                 <Area
                   type="monotone"
@@ -487,6 +532,12 @@ export function ProjectFinancialCharts({
                 data={cashFlowData}
                 margin={{ top: 12, right: 24, left: 8, bottom: 8 }}
               >
+                <defs>
+                  <linearGradient id="cashflowSpreadGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={chartColors.spread} stopOpacity={0.3} />
+                    <stop offset="100%" stopColor={chartColors.spread} stopOpacity={0.06} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid stroke="#f1f5f9" vertical={false} />
                 <XAxis dataKey="year" stroke="#9ca3af" fontSize={12} />
                 <YAxis
@@ -495,8 +546,23 @@ export function ProjectFinancialCharts({
                   fontSize={12}
                   width={56}
                 />
-                <Tooltip formatter={formatTooltipValue} />
+                <Tooltip content={<ChartTooltip />} />
                 <Legend />
+                {contractDuration !== null ? (
+                  <ReferenceLine
+                    x={contractDuration}
+                    stroke={chartColors.raccordement}
+                    strokeDasharray="4 4"
+                    strokeWidth={2}
+                    label={{
+                      value: "Fin contrat",
+                      position: "insideTopRight",
+                      fill: chartColors.raccordement,
+                      fontSize: 12,
+                      fontWeight: 700,
+                    }}
+                  />
+                ) : null}
                 <Area
                   dataKey="areaBaseKeuro"
                   stackId="spread"
@@ -510,24 +576,32 @@ export function ProjectFinancialCharts({
                   stackId="spread"
                   name="Ecart P50/P90"
                   stroke="transparent"
-                  fill={chartColors.spread}
-                  fillOpacity={0.28}
+                  fill="url(#cashflowSpreadGradient)"
+                  fillOpacity={1}
+                  isAnimationActive
+                  animationDuration={900}
                 />
                 <Line
                   type="monotone"
                   dataKey="revenueP50Keuro"
                   name="CA P50"
                   stroke={chartColors.p50}
-                  strokeWidth={2}
+                  strokeWidth={3}
                   dot={false}
+                  className="chart-line-draw"
+                  isAnimationActive
+                  animationDuration={1200}
                 />
                 <Line
                   type="monotone"
                   dataKey="revenueP90Keuro"
                   name="CA P90"
                   stroke={chartColors.p90}
+                  strokeDasharray="6 5"
                   strokeWidth={2}
                   dot={false}
+                  isAnimationActive
+                  animationDuration={1000}
                 />
                 <Line
                   type="monotone"
@@ -536,6 +610,8 @@ export function ProjectFinancialCharts({
                   stroke={chartColors.opex}
                   strokeWidth={2}
                   dot={false}
+                  isAnimationActive
+                  animationDuration={1000}
                 />
               </ComposedChart>
             </ResponsiveContainer>
