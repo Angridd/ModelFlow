@@ -66,6 +66,7 @@ model Scenario {
   tariffInflationRate      Float    @default(0)
   opexInflationRate        Float    @default(2)
   contractDuration         Int?
+  constructionYears        Int?
   assuranceRate            Float?
   inflationAssurance       Float?
   balancingCost            Float?

@@ -12,6 +12,7 @@ const IRR_MAX_RATE = 10;
 const DSCR_FALLBACK = 1.3;
 const CCA_REMUN_RATE = 0;
 const CONTRACT_DURATION_FALLBACK = 20;
+const CONSTRUCTION_YEARS_FALLBACK = 1;
 const ASSURANCE_RATE_FALLBACK = 2.5;
 const INFLATION_ASSURANCE_FALLBACK = 2;
 const BALANCING_COST_FALLBACK = 2;
@@ -51,6 +52,7 @@ export type FinanceEngineInput = FinancialAssumptions & {
   dscrSchedule?: DscrTranche[] | null;
   gearingMaxPct?: number | null;
   gearingMax?: number | null;
+  structuringFeeRate?: number | null;
   tauxIS?: number | null;
   amortDuree?: number | null;
   margeDevKeuro?: number | null;
@@ -70,6 +72,7 @@ export type FinanceEngineInput = FinancialAssumptions & {
   interimFinancingRate?: number | null;
   commitmentFeesRate?: number | null;
   contractDuration?: number | null;
+  constructionYears?: number | null;
   auroraCurves?: Array<{
     year: number;
     high: number;
@@ -343,15 +346,15 @@ function calculateIrr(initialInvestment: number, cashFlows: number[]) {
 
 export function calculateDoubleIRR(
   t0Flows: T0Flows,
-  projectCashFlows: number[],
+  _projectCashFlows: number[],
   equityCashFlows: number[],
 ): DoubleIRR {
   const projectInvestment = t0Flows.miseNetteInvest;
   const equityInvestment = t0Flows.miseNetteEntrep;
-  const projectIrr = calculateIrr(projectInvestment, projectCashFlows) * 100;
+  const projectIrr = calculateIrr(projectInvestment, equityCashFlows) * 100;
   const equityIrr = calculateIrr(equityInvestment, equityCashFlows) * 100;
   const npvRate = asRate(6);
-  const npvSPV = projectCashFlows.reduce(
+  const npvSPV = equityCashFlows.reduce(
     (total, cashFlow, index) => total + discounted(cashFlow, index + 1, npvRate),
     -projectInvestment,
   );
@@ -441,6 +444,10 @@ function resolveSchedule(input: FinanceEngineInput): DscrTranche[] | null {
 
 function resolveGearingMaxPct(input: FinanceEngineInput) {
   return input.gearingMaxPct ?? input.gearingMax ?? null;
+}
+
+function resolveConstructionYears(input: Pick<FinanceEngineInput, "constructionYears">) {
+  return Math.max(0, Math.trunc(input.constructionYears ?? CONSTRUCTION_YEARS_FALLBACK));
 }
 
 function buildAuroraCurveByYear(input: FinanceEngineInput) {
@@ -1509,6 +1516,59 @@ function applyWaterfall(
   });
 }
 
+function zeroAnnualCashFlow(year: number): AnnualCashFlow {
+  return {
+    year,
+    annualTariff: 0,
+    productionP50Mwh: 0,
+    productionP90Mwh: 0,
+    revenueP50Keuro: 0,
+    revenueP90Keuro: 0,
+    opexKeuro: 0,
+    cashFlowKeuro: 0,
+    discountedCashFlowKeuro: 0,
+    debtServiceKeuro: 0,
+    debtServiceSculptedKeuro: null,
+    debtOutstandingKeuro: 0,
+    cfadsP90Keuro: 0,
+    cfadsP90AfterTaxKeuro: 0,
+    amort: 0,
+    vncKeuro: 0,
+    ebit: 0,
+    interets: 0,
+    ebt: 0,
+    is: 0,
+    resultatNet: 0,
+    cfadsAfterTax: 0,
+    dividende: 0,
+    fluxActionnaire: 0,
+    ccaRemboursementKeuro: 0,
+    ccaInteretsKeuro: 0,
+    ccaOutstandingKeuro: 0,
+    deficitCumuleKeuro: 0,
+    resultatCumuleKeuro: 0,
+    dsraSoldeKeuro: 0,
+    dsraDepotKeuro: 0,
+    dsraRetraitKeuro: 0,
+    cashBloqueKeuro: 0,
+    dscr: null,
+    dscrRealized: null,
+    dscrTargetAtYear: null,
+  };
+}
+
+function withConstructionRows(
+  rows: AnnualCashFlow[],
+  constructionYears: number,
+): AnnualCashFlow[] {
+  const constructionRows = Array.from(
+    { length: constructionYears + 1 },
+    (_, index) => zeroAnnualCashFlow(-constructionYears + index),
+  );
+
+  return [...constructionRows, ...rows];
+}
+
 function calculateFinancing(input: FinanceEngineInput): SizingComputation {
   const capexTotalKeuro = calculateCapexDetails(input).capexTotalKeuro;
   const financingFees = calculateFinancingFees({
@@ -1537,7 +1597,10 @@ function calculateFinancing(input: FinanceEngineInput): SizingComputation {
     return {
       sizing: null,
       scheduleByYear: new Map(),
-      annualCashFlows,
+      annualCashFlows: withConstructionRows(
+        annualCashFlows,
+        resolveConstructionYears(input),
+      ),
       iterations: 0,
     };
   }
@@ -1575,7 +1638,10 @@ function calculateFinancing(input: FinanceEngineInput): SizingComputation {
   return {
     sizing: marginResult.sizing,
     scheduleByYear: marginResult.scheduleByYear,
-    annualCashFlows,
+    annualCashFlows: withConstructionRows(
+      annualCashFlows,
+      resolveConstructionYears(input),
+    ),
     iterations: marginResult.sizing.iterationsCount,
   };
 }
@@ -1597,19 +1663,23 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
   const initialInvestment = capexTotalKeuro + financingFees.financingFeesKeuro;
   const financing = calculateFinancing(input);
   const annualCashFlows = financing.annualCashFlows;
+  const operatingCashFlows = annualCashFlows.filter((row) => row.year >= 1);
+  const constructionYears = resolveConstructionYears(input);
+  const postInvestmentZeroFlows = Array(constructionYears).fill(0) as number[];
 
   // VAN and TRI use after-tax P50 operating cash-flows.
-  const cashFlows = annualCashFlows.map((row) => row.cfadsAfterTax);
-  const discountedCashFlows = annualCashFlows.reduce(
+  const cashFlows = operatingCashFlows.map((row) => row.cfadsAfterTax);
+  const irrCashFlows = [...postInvestmentZeroFlows, ...cashFlows];
+  const discountedCashFlows = operatingCashFlows.reduce(
     (total, row) => total + row.discountedCashFlowKeuro,
     0,
   );
-  const discountedOpex = annualCashFlows.reduce(
+  const discountedOpex = operatingCashFlows.reduce(
     (total, row) => total + discounted(row.opexKeuro, row.year, asRate(input.discountRate)),
     0,
   );
   // LCOE uses P50 production.
-  const discountedProduction = annualCashFlows.reduce(
+  const discountedProduction = operatingCashFlows.reduce(
     (total, row) =>
       total + discounted(row.productionP50Mwh, row.year, asRate(input.discountRate)),
     0,
@@ -1634,9 +1704,6 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
   // NPV kEUR = sum of discounted P50 cash-flows - effective CAPEX.
   const npv = discountedCashFlows - capexEffectif;
 
-  // IRR % = rate that sets NPV to zero using effective CAPEX.
-  const irr = calculateIrr(capexEffectif, cashFlows) * 100;
-
   // LCOE EUR/MWh = discounted total cost / discounted P50 production * 1000.
   const lcoe =
     discountedProduction > 0
@@ -1649,15 +1716,19 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
   const tauxISEntreprise = input.tauxISEntreprise ?? input.tauxIS ?? 0;
   const netEntrepriseFactor = 1 - asRate(tauxISEntreprise);
   const dsraInitialKeuro =
-    annualCashFlows.length > 0
-      ? (annualCashFlows[0].debtServiceSculptedKeuro ??
-          annualCashFlows[0].debtServiceKeuro) *
+    operatingCashFlows.length > 0
+      ? (operatingCashFlows[0].debtServiceSculptedKeuro ??
+          operatingCashFlows[0].debtServiceKeuro) *
         (input.dsraMonths ?? 0) / 12
       : 0;
-  const miseNetteInvest = ccaKeuro;
+  const miseNetteInvest =
+    ccaKeuro + devFeesKeuro + margeDev * (1 - asRate(input.tauxIS ?? 0));
   const miseNetteEntrep =
-    ccaKeuro - margeDev * netEntrepriseFactor - devFeesKeuro * netEntrepriseFactor;
-  const shareholderFlows = annualCashFlows.map((row) => row.fluxActionnaire);
+    miseNetteInvest - margeDev * netEntrepriseFactor - devFeesKeuro * netEntrepriseFactor;
+  const shareholderFlows = [
+    ...postInvestmentZeroFlows,
+    ...operatingCashFlows.map((row) => row.fluxActionnaire),
+  ];
   const shouldCalculateDoubleIrr =
     retainedDebt > 0 ||
     ccaKeuro > 0 ||
@@ -1674,14 +1745,14 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
           miseNetteInvest,
           miseNetteEntrep,
         },
-        cashFlows,
+        irrCashFlows,
         shareholderFlows,
       )
     : null;
 
   return {
     npv: round(npv),
-    irr: round(irr),
+    irr: round(calculateIrr(miseNetteInvest, shareholderFlows) * 100),
     lcoe: round(lcoe),
     dscr: dscr !== null ? round(dscr) : null,
     debtAmountKeuro: sizing !== null ? round(sizing.debtRetenuKeuro) : null,

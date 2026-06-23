@@ -148,6 +148,14 @@ const revenueFields = [
     title: "Duree du tarif contractuel. Prix marche applique ensuite",
     defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.contractDuration,
   },
+  {
+    name: "constructionYears" as const,
+    label: "Durée construction (ans)",
+    step: "1",
+    placeholder: "ex. 1",
+    title: "Nombre d'années entre le financement et la mise en service (COD)",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.constructionYears,
+  },
 ] as const;
 
 const opexExtraFields = [

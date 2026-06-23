@@ -30,6 +30,7 @@ export const DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS = {
   coefArcheo: 0.71,
   gearingMax: 95,
   contractDuration: 20,
+  constructionYears: 1,
   assuranceRate: 2.5,
   inflationAssurance: 2,
   balancingCost: 2,

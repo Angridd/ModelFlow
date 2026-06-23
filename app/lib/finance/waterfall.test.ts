@@ -25,6 +25,16 @@ function baseInput(overrides: Partial<FinanceEngineInput> = {}): FinanceEngineIn
   };
 }
 
+function operatingRow(rows: ReturnType<typeof calculateAnnualCashFlows>, year: number) {
+  const row = rows.find((item) => item.year === year);
+
+  if (!row) {
+    throw new Error(`Missing operating row ${year}`);
+  }
+
+  return row;
+}
+
 describe("waterfall fiscal, DSRA, CCA et double TRI", () => {
   it("IS = 0 si tauxIS null", () => {
     const rows = calculateAnnualCashFlows(baseInput({ tauxIS: null }));
@@ -34,7 +44,7 @@ describe("waterfall fiscal, DSRA, CCA et double TRI", () => {
 
   it("deductibilite IS correcte avec EBT apres interets comme base", () => {
     const rows = calculateAnnualCashFlows(baseInput({ tauxIS: 25 }));
-    const row = rows[0];
+    const row = operatingRow(rows, 1);
     const expectedTax = Math.max(0, (row.ebit - row.interets) * 0.25);
 
     expect(row.ebt).toBeCloseTo(row.ebit - row.interets, 6);
@@ -50,9 +60,11 @@ describe("waterfall fiscal, DSRA, CCA et double TRI", () => {
       }),
     );
 
-    expect(rows[0].ebt).toBeLessThan(0);
-    expect(rows[0].deficitCumuleKeuro).toBeGreaterThan(0);
-    expect(rows[0].is).toBe(0);
+    const firstYear = operatingRow(rows, 1);
+
+    expect(firstYear.ebt).toBeLessThan(0);
+    expect(firstYear.deficitCumuleKeuro).toBeGreaterThan(0);
+    expect(firstYear.is).toBe(0);
   });
 
   it("report deficientaire est absorbe par les annees beneficiaires", () => {
@@ -81,8 +93,11 @@ describe("waterfall fiscal, DSRA, CCA et double TRI", () => {
       }),
     );
 
-    expect(rows[0].dsraDepotKeuro).toBeGreaterThan(0);
-    expect(rows[0].dsraSoldeKeuro).toBeLessThanOrEqual(rows[1].debtServiceKeuro * 0.5);
+    const firstYear = operatingRow(rows, 1);
+    const secondYear = operatingRow(rows, 2);
+
+    expect(firstYear.dsraDepotKeuro).toBeGreaterThan(0);
+    expect(firstYear.dsraSoldeKeuro).toBeLessThanOrEqual(secondYear.debtServiceKeuro * 0.5);
   });
 
   it("DSRA est liberee au tenor de dette", () => {
@@ -94,9 +109,12 @@ describe("waterfall fiscal, DSRA, CCA et double TRI", () => {
       }),
     );
 
-    expect(rows.slice(0, 2).some((row) => row.dsraSoldeKeuro > 0)).toBe(true);
-    expect(rows[2].dsraRetraitKeuro).toBeGreaterThan(0);
-    expect(rows[2].dsraSoldeKeuro).toBe(0);
+    const operatingRows = rows.filter((row) => row.year >= 1);
+    const thirdYear = operatingRow(rows, 3);
+
+    expect(operatingRows.slice(0, 2).some((row) => row.dsraSoldeKeuro > 0)).toBe(true);
+    expect(thirdYear.dsraRetraitKeuro).toBeGreaterThan(0);
+    expect(thirdYear.dsraSoldeKeuro).toBe(0);
   });
 
   it("CCA est calcule depuis capexEffectif - detteRetenue", () => {
@@ -108,10 +126,11 @@ describe("waterfall fiscal, DSRA, CCA et double TRI", () => {
       }),
     );
     const ccaInitial = 700 * 10;
-    const firstYearRepaid = rows[0].ccaRemboursementKeuro;
+    const firstYear = operatingRow(rows, 1);
+    const firstYearRepaid = firstYear.ccaRemboursementKeuro;
 
     expect(firstYearRepaid).toBeGreaterThan(0);
-    expect(rows[0].ccaOutstandingKeuro).toBeCloseTo(ccaInitial - firstYearRepaid);
+    expect(firstYear.ccaOutstandingKeuro).toBeCloseTo(ccaInitial - firstYearRepaid);
   });
 
   it("CCA jamais bloque peut se rembourser pendant la dette si le cash le permet", () => {
@@ -122,7 +141,10 @@ describe("waterfall fiscal, DSRA, CCA et double TRI", () => {
       }),
     );
 
-    expect(rows.slice(0, 8).some((row) => row.ccaRemboursementKeuro > 0)).toBe(true);
+    expect(
+      rows.filter((row) => row.year >= 1 && row.year <= 8)
+        .some((row) => row.ccaRemboursementKeuro > 0),
+    ).toBe(true);
   });
 
   it("double TRI integre les dev fees et ameliore le TRI entreprise", () => {

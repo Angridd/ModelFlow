@@ -159,6 +159,7 @@ export default async function ProjectDetailPage({
     tariffInflationRate: scenario.tariffInflationRate,
     opexInflationRate: scenario.opexInflationRate,
     contractDuration: scenario.contractDuration,
+    constructionYears: scenario.constructionYears,
     assuranceRate: scenario.assuranceRate,
     inflationAssurance: scenario.inflationAssurance,
     balancingCost: scenario.balancingCost,
@@ -225,13 +226,14 @@ export default async function ProjectDetailPage({
   const cashFlowCapexDetails = cashFlowScenario
     ? calculateCapexDetails(buildFinanceInput(cashFlowScenario))
     : null;
+  const firstOperatingCashFlow = annualCashFlows.find((row) => row.year === 1);
   const cashFlowOpexDetails =
-    cashFlowScenario && annualCashFlows[0]
+    cashFlowScenario && firstOperatingCashFlow
       ? calculateOpexDetails(
           buildFinanceInput(cashFlowScenario),
           1,
-          annualCashFlows[0].revenueP50Keuro,
-          annualCashFlows[0].productionP50Mwh,
+          firstOperatingCashFlow.revenueP50Keuro,
+          firstOperatingCashFlow.productionP50Mwh,
         )
       : null;
   const sizing = cashFlowMetrics?.sizing ?? null;
