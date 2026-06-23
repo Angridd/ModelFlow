@@ -154,6 +154,7 @@ export type AnnualCashFlow = {
   cfadsP90Keuro: number;
   cfadsP90AfterTaxKeuro: number;
   amort: number;
+  vncKeuro: number;
   ebit: number;
   interets: number;
   ebt: number;
@@ -265,6 +266,12 @@ type PreRow = {
   standardDebtInterestKeuro: number;
   standardDebtOutstandingKeuro: number;
   amort: number;
+  vncKeuro: number;
+};
+
+type AmortizationScheduleItem = {
+  amort: number;
+  vncKeuro: number;
 };
 
 type RetainedDebtScheduleItem = Pick<
@@ -1198,6 +1205,67 @@ function ajusteMargeFacturable(
   return result;
 }
 
+function degressiveAmortizationCoefficient(durationYears: number) {
+  if (durationYears >= 3 && durationYears <= 4) {
+    return 1.25;
+  }
+
+  if (durationYears >= 5 && durationYears <= 6) {
+    return 1.75;
+  }
+
+  if (durationYears > 6) {
+    return 2.25;
+  }
+
+  return 1;
+}
+
+function buildAmortizationSchedule(
+  initialInvestmentKeuro: number,
+  amortDuree: number,
+  projectLifeYears: number,
+): AmortizationScheduleItem[] {
+  const schedule: AmortizationScheduleItem[] = [];
+  let vncKeuro = Math.max(0, initialInvestmentKeuro);
+
+  if (projectLifeYears <= 0) {
+    return schedule;
+  }
+
+  if (amortDuree <= 0) {
+    for (let year = 1; year <= projectLifeYears; year += 1) {
+      schedule.push({ amort: 0, vncKeuro });
+    }
+
+    return schedule;
+  }
+
+  const linearRate = 1 / amortDuree;
+  const degressiveRate = linearRate * degressiveAmortizationCoefficient(amortDuree);
+
+  for (let year = 1; year <= projectLifeYears; year += 1) {
+    let amort = 0;
+
+    if (year <= amortDuree && vncKeuro > 0) {
+      const remainingYears = amortDuree - year + 1;
+      const degressiveAmort = vncKeuro * degressiveRate;
+      const linearAmort = remainingYears > 0 ? vncKeuro / remainingYears : vncKeuro;
+      amort = Math.max(degressiveAmort, linearAmort);
+
+      if (vncKeuro - amort < 0) {
+        amort = vncKeuro;
+      }
+
+      vncKeuro = Math.max(0, vncKeuro - amort);
+    }
+
+    schedule.push({ amort, vncKeuro });
+  }
+
+  return schedule;
+}
+
 function buildPreRows(
   input: FinanceEngineInput,
   investmentOverrideKeuro?: number,
@@ -1219,10 +1287,11 @@ function buildPreRows(
     debtInterestRate,
     input.debtMaturityYears,
   );
-  const amortDuree = input.amortDuree ?? input.projectLifeYears;
-  const annualAmort = amortDuree > 0
-    ? initialInvestment / amortDuree
-    : 0;
+  const amortizationSchedule = buildAmortizationSchedule(
+    initialInvestment,
+    input.amortDuree ?? input.projectLifeYears,
+    input.projectLifeYears,
+  );
   const contractDuration = input.contractDuration ?? CONTRACT_DURATION_FALLBACK;
   const auroraCurveByYear = buildAuroraCurveByYear(input);
   // P90 yield: use provided value or fall back to P50 * 0.93.
@@ -1279,6 +1348,10 @@ function buildPreRows(
       standardDebtSchedule.get(year)?.interest ?? 0;
     const standardDebtOutstanding =
       standardDebtSchedule.get(year)?.outstanding ?? 0;
+    const amortization = amortizationSchedule[year - 1] ?? {
+      amort: 0,
+      vncKeuro: initialInvestment,
+    };
 
     preRows.push({
       year,
@@ -1293,7 +1366,8 @@ function buildPreRows(
       debtServiceKeuro: debtService,
       standardDebtInterestKeuro: standardDebtInterest,
       standardDebtOutstandingKeuro: standardDebtOutstanding,
-      amort: annualAmort,
+      amort: amortization.amort,
+      vncKeuro: amortization.vncKeuro,
     });
   }
 
@@ -1397,6 +1471,7 @@ function applyWaterfall(
       debtOutstandingKeuro: scheduleItem?.outstanding ?? pre.standardDebtOutstandingKeuro,
       cfadsP90Keuro: pre.cfadsP90Keuro,
       amort: pre.amort,
+      vncKeuro: pre.vncKeuro,
       ebit,
       interets,
       ebt,
