@@ -92,6 +92,10 @@ model Scenario {
   prixTerrainHa            Float?
   abattTerrain             Float?
   inflationTaxes           Float?
+  iferRate1                Float?
+  iferRate2                Float?
+  iferRpn                  Float?
+  inflationAurora          Float?
   dscrTarget               Float?
   debtTenorYears           Int?
   dscrSchedule             String?

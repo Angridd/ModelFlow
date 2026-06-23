@@ -26,6 +26,10 @@ const INFLATION_MRA_FALLBACK = 2;
 const INFLATION_BACK_OFFICE_FALLBACK = 2;
 const INFLATION_DIVERS_FALLBACK = 2;
 const METHODE_TAXES_FALLBACK = "appreciation_directe";
+const IFER_RATE_1_FALLBACK = 3.5;
+const IFER_RATE_2_FALLBACK = 8.5;
+const IFER_RPN_FALLBACK = 1.35;
+const INFLATION_AURORA_FALLBACK = 2;
 const TAUX_LF_AD = 0.08;
 const TAUX_LF_COMPTA = 0.04;
 const ABATT_IMMO = 0.30;
@@ -109,6 +113,10 @@ export type FinanceEngineInput = FinancialAssumptions & {
   prixTerrainHa?: number | null;
   abattTerrain?: number | null;
   inflationTaxes?: number | null;
+  iferRate1?: number | null;
+  iferRate2?: number | null;
+  iferRpn?: number | null;
+  inflationAurora?: number | null;
 };
 
 export type FinanceEngineResult = {
@@ -126,6 +134,8 @@ export type FinanceEngineResult = {
   contingencyKeuro: number;
   tfAnnuelleKeuro: number;
   cfeAnnuelleKeuro: number;
+  iferKeuroAn1: number;
+  iferKeuroAn21: number;
 };
 
 export type AnnualCashFlow = {
@@ -225,6 +235,7 @@ export type OpexDetails = {
   loyerKeuro: number;
   assuranceKeuro: number;
   balancingKeuro: number;
+  iferKeuro: number;
   baseTaxesKeuro: number;
   tfKeuro: number;
   cfeKeuro: number;
@@ -505,7 +516,10 @@ function hasDetailedOpexInput(input: FinanceEngineInput) {
     input.tauxCCI != null ||
     input.prixTerrainHa != null ||
     input.abattTerrain != null ||
-    input.inflationTaxes != null
+    input.inflationTaxes != null ||
+    input.iferRate1 != null ||
+    input.iferRate2 != null ||
+    input.iferRpn != null
   );
 }
 
@@ -517,6 +531,18 @@ function taxeLocale(baseEuro: number, taux: number[], frais: readonly number[]) 
   );
 
   return composantes.reduce((total, composante) => total + composante, 0) + fraisGestion;
+}
+
+function calculateIferKeuro(input: FinanceEngineInput, year: number) {
+  const rpn = input.iferRpn ?? IFER_RPN_FALLBACK;
+  const puissanceInjectee = rpn > 0 ? input.capacityMw / rpn : 0;
+  const contractDuration = input.contractDuration ?? CONTRACT_DURATION_FALLBACK;
+  const iferRate =
+    year <= contractDuration
+      ? input.iferRate1 ?? IFER_RATE_1_FALLBACK
+      : input.iferRate2 ?? IFER_RATE_2_FALLBACK;
+
+  return puissanceInjectee * iferRate;
 }
 
 export function calculateTaxesFoncieres(
@@ -713,6 +739,7 @@ export function calculateOpexDetails(
   const assuranceKeuro =
     assuranceRate * revenueP50Keuro * (1 + inflationAssurance) ** year;
   const balancingKeuro = (balancingCost * productionP50Mwh) / 1000;
+  const iferKeuro = calculateIferKeuro(input, year);
   const hasDetailedOpex = hasDetailedOpexInput(input);
   const taxesLocales = calculateTaxesFoncieres(
     input,
@@ -727,6 +754,7 @@ export function calculateOpexDetails(
       legacyOpexKeuro +
       assuranceKeuro +
       balancingKeuro +
+      iferKeuro +
       taxesLocales.tfKeuro +
       taxesLocales.cfeKeuro;
 
@@ -739,6 +767,7 @@ export function calculateOpexDetails(
       loyerKeuro: 0,
       assuranceKeuro,
       balancingKeuro,
+      iferKeuro,
       baseTaxesKeuro: taxesLocales.baseTaxesKeuro,
       tfKeuro: taxesLocales.tfKeuro,
       cfeKeuro: taxesLocales.cfeKeuro,
@@ -782,6 +811,7 @@ export function calculateOpexDetails(
     loyerKeuro +
     assuranceKeuro +
     balancingKeuro +
+    iferKeuro +
     taxesLocales.tfKeuro +
     taxesLocales.cfeKeuro;
 
@@ -794,6 +824,7 @@ export function calculateOpexDetails(
     loyerKeuro,
     assuranceKeuro,
     balancingKeuro,
+    iferKeuro,
     baseTaxesKeuro: taxesLocales.baseTaxesKeuro,
     tfKeuro: taxesLocales.tfKeuro,
     cfeKeuro: taxesLocales.cfeKeuro,
@@ -1214,12 +1245,21 @@ function buildPreRows(
       auroraCurveByYear,
       year,
     );
+    const auroraInflationFactor =
+      year > contractDuration
+        ? (1 + asRate(input.inflationAurora ?? INFLATION_AURORA_FALLBACK)) **
+          (year - contractDuration)
+        : 1;
     // Tariff year N applies during the contract period, then merchant prices take over.
     const annualTariff =
-      year <= contractDuration ? contractedTariff : merchantPrices.investorPrice;
+      year <= contractDuration
+        ? contractedTariff
+        : merchantPrices.investorPrice * auroraInflationFactor;
 
     const annualTariffP90 =
-      year <= contractDuration ? contractedTariff : merchantPrices.debtSizingPrice;
+      year <= contractDuration
+        ? contractedTariff
+        : merchantPrices.debtSizingPrice * auroraInflationFactor;
 
     // Revenue kEUR = production MWh * price EUR/MWh / 1000.
     const revenueP50 = (productionP50 * annualTariff) / 1000;
@@ -1477,6 +1517,8 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
     capexTotalKeuro,
   });
   const taxesLocales = calculateTaxesFoncieres(input, input.capex * input.capacityMw);
+  const iferKeuroAn1 = calculateIferKeuro(input, 1);
+  const iferKeuroAn21 = calculateIferKeuro(input, 21);
   const initialInvestment = capexTotalKeuro + financingFees.financingFeesKeuro;
   const financing = calculateFinancing(input);
   const annualCashFlows = financing.annualCashFlows;
@@ -1584,6 +1626,8 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
     contingencyKeuro: round(calculateCapexDetails(input).contingencyKeuro),
     tfAnnuelleKeuro: round(taxesLocales.tfAnnuelleKeuro),
     cfeAnnuelleKeuro: round(taxesLocales.cfeAnnuelleKeuro),
+    iferKeuroAn1: round(iferKeuroAn1),
+    iferKeuroAn21: round(iferKeuroAn21),
     sizing: sizing !== null
       ? {
           ...sizing,

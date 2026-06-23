@@ -36,6 +36,9 @@ type OpexDetailInitialValue = {
   prixTerrainHa?: number | null;
   abattTerrain?: number | null;
   inflationTaxes?: number | null;
+  iferRate1?: number | null;
+  iferRate2?: number | null;
+  iferRpn?: number | null;
 };
 
 type OpexDetailFieldsProps = {
@@ -163,6 +166,8 @@ export function OpexDetailFields({
   const [inflationTaxes, setInflationTaxes] = useState(
     initialNumber(initialValue.inflationTaxes, "0.4"),
   );
+  const [iferRate1, setIferRate1] = useState(initialNumber(initialValue.iferRate1, "3.5"));
+  const [iferRate2, setIferRate2] = useState(initialNumber(initialValue.iferRate2, "8.5"));
 
   const capexPerMwKeuro = useSyncedFormNumber("capex", 0);
   const surfaceHa = useSyncedFormNumber(
@@ -257,6 +262,9 @@ export function OpexDetailFields({
           prixTerrainHa: parseNumber(prixTerrainHa),
           abattTerrain: parseNumber(abattTerrain),
           inflationTaxes: parseNumber(inflationTaxes),
+          iferRate1: parseNumber(iferRate1),
+          iferRate2: parseNumber(iferRate2),
+          iferRpn: initialValue.iferRpn,
         },
         1,
         revenueP50Keuro,
@@ -278,6 +286,8 @@ export function OpexDetailFields({
       inflationOM,
       inflationTaxes,
       initialValue.opex,
+      iferRate1,
+      iferRate2,
       loyerInflation,
       loyerMode,
       loyerValeur,
@@ -305,6 +315,7 @@ export function OpexDetailFields({
   return (
     <section className="grid gap-4 rounded-md border border-zinc-200 bg-zinc-50 p-4">
       <input type="hidden" name="opex" value={details.opexPerMwKeuro} />
+      <input type="hidden" name="iferRpn" value={initialValue.iferRpn ?? 1.35} />
       <h2 className="text-sm font-semibold text-zinc-950">OPEX detaille</h2>
       <div className="grid gap-5 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
@@ -542,6 +553,38 @@ export function OpexDetailFields({
           <span className="badge badge-yellow">Taux non renseignés - TF et CFE = 0</span>
         ) : null}
       </div>
+      <div className="grid gap-4 border-t border-zinc-200 pt-4">
+        <h3 className="text-sm font-semibold text-zinc-950">IFER</h3>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            <span>IFER années 1-20 (k€/MW injecté/an) <span className="badge-default">Défaut</span></span>
+            <input
+              name="iferRate1"
+              type="number"
+              min="0"
+              step="0.01"
+              value={iferRate1}
+              onChange={(event) => setIferRate1(event.target.value)}
+              placeholder="ex. 3.5"
+              title="Imposition Forfaitaire sur les Entreprises de Réseau — barème années 1 à 20"
+              className={defaultInputClass(iferRate1, "3.5")}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            <span>IFER années 21+ (k€/MW injecté/an) <span className="badge-default">Défaut</span></span>
+            <input
+              name="iferRate2"
+              type="number"
+              min="0"
+              step="0.01"
+              value={iferRate2}
+              onChange={(event) => setIferRate2(event.target.value)}
+              placeholder="ex. 8.5"
+              className={defaultInputClass(iferRate2, "8.5")}
+            />
+          </label>
+        </div>
+      </div>
       <div className="grid gap-2 border-t border-zinc-200 pt-4 text-sm">
         <div className="flex justify-between gap-4">
           <span className="text-zinc-500">O&M</span>
@@ -577,6 +620,12 @@ export function OpexDetailFields({
           <span className="text-zinc-500">Balancing</span>
           <span className="font-medium text-zinc-950">
             {formatKeuro(details.balancingKeuro)}
+          </span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span className="text-zinc-500">IFER</span>
+          <span className="font-medium text-zinc-950">
+            {formatKeuroDecimal(details.iferKeuro)}
           </span>
         </div>
         <div className="mt-2 flex justify-between gap-4 border-t border-zinc-300 pt-3">

@@ -215,11 +215,13 @@ function AuroraPriceCurveFields({
   investorCurveW = 1,
   debtSizingCentralW = 0.7,
   debtSizingLowW = 0.3,
+  inflationAurora = DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationAurora,
 }: {
   status: AuroraStatus;
   investorCurveW?: number | null;
   debtSizingCentralW?: number | null;
   debtSizingLowW?: number | null;
+  inflationAurora?: number | null;
 }) {
   const investorCurveDefault = (investorCurveW ?? 1) * 100;
   const debtSizingCentralDefault = (debtSizingCentralW ?? 0.7) * 100;
@@ -268,6 +270,19 @@ function AuroraPriceCurveFields({
                 step="0.01"
                 defaultValue={debtSizingLowDefault}
                 title="Central + Low doit etre egal a 100 %."
+                className="h-10 px-3"
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+              <span>Inflation Aurora post-contrat (%/an) <span className="badge-default">Defaut</span></span>
+              <DefaultNumberInput
+                name="inflationAurora"
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue={inflationAurora ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationAurora}
+                placeholder="ex. 2"
+                title="Inflation annuelle appliquee aux prix Aurora apres la periode contractuelle."
                 className="h-10 px-3"
               />
             </label>
@@ -471,6 +486,7 @@ export default async function EditScenarioPage({
           investorCurveW={scenario.project.investorCurveW}
           debtSizingCentralW={scenario.project.debtSizingCentralW}
           debtSizingLowW={scenario.project.debtSizingLowW}
+          inflationAurora={scenario.inflationAurora}
         />
 
         <section className="form-section">
@@ -547,6 +563,9 @@ export default async function EditScenarioPage({
               scenario.abattTerrain ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.abattTerrain,
             inflationTaxes:
               scenario.inflationTaxes ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationTaxes,
+            iferRate1: scenario.iferRate1 ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.iferRate1,
+            iferRate2: scenario.iferRate2 ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.iferRate2,
+            iferRpn: scenario.iferRpn ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.iferRpn,
           }}
         />
 
