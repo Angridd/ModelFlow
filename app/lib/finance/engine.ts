@@ -55,6 +55,8 @@ export type FinanceEngineInput = FinancialAssumptions & {
   structuringFeeRate?: number | null;
   tauxIS?: number | null;
   amortDuree?: number | null;
+  capexType1Keuro?: number | null;
+  capexType2Keuro?: number | null;
   margeDevKeuro?: number | null;
   dsraMonths?: number | null;
   devFeesKEuroPerMW?: number | null;
@@ -1254,9 +1256,18 @@ function buildAmortizationSchedule(
   initialInvestmentKeuro: number,
   amortDuree: number,
   projectLifeYears: number,
+  capexType1Keuro?: number | null,
+  capexType2Keuro?: number | null,
 ): AmortizationScheduleItem[] {
   const schedule: AmortizationScheduleItem[] = [];
-  let vncKeuro = Math.max(0, initialInvestmentKeuro);
+  const hasTypedCapex = capexType1Keuro != null || capexType2Keuro != null;
+  let type1OutstandingKeuro = hasTypedCapex
+    ? Math.max(0, capexType1Keuro ?? 0)
+    : Math.max(0, initialInvestmentKeuro);
+  let type2OutstandingKeuro = hasTypedCapex
+    ? Math.max(0, capexType2Keuro ?? 0)
+    : 0;
+  let vncKeuro = type1OutstandingKeuro + type2OutstandingKeuro;
 
   if (projectLifeYears <= 0) {
     return schedule;
@@ -1272,23 +1283,32 @@ function buildAmortizationSchedule(
 
   const linearRate = 1 / amortDuree;
   const degressiveRate = linearRate * degressiveAmortizationCoefficient(amortDuree);
+  const type2AnnualAmortKeuro = type2OutstandingKeuro / amortDuree;
 
   for (let year = 1; year <= projectLifeYears; year += 1) {
-    let amort = 0;
+    let type1AmortKeuro = 0;
+    let type2AmortKeuro = 0;
 
-    if (year <= amortDuree && vncKeuro > 0) {
+    if (year <= amortDuree && type1OutstandingKeuro > 0) {
       const remainingYears = amortDuree - year + 1;
-      const degressiveAmort = vncKeuro * degressiveRate;
-      const linearAmort = remainingYears > 0 ? vncKeuro / remainingYears : vncKeuro;
-      amort = Math.max(degressiveAmort, linearAmort);
-
-      if (vncKeuro - amort < 0) {
-        amort = vncKeuro;
-      }
-
-      vncKeuro = Math.max(0, vncKeuro - amort);
+      const degressiveAmort = type1OutstandingKeuro * degressiveRate;
+      const linearAmort = remainingYears > 0
+        ? type1OutstandingKeuro / remainingYears
+        : type1OutstandingKeuro;
+      type1AmortKeuro = Math.min(
+        type1OutstandingKeuro,
+        Math.max(degressiveAmort, linearAmort),
+      );
+      type1OutstandingKeuro = Math.max(0, type1OutstandingKeuro - type1AmortKeuro);
     }
 
+    if (year <= amortDuree && type2OutstandingKeuro > 0) {
+      type2AmortKeuro = Math.min(type2OutstandingKeuro, type2AnnualAmortKeuro);
+      type2OutstandingKeuro = Math.max(0, type2OutstandingKeuro - type2AmortKeuro);
+    }
+
+    const amort = type1AmortKeuro + type2AmortKeuro;
+    vncKeuro = type1OutstandingKeuro + type2OutstandingKeuro;
     schedule.push({ amort, vncKeuro });
   }
 
@@ -1320,6 +1340,8 @@ function buildPreRows(
     initialInvestment,
     input.amortDuree ?? input.projectLifeYears,
     input.projectLifeYears,
+    input.capexType1Keuro,
+    input.capexType2Keuro,
   );
   const contractDuration = input.contractDuration ?? CONTRACT_DURATION_FALLBACK;
   const auroraCurveByYear = buildAuroraCurveByYear(input);

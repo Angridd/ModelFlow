@@ -75,6 +75,8 @@ function baugeInput(): FinanceEngineInput {
     // Fiscal
     tauxIS: 25,
     amortDuree: 20,
+    capexType1Keuro: 3404.172,
+    capexType2Keuro: 2270.0,
     // SHL / CCA
     ccaApportKeuro: 789,
     ccaRemunRate: 5,
@@ -176,6 +178,16 @@ describe("calibration Baugé — ligne par ligne", () => {
       const bp = (BP.ebitda as Record<number, number>)[y];
       console.log(
         `an ${String(y).padStart(2)} | MF ${fmt(r?.cashFlowKeuro ?? 0).padStart(7)} | BP ${bp != null ? fmt(bp).padStart(7) : "   —   "}`,
+      );
+    }
+
+    console.log("\n=== LIGNE 5 — AMORTISSEMENT (k€) ===");
+    const BP_amort = { 1: 496.5, 2: 453.4, 5: 351.1, 10: 244.3, 13: 215.1, 21: 215.1 };
+    for (const y of [1, 2, 5, 10, 13, 21]) {
+      const r = ops.find((x) => x.year === y);
+      const bp = (BP_amort as Record<number, number>)[y];
+      console.log(
+        `an ${String(y).padStart(2)} | MF ${(r?.amort ?? 0).toFixed(1).padStart(7)} | BP ${bp != null ? bp.toFixed(1).padStart(7) : "   —   "}`,
       );
     }
 
