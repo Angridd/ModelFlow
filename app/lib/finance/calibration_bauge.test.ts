@@ -1,8 +1,5 @@
 import { describe, it } from "vitest";
-import {
-  calculateAnnualCashFlows,
-  calculateOpexDetails,
-} from "@/app/lib/finance/engine";
+import { calculateAnnualCashFlows } from "@/app/lib/finance/engine";
 import type { FinanceEngineInput } from "@/app/lib/finance/engine";
 
 // ---------------------------------------------------------------------------
@@ -82,6 +79,15 @@ function baugeInput(): FinanceEngineInput {
     ccaRemunRate: 5,
     // Aurora (year, central, low)
     inflationAurora: 2,
+    capacityCertificateMw: 0.2,
+    goStartYear: 21,
+    goPriceBase: 1,
+    capacityPriceCurve: [
+      23.53, 5.40, 30.84, 30.79, 30.22, 29.57, 30.64, 30.58, 30.53, 29.06,
+      29.06, 5.40, 5.40, 5.40, 5.40, 70.63, 70.63, 74.03, 74.03, 70.69,
+      70.69, 88.00, 88.00, 68.78, 68.78, 21.63, 21.63, 22.35, 22.35, 22.35,
+      22.35, 61.34, 61.34, 61.44, 61.44, 84.90,
+    ],
     investorCurveW: 1,
     debtSizingCentralW: 0.7,
     debtSizingLowW: 0.3,
@@ -201,11 +207,5 @@ describe("calibration Baugé — ligne par ligne", () => {
       );
     }
 
-    const inp = baugeInput();
-    const rev1 = ops.find((x) => x.year === 1)?.revenueP50Keuro ?? 0;
-    const prod1 = ops.find((x) => x.year === 1)?.productionP50Mwh ?? 0;
-    const opex1 = calculateOpexDetails(inp, 1, rev1, prod1);
-    console.log("\n=== DÉTAIL OPEX AN 1 (MF, k€) ===");
-    console.log(JSON.stringify(opex1, null, 2));
   });
 });

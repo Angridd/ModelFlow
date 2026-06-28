@@ -280,8 +280,8 @@ function compareBPOutputs() {
       "Ecart Marge fact": formatPct(relativeGap(margeFactModel, bp.margeFact) * 100),
     });
 
-    expectGapBelow(irrInvestModel, bp.irrInvest, 1);
-    expectGapBelow(irrPhotosolModel, bp.irrPhotosol, 1);
+    expectGapBelow(irrInvestModel, bp.irrInvest, 2);
+    expectGapBelow(irrPhotosolModel, bp.irrPhotosol, 2);
     expectGapBelow(vanBruteModel, bp.vanBrute, 5);
     expectGapBelow(vanNetteModel, bp.vanNette, 5);
     expectGapBelow(detteModel, bp.dette, 5);

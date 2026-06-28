@@ -81,6 +81,10 @@ export type FinanceEngineInput = FinancialAssumptions & {
     central: number;
     low: number;
   }> | null;
+  capacityPriceCurve?: number[];
+  capacityCertificateMw?: number;
+  goStartYear?: number;
+  goPriceBase?: number;
   debtSizingCentralW?: number | null;
   debtSizingLowW?: number | null;
   investorCurveW?: number | null;
@@ -1360,7 +1364,7 @@ function buildPreRows(
     // P90 production year N = yield P90 MWh/MW/year * MW * annual degradation.
     const productionP90 = effectiveYieldP90 * input.capacityMw * degradationFactor;
 
-    const contractedTariff = input.tariff * (1 + tariffInflationRate) ** year;
+    const contractedTariff = input.tariff * (1 + tariffInflationRate) ** (year - 1);
     const merchantPrices = resolveMerchantPrices(
       input,
       auroraCurveByYear,
@@ -1379,19 +1383,46 @@ function buildPreRows(
 
     // Revenue kEUR = production MWh * price EUR/MWh / 1000.
     const revenueP50 = (productionP50 * annualTariff) / 1000;
+
+    // Capacity certificate revenue, inflated from the fixed 2024 BP base year.
+    const calendarYear = (input.commissioningYear ?? 0) + year - 1;
+    const capacityPriceCurve = input.capacityPriceCurve ?? [];
+    const capacityIdx = calendarYear - 2025;
+    const capacityPriceBrut =
+      capacityIdx >= 0 && capacityIdx < capacityPriceCurve.length
+        ? capacityPriceCurve[capacityIdx]
+        : (capacityPriceCurve.length > 0
+            ? capacityPriceCurve[capacityPriceCurve.length - 1]
+            : 0);
+    const capacityInflation =
+      (1 + asRate(input.inflationAurora ?? 2)) ** (calendarYear - 2024);
+    const capacityKw = (input.capacityCertificateMw ?? 0) * 1000;
+    const revenueCapacityKeuro =
+      (capacityPriceBrut * capacityInflation * capacityKw) / 1000;
+
+    // Guarantees of origin start at the configured project year.
+    const hasGoRevenue = input.goStartYear != null || input.goPriceBase != null;
+    const goStartYear = input.goStartYear ?? 21;
+    const goPriceBase = input.goPriceBase ?? 1;
+    const goInflation = (1 + asRate(input.inflationOM ?? 2)) ** (year - 1);
+    const revenueGoKeuro =
+      hasGoRevenue && year >= goStartYear
+        ? (goPriceBase * goInflation * productionP50) / 1000
+        : 0;
+    const revenueP50Total = revenueP50 + revenueCapacityKeuro + revenueGoKeuro;
     const revenueP90 = (productionP90 * annualTariffP90) / 1000;
 
     const annualOpex =
       calculateOpexDetails(
         input,
         year,
-        revenueP50,
+        revenueP50Total,
         productionP50,
         baseCapexKeuro,
       ).opexTotalKeuro;
 
     // Equity cash-flow (P50) kEUR = revenue P50 - OPEX (project NPV/IRR base).
-    const cfadsP50 = revenueP50 - annualOpex;
+    const cfadsP50 = revenueP50Total - annualOpex;
 
     // Banking CFADS (P90) kEUR = revenue P90 - OPEX (DSCR sizing base).
     const cfadsP90 = revenueP90 - annualOpex;
@@ -1411,7 +1442,7 @@ function buildPreRows(
       annualTariff,
       productionP50Mwh: productionP50,
       productionP90Mwh: productionP90,
-      revenueP50Keuro: revenueP50,
+      revenueP50Keuro: revenueP50Total,
       revenueP90Keuro: revenueP90,
       opexKeuro: annualOpex,
       cashFlowKeuro: cfadsP50,
