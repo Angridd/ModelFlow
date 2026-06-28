@@ -468,24 +468,39 @@ function resolveMerchantPrices(
   auroraCurveByYear: Map<number, { high: number; central: number; low: number }>,
   projectYear: number,
 ) {
-  const calendarYear =
-    input.commissioningYear != null && input.commissioningYear > 0
-      ? input.commissioningYear + projectYear - 1
-      : projectYear;
+  const hasCalendarYears = input.commissioningYear != null && input.commissioningYear > 0;
+  const calendarYear = hasCalendarYears
+    ? input.commissioningYear! + projectYear - 1
+    : projectYear;
   const auroraCurve = auroraCurveByYear.get(calendarYear);
+  const inflationRate = asRate(input.inflationAurora ?? INFLATION_AURORA_FALLBACK);
+  const contractDuration = input.contractDuration ?? CONTRACT_DURATION_FALLBACK;
+  const inflFactor = hasCalendarYears
+    ? (1 + inflationRate) ** (calendarYear - 2024)
+    : (1 + inflationRate) ** Math.max(0, projectYear - contractDuration);
 
   if (!auroraCurve) {
+    if (auroraCurveByYear.size === 0) {
+      return { investorPrice: 0, debtSizingPrice: 0 };
+    }
+
+    const lastYear = Math.max(...auroraCurveByYear.keys());
+    const lastCurve = auroraCurveByYear.get(lastYear)!;
     return {
-      investorPrice: 0,
-      debtSizingPrice: 0,
+      investorPrice: lastCurve.central * (input.investorCurveW ?? 1) * inflFactor,
+      debtSizingPrice:
+        (lastCurve.central * (input.debtSizingCentralW ?? 0.7) +
+          lastCurve.low * (input.debtSizingLowW ?? 0.3)) *
+        inflFactor,
     };
   }
 
   return {
-    investorPrice: auroraCurve.central * (input.investorCurveW ?? 1),
+    investorPrice: auroraCurve.central * (input.investorCurveW ?? 1) * inflFactor,
     debtSizingPrice:
-      auroraCurve.central * (input.debtSizingCentralW ?? 0.7) +
-      auroraCurve.low * (input.debtSizingLowW ?? 0.3),
+      (auroraCurve.central * (input.debtSizingCentralW ?? 0.7) +
+        auroraCurve.low * (input.debtSizingLowW ?? 0.3)) *
+      inflFactor,
   };
 }
 
@@ -685,6 +700,12 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
   };
 }
 
+function resolveBaseCapexKeuro(input: FinanceEngineInput) {
+  return input.capex > 0
+    ? input.capex * input.capacityMw
+    : calculateCapexDetails(input).capexTotalKeuro;
+}
+
 function hasFinancingFeesInput(input: FinancingFeesInput) {
   return (
     input.legalFeesKEuro != null ||
@@ -744,6 +765,7 @@ export function calculateOpexDetails(
   year: number,
   revenueP50Keuro: number,
   productionP50Mwh: number,
+  baseCapexKeuro?: number,
 ): OpexDetails {
   const assuranceRate = asRate(input.assuranceRate ?? ASSURANCE_RATE_FALLBACK);
   const inflationAssurance = asRate(
@@ -757,7 +779,7 @@ export function calculateOpexDetails(
   const hasDetailedOpex = hasDetailedOpexInput(input);
   const taxesLocales = calculateTaxesFoncieres(
     input,
-    input.capex * input.capacityMw,
+    baseCapexKeuro ?? resolveBaseCapexKeuro(input),
     year,
   );
 
@@ -1301,6 +1323,7 @@ function buildPreRows(
   );
   const contractDuration = input.contractDuration ?? CONTRACT_DURATION_FALLBACK;
   const auroraCurveByYear = buildAuroraCurveByYear(input);
+  const baseCapexKeuro = resolveBaseCapexKeuro(input);
   // P90 yield: use provided value or fall back to P50 * 0.93.
   const effectiveYieldP90 = input.yieldP90Mwh ?? input.yieldMwh * 0.93;
 
@@ -1321,28 +1344,29 @@ function buildPreRows(
       auroraCurveByYear,
       year,
     );
-    const auroraInflationFactor =
-      year > contractDuration
-        ? (1 + asRate(input.inflationAurora ?? INFLATION_AURORA_FALLBACK)) **
-          (year - contractDuration)
-        : 1;
     // Tariff year N applies during the contract period, then merchant prices take over.
     const annualTariff =
       year <= contractDuration
         ? contractedTariff
-        : merchantPrices.investorPrice * auroraInflationFactor;
+        : merchantPrices.investorPrice;
 
     const annualTariffP90 =
       year <= contractDuration
         ? contractedTariff
-        : merchantPrices.debtSizingPrice * auroraInflationFactor;
+        : merchantPrices.debtSizingPrice;
 
     // Revenue kEUR = production MWh * price EUR/MWh / 1000.
     const revenueP50 = (productionP50 * annualTariff) / 1000;
     const revenueP90 = (productionP90 * annualTariffP90) / 1000;
 
     const annualOpex =
-      calculateOpexDetails(input, year, revenueP50, productionP50).opexTotalKeuro;
+      calculateOpexDetails(
+        input,
+        year,
+        revenueP50,
+        productionP50,
+        baseCapexKeuro,
+      ).opexTotalKeuro;
 
     // Equity cash-flow (P50) kEUR = revenue P50 - OPEX (project NPV/IRR base).
     const cfadsP50 = revenueP50 - annualOpex;
@@ -1657,7 +1681,7 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
     ...input,
     capexTotalKeuro,
   });
-  const taxesLocales = calculateTaxesFoncieres(input, input.capex * input.capacityMw);
+  const taxesLocales = calculateTaxesFoncieres(input, resolveBaseCapexKeuro(input));
   const iferKeuroAn1 = calculateIferKeuro(input, 1);
   const iferKeuroAn21 = calculateIferKeuro(input, 21);
   const initialInvestment = capexTotalKeuro + financingFees.financingFeesKeuro;
