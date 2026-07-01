@@ -304,6 +304,33 @@ Revenus GO (k€)      : an1 0 · ... · an21 11.5 (démarre en merchant)
 Total OPEX (k€)      : an1 139.59 · an5 147.18 · an10 158.0 · an21 238.47
 EBITDA (k€)          : an1 495.97 · an5 488.81 · an10 471.98 · an21 391.14
 
+### Détail OPEX an1 Baugé (vérifié poste par poste vs BP)
+| Poste        | BP an1 (€) | Base de calcul                                    |
+|--------------|-----------|----------------------------------------------------|
+| O&M fixe     | ~32 100   | contrat O&M                                        |
+| MRA          | ~8 099    |                                                    |
+| Back-office  | ~22 500   |                                                    |
+| Divers       | ~8 611    |                                                    |
+| Loyer        | 15 000    |                                                    |
+| Assurance    | ~9 434    |                                                    |
+| Balancing    | 16 771    | **2 €/MWh × prod P50** (= 2 × 8385) — moteur OK ✅  |
+| IFER         | 19 108    | taux × puissance injectée (P/1.35) — moteur OK ✅   |
+| **Aléas**    | **3 178** | **0.5 % × revenu PV an1** (= 0.005 × 635 560)       |
+| TF           | 2 629     | Règle 6 ✅                                          |
+| CFE          | 2 165     | Règle 6 ✅                                          |
+| **TOTAL**    | **139 600** |                                                  |
+
+⚠️ **Poste Aléas** (0.5 % du revenu PV) était absent du moteur → cause de l'écart OPEX résiduel
+de −1.2 k€. Indexé sur le CA, donc grandit avec les revenus. Input `tauxAleas` (défaut 0.5 %).
+
+⚠️ Balancing (16 771 €) et IFER (19 108 €) sont **corrects** dans le moteur. Ne pas y toucher.
+
+⚠️ **Bug d'indexation OPEX an1** : le moteur applique l'inflation `(1.02)^year` dès l'année 1,
+alors que le BP garde les valeurs de base en an 1 (`^0 = 1`) et n'indexe qu'à partir de l'an 2.
+Symptôme : tous les postes fixes (O&M, MRA, back-office, divers) sont exactement +2 % trop hauts
+en an 1. Correction : indexation OPEX en `(1+infl)^(year−1)`, comme le tarif PPA (même bug déjà
+corrigé côté revenus). Vérification : 32.737 / 1.02 = 32.10 = BP ✓ sur tous les postes.
+
 Outputs cibles BP : TRI Investisseur **12.0 %** · VAN brute **1125 k€** · VAN nette **355 k€**
 · Dette **5217 k€** · Gearing **86.86 %** · CCA / Equity **789 k€**
 · TRI Projet brut 7.57 % · TRI Projet net 6.21 %.

@@ -139,6 +139,7 @@ export type FinanceEngineInput = FinancialAssumptions & {
   iferRate2?: number | null;
   iferRpn?: number | null;
   inflationAurora?: number | null;
+  aleasOpexRate?: number | null;
 };
 
 export type FinanceEngineResult = {
@@ -264,6 +265,7 @@ export type OpexDetails = {
   baseTaxesKeuro: number;
   tfKeuro: number;
   cfeKeuro: number;
+  aleasKeuro: number;
   opexTotalKeuro: number;
   opexPerMwKeuro: number;
 };
@@ -840,7 +842,7 @@ export function calculateOpexDetails(
   );
   const balancingCost = input.balancingCost ?? BALANCING_COST_FALLBACK;
   const assuranceKeuro =
-    assuranceRate * revenueP50Keuro * (1 + inflationAssurance) ** year;
+    assuranceRate * revenueP50Keuro * (1 + inflationAssurance) ** (year - 1);
   const balancingKeuro = (balancingCost * productionP50Mwh) / 1000;
   const iferKeuro = calculateIferKeuro(input, year);
   const hasDetailedOpex = hasDetailedOpexInput(input);
@@ -849,6 +851,8 @@ export function calculateOpexDetails(
     baseCapexKeuro ?? resolveBaseCapexKeuro(input),
     year,
   );
+
+  const aleasKeuro = asRate(input.aleasOpexRate ?? 0.5) * revenueP50Keuro;
 
   if (!hasDetailedOpex) {
     const legacyOpexKeuro =
@@ -859,7 +863,8 @@ export function calculateOpexDetails(
       balancingKeuro +
       iferKeuro +
       taxesLocales.tfKeuro +
-      taxesLocales.cfeKeuro;
+      taxesLocales.cfeKeuro +
+      aleasKeuro;
 
     return {
       hasDetailedOpex,
@@ -874,6 +879,7 @@ export function calculateOpexDetails(
       baseTaxesKeuro: taxesLocales.baseTaxesKeuro,
       tfKeuro: taxesLocales.tfKeuro,
       cfeKeuro: taxesLocales.cfeKeuro,
+      aleasKeuro,
       opexTotalKeuro,
       opexPerMwKeuro: input.capacityMw > 0 ? opexTotalKeuro / input.capacityMw : 0,
     };
@@ -882,17 +888,17 @@ export function calculateOpexDetails(
   const omKeuro =
     (input.omFixedEuroKwc ?? OM_FIXED_EURO_KWC_FALLBACK) *
     input.capacityMw *
-    (1 + asRate(input.inflationOM ?? INFLATION_OM_FALLBACK)) ** year;
+    (1 + asRate(input.inflationOM ?? INFLATION_OM_FALLBACK)) ** (year - 1);
   const mraKeuro =
     (input.mraEuroKwc ?? MRA_EURO_KWC_FALLBACK) *
     input.capacityMw *
-    (1 + asRate(input.inflationMRA ?? INFLATION_MRA_FALLBACK)) ** year;
+    (1 + asRate(input.inflationMRA ?? INFLATION_MRA_FALLBACK)) ** (year - 1);
   const backOfficeKeuro =
     (input.backOfficeKeuro ?? BACK_OFFICE_KEURO_FALLBACK) *
-    (1 + asRate(input.inflationBackOffice ?? INFLATION_BACK_OFFICE_FALLBACK)) ** year;
+    (1 + asRate(input.inflationBackOffice ?? INFLATION_BACK_OFFICE_FALLBACK)) ** (year - 1);
   const diversKeuro =
     (input.diversOpexKeuro ?? DIVERS_OPEX_KEURO_FALLBACK) *
-    (1 + asRate(input.inflationDivers ?? INFLATION_DIVERS_FALLBACK)) ** year;
+    (1 + asRate(input.inflationDivers ?? INFLATION_DIVERS_FALLBACK)) ** (year - 1);
   const loyerValeur = input.loyerValeur ?? 0;
   const loyerBaseKeuro =
     input.loyerMode === "fixe"
@@ -905,7 +911,7 @@ export function calculateOpexDetails(
             ? asRate(loyerValeur) * revenueP50Keuro
             : 0;
   const loyerKeuro =
-    loyerBaseKeuro * (1 + asRate(input.loyerInflation ?? LOYER_INFLATION_FALLBACK)) ** year;
+    loyerBaseKeuro * (1 + asRate(input.loyerInflation ?? LOYER_INFLATION_FALLBACK)) ** (year - 1);
   const opexTotalKeuro =
     omKeuro +
     mraKeuro +
@@ -916,7 +922,8 @@ export function calculateOpexDetails(
     balancingKeuro +
     iferKeuro +
     taxesLocales.tfKeuro +
-    taxesLocales.cfeKeuro;
+    taxesLocales.cfeKeuro +
+    aleasKeuro;
 
   return {
     hasDetailedOpex,
@@ -931,6 +938,7 @@ export function calculateOpexDetails(
     baseTaxesKeuro: taxesLocales.baseTaxesKeuro,
     tfKeuro: taxesLocales.tfKeuro,
     cfeKeuro: taxesLocales.cfeKeuro,
+    aleasKeuro,
     opexTotalKeuro,
     opexPerMwKeuro: input.capacityMw > 0 ? opexTotalKeuro / input.capacityMw : 0,
   };

@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { calculateAnnualCashFlows, calculateCapexDetails, calculateScenarioMetrics, calculateTaxesFoncieres } from "@/app/lib/finance/engine";
+import { calculateAnnualCashFlows, calculateCapexDetails, calculateOpexDetails, calculateScenarioMetrics, calculateTaxesFoncieres } from "@/app/lib/finance/engine";
 import type { FinanceEngineInput } from "@/app/lib/finance/engine";
 
 // ---------------------------------------------------------------------------
@@ -58,6 +58,7 @@ function baugeInput(): FinanceEngineInput {
     inflationMRA: 2,
     inflationBackOffice: 2,
     diversOpexKeuro: 8.611,
+    aleasOpexRate: 0.5,
     // Taxes — Appréciation Directe (Règle 6, base cadastrale commune = 7498 €)
     methodeTaxes: "appreciation_directe",
     baseFonciereKeuro: 168.257,
@@ -445,6 +446,74 @@ describe("calibration Baugé — CFADS P90 + sculpting DSCR", () => {
       console.log(`  an1 : CFADS P50=${an1.cashFlowKeuro.toFixed(2)} k€  CFADS P90=${an1.cfadsP90Keuro.toFixed(2)} k€  ratio=${(an1.cfadsP90Keuro / an1.cashFlowKeuro * 100).toFixed(1)}%`);
       console.log(`  an1 : revenus P50=${an1.revenueP50Keuro.toFixed(2)} k€  revenus P90=${an1.revenueP90Keuro.toFixed(2)} k€`);
     }
+  });
+});
+
+describe("calibration Baugé — OPEX an1 poste par poste", () => {
+  it("affiche le détail OPEX an1 vs BP", () => {
+    const input = baugeInput();
+    const capex = calculateCapexDetails(input);
+    const rows = calculateAnnualCashFlows(input);
+    const an1 = rows.find((r) => r.year === 1)!;
+
+    const opex = calculateOpexDetails(
+      input,
+      1,
+      an1.revenueP50Keuro,
+      an1.productionP50Mwh,
+      capex.capexTotalKeuro,
+    );
+
+    // Valeurs BP Baugé an1 (k€) — d'après onglet charges BP Excel
+    const BP_OPEX: Record<string, number | null> = {
+      om:          32.100,   // O&M fixe (4.585 €/kWc × 7 MWc ÷ 1000)
+      mra:          8.099,   // MRA (1.157 €/kWc × 7 MWc ÷ 1000)
+      backOffice:  22.500,   // back-office
+      divers:       8.611,   // divers
+      loyer:       15.000,   // 15 ha × 1000 €/ha
+      assurance:    9.434,   // 1.5% × revenu P50 628.9 k€
+      balancing:   16.772,   // 2 €/MWh × 8386 MWh / 1000
+      ifer:        19.108,   // IFER = (3.685 + 8.854 / 1.35) × 7 MWc
+      tf:           2.629,   // TF (BP exact 2629 €)
+      cfe:          2.165,   // CFE (BP exact 2165 €)
+      aleas:        3.178,   // 0.5% × revenu P50 635.6 k€
+      total:      139.600,   // Total OPEX an1 BP
+    };
+
+    console.log("\n=== OPEX AN1 — DÉTAIL POSTE PAR POSTE (k€) ===");
+    console.log(
+      `${"Poste".padEnd(20)} | ${"MF (k€)".padStart(10)} | ${"BP (k€)".padStart(10)} | ${"Δ (k€)".padStart(10)} | ${"Δ (€)".padStart(10)}`,
+    );
+    console.log("-".repeat(72));
+
+    const postes: Array<[string, number, number | null]> = [
+      ["O&M fixe",     opex.omKeuro,          BP_OPEX.om],
+      ["MRA",          opex.mraKeuro,          BP_OPEX.mra],
+      ["Back-office",  opex.backOfficeKeuro,   BP_OPEX.backOffice],
+      ["Divers",       opex.diversKeuro,       BP_OPEX.divers],
+      ["Loyer",        opex.loyerKeuro,        BP_OPEX.loyer],
+      ["Assurance",    opex.assuranceKeuro,    BP_OPEX.assurance],
+      ["Balancing",    opex.balancingKeuro,    BP_OPEX.balancing],
+      ["IFER",         opex.iferKeuro,         BP_OPEX.ifer],
+      ["TF",           opex.tfKeuro,           BP_OPEX.tf],
+      ["CFE",          opex.cfeKeuro,          BP_OPEX.cfe],
+      ["Aléas (0.5%)", opex.aleasKeuro,        BP_OPEX.aleas],
+    ];
+
+    for (const [label, mf, bp] of postes) {
+      const delta = bp != null ? mf - bp : null;
+      const deltaEuro = delta != null ? delta * 1000 : null;
+      console.log(
+        `${label.padEnd(20)} | ${mf.toFixed(3).padStart(10)} | ${bp != null ? bp.toFixed(3).padStart(10) : "         —"} | ${delta != null ? delta.toFixed(3).padStart(10) : "         —"} | ${deltaEuro != null ? deltaEuro.toFixed(0).padStart(10) : "         —"}`,
+      );
+    }
+
+    console.log("-".repeat(72));
+    console.log(
+      `${"TOTAL OPEX".padEnd(20)} | ${opex.opexTotalKeuro.toFixed(3).padStart(10)} | ${(BP_OPEX.total ?? 0).toFixed(3).padStart(10)} | ${(opex.opexTotalKeuro - (BP_OPEX.total ?? 0)).toFixed(3).padStart(10)} | ${((opex.opexTotalKeuro - (BP_OPEX.total ?? 0)) * 1000).toFixed(0).padStart(10)}`,
+    );
+
+    console.log(`\n  (an1 cashflow check : opexTotalKeuro=${opex.opexTotalKeuro.toFixed(3)} = opexKeuro=${an1.opexKeuro.toFixed(3)} ?  match=${Math.abs(opex.opexTotalKeuro - an1.opexKeuro) < 0.01})`);
   });
 });
 
