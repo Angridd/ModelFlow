@@ -416,36 +416,48 @@ describe("calibration Baugé — CFADS P90 + sculpting DSCR", () => {
     const metrics = calculateScenarioMetrics(input);
     const sizing = metrics.sizing;
 
-    // Valeurs BP P50 connues (pour référence) — pas de P90 BP explicite fourni
-    // BP CFADS P50 an1 ≈ 496k ; P90 ≈ P50 × (yieldP90/yieldP50) corrigé prix merchant
-    const watchYears = [1, 2, 5, 10, 21, 24];
+    // BP CFADS P90 (k€) — onglet sizing DSCR BP Excel (EBITDA P90 = revPV P90 − OPEX P90)
+    const BP_CFADS_P90: Record<number, number> = {
+      1: 446.459,
+      2: 443.985,
+      3: 441.455,
+      10: 436.222,
+    };
 
-    console.log("\n=== CFADS P90 + SCULPTING DSCR (moteur) ===");
-    console.log(`${"an".padStart(3)} | ${"prodP90(MWh)".padStart(12)} | ${"CFADS P90 (k€)".padStart(15)} | ${"DSCR cible".padStart(11)} | ${"dette svc sculpt (k€)".padStart(22)} | ${"CFADS P90/DSCR (k€)".padStart(21)}`);
-    console.log("-".repeat(100));
+    const watchYears = [1, 2, 3, 5, 10];
+
+    console.log("\n=== CFADS P90 — DÉCOMPOSITION vs BP (k€) ===");
+    console.log(
+      `${"an".padStart(3)} | ${"revP90".padStart(8)} | ${"balancP90".padStart(10)} | ${"opexP90".padStart(8)} | ${"cfadsP90 MF".padStart(12)} | ${"cfadsP90 BP".padStart(12)} | ${"Δ".padStart(7)}`,
+    );
+    console.log("-".repeat(78));
 
     for (const y of watchYears) {
       const r = ops.find((x) => x.year === y);
       if (!r) continue;
-      const dscrTarget = r.dscrTargetAtYear ?? 1.15;
-      const maxSvc = r.cfadsP90Keuro / dscrTarget;
+      const revP90 = r.revenueP90Keuro;
+      const cfadsP90MF = r.cfadsP90Keuro;
+      const opexP90MF = revP90 - cfadsP90MF;
+      const balancP90 = (input.balancingCost ?? 2) * r.productionP90Mwh / 1000;
+      const bpVal = BP_CFADS_P90[y];
+      const delta = bpVal != null ? cfadsP90MF - bpVal : null;
       console.log(
-        `${String(y).padStart(3)} | ${(r.productionP90Mwh).toFixed(0).padStart(12)} | ${r.cfadsP90Keuro.toFixed(2).padStart(15)} | ${dscrTarget.toFixed(2).padStart(11)} | ${(r.debtServiceSculptedKeuro ?? 0).toFixed(2).padStart(22)} | ${maxSvc.toFixed(2).padStart(21)}`,
+        `${String(y).padStart(3)} | ${revP90.toFixed(2).padStart(8)} | ${balancP90.toFixed(3).padStart(10)} | ${opexP90MF.toFixed(2).padStart(8)} | ${cfadsP90MF.toFixed(3).padStart(12)} | ${bpVal != null ? bpVal.toFixed(3).padStart(12) : "           —"} | ${delta != null ? delta.toFixed(3).padStart(7) : "      —"}`,
       );
     }
 
-    console.log("\n  → dette sculptée totale (NPV services) = sizing.debtSculptedKeuro");
+    console.log("\n=== SIZING après correction balancing P90 ===");
+    const capexTotal = metrics.debtAmountKeuro != null
+      ? (sizing?.debtRetenuKeuro ?? 0) / (sizing?.gearingActuel ?? 1)
+      : 0;
     console.log(`  debtSculptedKeuro   = ${(sizing?.debtSculptedKeuro ?? 0).toFixed(3)} k€`);
     console.log(`  debtGearingMaxKeuro = ${(sizing?.debtGearingMaxKeuro ?? 0).toFixed(3)} k€`);
-    console.log(`  debtRetenuKeuro     = ${(sizing?.debtRetenuKeuro ?? 0).toFixed(3)} k€`);
-
-    // Ratio P90/P50 an1 pour comprendre l'amplitude
-    const an1 = ops.find((x) => x.year === 1);
-    if (an1) {
-      console.log(`\n  an1 : prodP50=${an1.productionP50Mwh.toFixed(0)} MWh  prodP90=${an1.productionP90Mwh.toFixed(0)} MWh  ratio=${(an1.productionP90Mwh / an1.productionP50Mwh * 100).toFixed(1)}%`);
-      console.log(`  an1 : CFADS P50=${an1.cashFlowKeuro.toFixed(2)} k€  CFADS P90=${an1.cfadsP90Keuro.toFixed(2)} k€  ratio=${(an1.cfadsP90Keuro / an1.cashFlowKeuro * 100).toFixed(1)}%`);
-      console.log(`  an1 : revenus P50=${an1.revenueP50Keuro.toFixed(2)} k€  revenus P90=${an1.revenueP90Keuro.toFixed(2)} k€`);
-    }
+    console.log(`  debtRetenuKeuro     = ${(sizing?.debtRetenuKeuro ?? 0).toFixed(3)} k€  (BP : 5 216.873)`);
+    const cca = (sizing?.debtRetenuKeuro ?? 0) > 0
+      ? (sizing!.debtGearingMaxKeuro ?? 0) / (sizing!.gearingActuel!) - (sizing?.debtRetenuKeuro ?? 0)
+      : 0;
+    console.log(`  gearingActuel       = ${((sizing?.gearingActuel ?? 0) * 100).toFixed(2)} %  (BP : 86.86 %)`);
+    console.log(`\n  an1 : CFADS P50=${ops.find(r => r.year === 1)?.cashFlowKeuro.toFixed(2)} k€  CFADS P90=${ops.find(r => r.year === 1)?.cfadsP90Keuro.toFixed(3)} k€`);
   });
 });
 

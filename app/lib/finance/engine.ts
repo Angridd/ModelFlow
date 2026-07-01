@@ -1499,8 +1499,14 @@ function buildPreRows(
     // Equity cash-flow (P50) kEUR = revenue P50 - OPEX (project NPV/IRR base).
     const cfadsP50 = revenueP50Total - annualOpex;
 
-    // Banking CFADS (P90) kEUR = revenue P90 - OPEX (DSCR sizing base).
-    const cfadsP90 = revenueP90 - annualOpex;
+    // OPEX P90: same postes as P50 except balancing (prod P90) and aléas (rev P90).
+    const balancingCostVal = input.balancingCost ?? BALANCING_COST_FALLBACK;
+    const aleasRateVal = asRate(input.aleasOpexRate ?? 0.5);
+    const opexP90Keuro = annualOpex
+      + (balancingCostVal * (productionP90 - productionP50)) / 1000
+      + aleasRateVal * (revenueP90 - revenueP50Total);
+    // Banking CFADS (P90) kEUR = revenue P90 - OPEX P90 (DSCR sizing base).
+    const cfadsP90 = revenueP90 - opexP90Keuro;
 
     const debtService = year <= input.debtMaturityYears ? annualDebtService : 0;
     const standardDebtInterest =

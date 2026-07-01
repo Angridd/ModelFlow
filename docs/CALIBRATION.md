@@ -338,11 +338,39 @@ naturellement **CCA = 789 k€** (= CAPEX − dette sizée), conformément à la
 ## Valeurs de référence BP Baugé (pour la validation ligne par ligne)
 
 Production P50 (MWh) : an1 8385 · an2 8352 · an5 8251 · an10 8083 · an21 7782 · an35 7346
-Revenus PV (k€)      : an1 628.9 · an5 628.8 · an10 628.4 · an21 595.6
-Revenus capacity (k€): an1 6.66 · an5 7.16 · an10 1.40 · an21 22.5
+Revenus PV (k€)      : an1 628.9 · an5 628.8 · an10 628.4 · an21 595.6  (PV pur seul, ligne "Revenues PV" du BP)
+Revenus capacity (k€): an1 6.66 · an5 7.16 · an10 1.40 · an21 22.5  (ligne séparée "Revenues capacity certificate")
 Revenus GO (k€)      : an1 0 · ... · an21 11.5 (démarre en merchant)
+
+⚠️ Le revenu **total** an1 = 628.9 (PV) + 6.66 (capacity) = **635.56 k€** — calé au centime avec MF.
+Ne PAS comparer le total MF (635.6) au PV pur BP (628.9) : ce sont des périmètres différents.
+Le revenu P50 est calé ; les résiduels de sizing (+5.5k) et de cash SHL (+4.8k) viennent d'ailleurs
+(sculpting P90 et/ou écart cash-available du BP), pas du revenu P50.
 Total OPEX (k€)      : an1 139.59 · an5 147.18 · an10 158.0 · an21 238.47
 EBITDA (k€)          : an1 495.97 · an5 488.81 · an10 471.98 · an21 391.14
+
+### Scénario P90 (debt sizing) — onglet C_P90 du BP
+
+Le sizing dette utilise le scénario **P90** (irradiation 1114 kWh/kWp vs 1198 en P50).
+```
+Production PV P90 (MWh) : an1 7798 · an2 7767 · an3 7736 · an4 7705 · an5 7674
+Revenue PV P90 (€)      : an1 584 875 · an2 584 865 · an3 584 847 · an4 584 818 · an5 584 780
+OPEX total P90 (€)      : an1 138 416 · an2 140 880 · an3 143 392 · an4 145 951 · an5 148 559
+EBITDA P90 (€)          : an1 446 459 · an2 443 985 · an3 441 455 · an4 438 867 · an5 436 222
+```
+
+⚠️ **DEUX différences P90 vs P50 (cruciales pour le sizing) :**
+
+1. **Capacity et GO EXCLUS en P90** : en scénario de sizing, le BP ne compte QUE le revenu PV pur.
+   Revenue capacity P90 = 0 (vs 6 663 en P50), Revenue GO P90 = 0. Prudence : la dette n'est
+   dimensionnée que sur le revenu contracté le plus sûr. Vérification :
+   `EBITDA P90 an1 = 584 875 (PV) − 0 (capacity) − 0 (GO) − 138 416 (OPEX) = 446 459 €` ✓ (pile).
+
+2. **Balancing suit la production P90** : an1 P90 = 15 537 € (= 2 €/MWh × 7798) vs P50 16 772 €.
+   Les postes fixes (O&M, loyer, IFER, TF/CFE, aléas) sont identiques.
+
+CFADS/EBITDA P90 an1 BP = **446 459 €** (moteur actuel : 445.13k, Δ −1.3k → probablement
+capacity incluse à tort OU balancing P50 au lieu de P90). Résiduel dette MF +5.5k à investiguer ici.
 
 ### Détail OPEX an1 Baugé (vérifié poste par poste vs BP)
 | Poste        | BP an1 (€) | Base de calcul                                    |
