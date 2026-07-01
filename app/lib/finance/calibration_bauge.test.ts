@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { calculateAnnualCashFlows } from "@/app/lib/finance/engine";
+import { calculateAnnualCashFlows, calculateCapexDetails } from "@/app/lib/finance/engine";
 import type { FinanceEngineInput } from "@/app/lib/finance/engine";
 
 // ---------------------------------------------------------------------------
@@ -39,7 +39,8 @@ function baugeInput(): FinanceEngineInput {
     tauxEURUSD: 1.16,
     boSCtWc: 35,
     raccordementOuvrageKEuro: 1500,
-    otherSoftCapexKeuro: 90,
+    indemnitesImmoKeuro: 50,
+    financingFeesKeuro: 241.906,
     contingencyRate: 2,
     devFeesKEuroPerMW: 110,
     // OPEX
@@ -144,6 +145,95 @@ function fmt(n: number, dec = 1) {
   return Number.isFinite(n) ? n.toFixed(dec) : "—";
 }
 
+// ---------------------------------------------------------------------------
+// BP Baugé — ventilation CAPEX de référence (onglet CAPEX du BP Excel, en k€)
+// Source : Règle 3 CALIBRATION.md + onglet CAPEX BP
+// Type 1 (dégressif) = modules + BoS + EPC/MOD    = 3 404.172 k€
+// Type 2 (linéaire)  = raccordement + other capex  = 2 270.000 k€
+//   dont raccordement ouvrage                       = 1 500.000 k€
+//   dont other capex (amortissable)                 =   770.000 k€  ← dev fees 110 k€/MW × 7
+// No D&A             = démantèlement + otherSoft +  ≈   332.000 k€
+//                      financing fees + etc.
+// TOTAL                                             = 6 005.975 k€ (≈ 6 006 k€)
+// ---------------------------------------------------------------------------
+const BP_CAPEX = {
+  modules:        954.172,   // type1 (3 404.172) − BoS (2 450) − contingency(≈0, dans type1?)
+  bos:           2450.000,   // 35 ct€/Wc × 7 MWc = 2 450 k€
+  raccordement:  1500.000,
+  devFees:        770.000,   // 110 k€/MW × 7 = 770 k€ (= other capex amortissable type2)
+  contingency:     49.000,   // ~2 % de BoS seul (hors modules) ≈ 49 k€ — inclus type1 BP
+  otherSoft:       90.000,   // champ otherSoftCapexKeuro (90 dans test, 50 corrigé CALIB.md)
+  taxesFoncieres:  40.000,   // taxe aménagement + archéo (estimé)
+  noDaOther:      152.803,   // solde No D&A (démantèlement, financing, etc.)
+  total:         6005.975,
+};
+
+describe("calibration Baugé — CAPEX poste par poste", () => {
+  it("affiche le détail CAPEX moteur vs BP", () => {
+    const input = baugeInput();
+    const capex = calculateCapexDetails(input);
+
+    console.log("\n=== CAPEX DETAIL MOTEUR vs BP Baugé (en k€) ===");
+    console.log(
+      `${"Poste".padEnd(30)} | ${"MF (k€)".padStart(10)} | ${"BP (k€)".padStart(10)} | ${"Δ (k€)".padStart(10)}`,
+    );
+    console.log("-".repeat(70));
+
+    const rows: Array<[string, number, number | null]> = [
+      ["Modules (prixModule USD/Wc)",     capex.modulesKeuro,       BP_CAPEX.modules],
+      ["BoS (boSCtWc)",                   capex.boSKeuro,           BP_CAPEX.bos],
+      ["Raccordement ouvrage",            capex.raccordementKeuro,  BP_CAPEX.raccordement],
+      ["Apport affaire",                  capex.apportAffaireKeuro, null],
+      ["Dev fees (devFeesKEuroPerMW)",    capex.devFeesKeuro,       BP_CAPEX.devFees],
+      ["Contingency (% BoS)",             capex.contingencyKeuro,   BP_CAPEX.contingency],
+      ["Taxe aménagement",                capex.taxeAmenagementKeuro, null],
+      ["Taxe archéo",                     capex.taxeArcheoKeuro,    null],
+      ["Taxes foncières (total)",         capex.taxesFoncieresKeuro, BP_CAPEX.taxesFoncieres],
+      ["Indemnités immo (No D&A)",        capex.indemnitesImmoKeuro, 50],
+      ["Financing fees (No D&A)",         capex.financingFeesKeuro,  241.906],
+    ];
+
+    for (const [label, mf, bp] of rows) {
+      const delta = bp != null ? mf - bp : null;
+      console.log(
+        `${label.padEnd(30)} | ${mf.toFixed(1).padStart(10)} | ${bp != null ? bp.toFixed(1).padStart(10) : "         —"} | ${delta != null ? delta.toFixed(1).padStart(10) : "         —"}`,
+      );
+    }
+
+    console.log("-".repeat(70));
+    console.log(
+      `${"TOTAL CAPEX".padEnd(30)} | ${capex.capexTotalKeuro.toFixed(1).padStart(10)} | ${BP_CAPEX.total.toFixed(1).padStart(10)} | ${(capex.capexTotalKeuro - BP_CAPEX.total).toFixed(1).padStart(10)}`,
+    );
+
+    console.log("\n--- Détail formule modules ---");
+    const prixModule = input.prixModuleUSDWc ?? 0;
+    const tauxEURUSD = input.tauxEURUSD ?? 1.16;
+    console.log(`  prixModuleUSDWc = ${prixModule} USD/Wc`);
+    console.log(`  tauxEURUSD      = ${tauxEURUSD}`);
+    console.log(`  formule actuelle : ${prixModule} / 100 / ${tauxEURUSD} = ${(prixModule / 100 / tauxEURUSD).toFixed(6)} €/Wc`);
+    console.log(`  formule correcte : ${prixModule} / ${tauxEURUSD}       = ${(prixModule / tauxEURUSD).toFixed(6)} €/Wc`);
+    console.log(`  modules actuels  : ${capex.modulesKeuro.toFixed(3)} k€`);
+    console.log(`  modules corrigés : ${(prixModule / tauxEURUSD * input.capacityMw * 1_000_000 / 1000).toFixed(3)} k€  (cible BP ≈ ${BP_CAPEX.modules} k€)`);
+    console.log(`  écart formule    : × 100 (division superflue par 100)`);
+
+    console.log("\n--- Champs non gérés par calculateCapexDetails ---");
+    // otherSoftCapexKeuro est dans baugeInput() mais absent de FinanceEngineInput
+    const rawInput = input as Record<string, unknown>;
+    console.log(`  otherSoftCapexKeuro : ${rawInput["otherSoftCapexKeuro"] ?? "ABSENT du type"} k€ → non utilisé dans le moteur`);
+
+    console.log("\n--- Réconciliation CAPEX BP 6006 k€ ---");
+    const capexIfFixed = capex.capexTotalKeuro
+      - capex.modulesKeuro
+      + (prixModule / tauxEURUSD * input.capacityMw * 1_000_000 / 1000)
+      + (Number(rawInput["otherSoftCapexKeuro"] ?? 0));
+    console.log(`  CAPEX moteur actuel                  : ${capex.capexTotalKeuro.toFixed(1)} k€`);
+    console.log(`  + correction formule modules (+896k) : ${(capex.capexTotalKeuro - capex.modulesKeuro + prixModule / tauxEURUSD * input.capacityMw * 1_000_000 / 1000).toFixed(1)} k€`);
+    console.log(`  + ajout otherSoftCapex               : ${capexIfFixed.toFixed(1)} k€`);
+    console.log(`  BP cible                             : ${BP_CAPEX.total.toFixed(1)} k€`);
+    console.log(`  Écart résiduel après 2 corrections   : ${(capexIfFixed - BP_CAPEX.total).toFixed(1)} k€`);
+  });
+});
+
 describe("calibration Baugé — ligne par ligne", () => {
   it("affiche le waterfall annuel vs BP", () => {
     const rows = calculateAnnualCashFlows(baugeInput());
@@ -204,6 +294,75 @@ describe("calibration Baugé — ligne par ligne", () => {
       if (!r) continue;
       console.log(
         `${String(y).padStart(2)} | ${fmt(r.amort).padStart(6)} | ${fmt(r.ebit).padStart(6)} | ${fmt(r.interets).padStart(6)} | ${fmt(r.ebt).padStart(6)} | ${fmt(r.is).padStart(5)} | ${fmt(r.cfadsAfterTax).padStart(6)} | ${fmt(r.dividende).padStart(6)} | ${fmt(r.fluxActionnaire).padStart(6)}`,
+      );
+    }
+
+    // -----------------------------------------------------------------------
+    // RÈGLE 4 — SHL (CCA) : observation avant modification du moteur
+    // BP Baugé de référence :
+    //   ccaOutstanding BoP an1 = 828.5k (789k × 1.05, intérêts an0 capitalisés)
+    //   ccaInterets an1=41.4k, an2=38.3k  (décroissant)
+    //   ccaRemboursement an1=62.6k, an2=65.4k, an12=73.7k, an13+ = 0
+    //   dividende an1-12=0, an13=17.6k, an14-18≈112k, an21≈xx
+    //   FCF after debt (=cfadsAfterTax - debtService) an1=104k, an2=103.7k
+    // -----------------------------------------------------------------------
+    const BP_SHL: Record<string, Record<number, number>> = {
+      ccaOutstanding: { 1: 828.5, 2: 790.2, 5: 671.0, 10: 469.8, 13: 341.3, 14: 264.6 },
+      ccaInterets:    { 1: 41.4,  2: 38.3,  5: 33.6,  10: 23.5 },
+      ccaRemb:        { 1: 62.6,  2: 65.4,  5: 71.3,  10: 74.6, 12: 73.7, 13: 341.3 },
+      dividende:      { 1: 0,     2: 0,     5: 0,     10: 0,    13: 17.6, 14: 112.0, 21: 0 },
+    };
+    const shlYears = [1, 2, 5, 10, 13, 14, 21, 35];
+
+    console.log("\n=== RÈGLE 4 — SHL outstanding (k€) BoP ===");
+    console.log("an | MF ccaOut | BP ccaOut");
+    for (const y of shlYears) {
+      const r = ops.find((x) => x.year === y);
+      const bpOut = BP_SHL.ccaOutstanding[y];
+      console.log(
+        `an ${String(y).padStart(2)} | MF ${fmt(r?.ccaOutstandingKeuro ?? 0).padStart(8)} | BP ${bpOut != null ? fmt(bpOut).padStart(8) : "       —"}`,
+      );
+    }
+
+    console.log("\n=== RÈGLE 4 — SHL intérêts (k€) ===");
+    console.log("an | MF ccaInt | BP ccaInt");
+    for (const y of shlYears) {
+      const r = ops.find((x) => x.year === y);
+      const bpInt = BP_SHL.ccaInterets[y];
+      console.log(
+        `an ${String(y).padStart(2)} | MF ${fmt(r?.ccaInteretsKeuro ?? 0).padStart(8)} | BP ${bpInt != null ? fmt(bpInt).padStart(8) : "       —"}`,
+      );
+    }
+
+    console.log("\n=== RÈGLE 4 — SHL remboursement (k€) ===");
+    console.log("an | MF ccaRemb | BP ccaRemb");
+    for (const y of shlYears) {
+      const r = ops.find((x) => x.year === y);
+      const bpRemb = BP_SHL.ccaRemb[y];
+      console.log(
+        `an ${String(y).padStart(2)} | MF ${fmt(r?.ccaRemboursementKeuro ?? 0).padStart(9)} | BP ${bpRemb != null ? fmt(bpRemb).padStart(9) : "        —"}`,
+      );
+    }
+
+    console.log("\n=== RÈGLE 4 — Dividendes (k€) ===");
+    console.log("an | MF divid | BP divid | MF fluxAct");
+    for (const y of shlYears) {
+      const r = ops.find((x) => x.year === y);
+      const bpDiv = BP_SHL.dividende[y];
+      console.log(
+        `an ${String(y).padStart(2)} | MF ${fmt(r?.dividende ?? 0).padStart(7)} | BP ${bpDiv != null ? fmt(bpDiv).padStart(7) : "      —"} | fluxAct ${fmt(r?.fluxActionnaire ?? 0).padStart(7)}`,
+      );
+    }
+
+    console.log("\n=== RÈGLE 4 — FCF after debt service (cfadsAT − debtService) ===");
+    console.log("BP an1=104.0k, an2=103.7k (cash AVANT SHL)");
+    for (const y of shlYears) {
+      const r = ops.find((x) => x.year === y);
+      if (!r) continue;
+      const debtSvc = r.debtServiceSculptedKeuro ?? r.debtServiceKeuro;
+      const fcfAfterDebt = r.cfadsAfterTax - debtSvc;
+      console.log(
+        `an ${String(y).padStart(2)} | cfadsAT ${fmt(r.cfadsAfterTax).padStart(8)} | debtSvc ${fmt(debtSvc).padStart(8)} | FCF ${fmt(fcfAfterDebt).padStart(8)}`,
       );
     }
 

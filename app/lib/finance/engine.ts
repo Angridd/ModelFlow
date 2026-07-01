@@ -92,6 +92,8 @@ export type FinanceEngineInput = FinancialAssumptions & {
   inflationAssurance?: number | null;
   balancingCost?: number | null;
   surfaceHa?: number | null;
+  indemnitesImmoKeuro?: number | null;
+  financingFeesKeuro?: number | null;
   prixModuleUSDWc?: number | null;
   tauxEURUSD?: number | null;
   boSCtWc?: number | null;
@@ -202,6 +204,8 @@ export type CapexDetails = {
   taxeAmenagementKeuro: number;
   taxeArcheoKeuro: number;
   taxesFoncieresKeuro: number;
+  indemnitesImmoKeuro: number;
+  financingFeesKeuro: number;
   capexTotalKeuro: number;
   capexPerMwKeuro: number;
 };
@@ -643,6 +647,8 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
       taxeAmenagementKeuro: 0,
       taxeArcheoKeuro: 0,
       taxesFoncieresKeuro: 0,
+      indemnitesImmoKeuro: 0,
+      financingFeesKeuro: 0,
       capexTotalKeuro: legacyCapexTotal,
       capexPerMwKeuro: input.capacityMw > 0 ? legacyCapexTotal / input.capacityMw : 0,
     };
@@ -682,8 +688,11 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
   const taxeAmenagementKeuro = taxeAmenagementEuro / 1000;
   const taxeArcheoKeuro = taxeArcheoEuro / 1000;
   const taxesFoncieresKeuro = taxeAmenagementKeuro + taxeArcheoKeuro;
+  const indemnitesImmoKeuro = input.indemnitesImmoKeuro ?? 0;
+  const financingFeesKeuro = input.financingFeesKeuro ?? 0;
   const capexTotalKeuro =
-    capexBeforeContingencyKeuro + contingencyKeuro + taxesFoncieresKeuro;
+    capexBeforeContingencyKeuro + contingencyKeuro + taxesFoncieresKeuro
+    + indemnitesImmoKeuro + financingFeesKeuro;
 
   return {
     hasDetailedCapex,
@@ -701,6 +710,8 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
     taxeAmenagementKeuro,
     taxeArcheoKeuro,
     taxesFoncieresKeuro,
+    indemnitesImmoKeuro,
+    financingFeesKeuro,
     capexTotalKeuro,
     capexPerMwKeuro: input.capacityMw > 0 ? capexTotalKeuro / input.capacityMw : 0,
   };
