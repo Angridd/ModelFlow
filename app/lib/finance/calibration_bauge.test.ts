@@ -551,3 +551,53 @@ describe("calibration Baugé — Règle 6 TF/CFE (Appréciation Directe)", () =>
     console.log(`  Gearing  = ${gearing.toFixed(2)} %    (BP :    86.86 %)`);
   });
 });
+
+describe("calibration Baugé — Règle 4 SHL schedule complet", () => {
+  it("affiche schedule SHL années -1 à 13 vs BP", () => {
+    const rows = calculateAnnualCashFlows(baugeInput());
+    const watchYears = [-1, 0, 1, 2, 3, 5, 10, 13];
+
+    // Valeurs BP de référence (k€)
+    const BP_SHL: Record<number, { bop: number | null; capit: number | null; intPaid: number | null; remb: number | null; eop: number | null; cash: number | null }> = {
+      [-1]: { bop: 0,     capit: null,  intPaid: null,  remb: null,  eop: 789.1, cash: null },
+      [0]:  { bop: 789.1, capit: 39.5,  intPaid: null,  remb: null,  eop: 828.6, cash: null },
+      [1]:  { bop: 828.6, capit: null,  intPaid: 41.4,  remb: 62.6,  eop: 766.0, cash: 104.0 },
+      [2]:  { bop: 766.0, capit: null,  intPaid: 38.3,  remb: 65.4,  eop: 700.6, cash: 103.7 },
+      [3]:  { bop: 700.6, capit: null,  intPaid: 35.0,  remb: 68.7,  eop: 631.9, cash: 103.7 },
+      [5]:  { bop: 631.9, capit: null,  intPaid: 28.0,  remb: 75.2,  eop: null,  cash: 103.2 },
+      [10]: { bop: null,  capit: null,  intPaid: null,   remb: null,  eop: null,  cash: null },
+      [13]: { bop: 341.3, capit: null,  intPaid: null,  remb: 341.3, eop: 0,     cash: null },
+    };
+
+    const hdr = `${"an".padStart(3)} | ${"ccaBoP".padStart(8)} | ${"drawdown".padStart(8)} | ${"capitInt".padStart(8)} | ${"intPaid".padStart(8)} | ${"remb".padStart(8)} | ${"ccaEoP".padStart(8)} | ${"cashAvail".padStart(9)}`;
+    console.log("\n=== RÈGLE 4 — SCHEDULE SHL COMPLET (k€) ===");
+    console.log(hdr);
+    console.log("-".repeat(hdr.length));
+
+    for (const y of watchYears) {
+      const r = rows.find((x) => x.year === y);
+      if (!r) { console.log(`${String(y).padStart(3)} | —`); continue; }
+      const bp = BP_SHL[y];
+      const debtSvc = r.debtServiceSculptedKeuro ?? r.debtServiceKeuro;
+      const cashAvail = Math.max(0, r.cfadsAfterTax - debtSvc);
+
+      const fmtD = (v: number, bpV: number | null) => {
+        const s = v.toFixed(1).padStart(8);
+        return bpV != null ? `${s}(${(v - bpV >= 0 ? "+" : "")}${(v - bpV).toFixed(1)})` : s;
+      };
+
+      console.log(
+        `${String(y).padStart(3)} | ${fmtD(r.ccaBoPKeuro, bp?.bop ?? null).padStart(14)} | ${fmtD(r.ccaDrawdownKeuro, null).padStart(8)} | ${fmtD(r.ccaCapitalizedInterestKeuro, bp?.capit ?? null).padStart(14)} | ${fmtD(r.ccaInteretsKeuro, bp?.intPaid ?? null).padStart(14)} | ${fmtD(r.ccaRemboursementKeuro, bp?.remb ?? null).padStart(14)} | ${fmtD(r.ccaEoPKeuro, bp?.eop ?? null).padStart(14)} | ${fmtD(cashAvail, bp?.cash ?? null).padStart(14)}`,
+      );
+    }
+
+    const an1 = rows.find((r) => r.year === 1)!;
+    const an0 = rows.find((r) => r.year === 0)!;
+    console.log(`\n  Drawdown (y-1) : ${rows.find(r => r.year === -1)?.ccaDrawdownKeuro.toFixed(3)} k€   (BP 789.101 k€)`);
+    console.log(`  Capitalisé y0  : ${an0.ccaCapitalizedInterestKeuro.toFixed(3)} k€  (BP 39.455 k€)`);
+    console.log(`  BoP y1         : ${an1.ccaBoPKeuro.toFixed(3)} k€  (BP 828.556 k€)`);
+    console.log(`  Intérêts y1    : ${an1.ccaInteretsKeuro.toFixed(3)} k€  (BP 41.428 k€)`);
+    console.log(`  Remb y1        : ${an1.ccaRemboursementKeuro.toFixed(3)} k€  (BP 62.600 k€)`);
+    console.log(`  EoP y1         : ${an1.ccaEoPKeuro.toFixed(3)} k€  (BP 765.956 k€)`);
+  });
+});

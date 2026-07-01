@@ -87,12 +87,52 @@ dette = min(dette sculptée par DSCR, gearing_max × CAPEX)
 CCA = CAPEX − dette
 ```
 
-Sur le BP Baugé, ce sizing donne **CCA = 789 k€**.
+Sur le BP Baugé, ce sizing donne **CCA = 789 101 € (drawdown en construction)**.
 
-Le CCA porte intérêt à `ccaRemunRate` (5 % sur Baugé). Pendant la construction, les intérêts
-sont **capitalisés** (ajoutés au principal). En exploitation, ils sont payés si le cash le permet,
-sinon capitalisés. Le remboursement du CCA se fait avec le cash disponible après service de la
-dette senior, avant dividendes.
+### Mécanique SHL exacte (décodée du BP Excel, taux 5 %)
+
+Le BP a un axe **"Period Year"** avec deux années pré-exploitation. MES (mise en service) = year 1.
+
+```
+Period Year         -1        0         1(MES)    2         3         ...
+(calendrier)       2027      2028      2029      2030      2031
+Flag               Financing Construct Operation Operation Operation
+                  ──────    ──────    ──────    ──────    ──────
+SHL BoP              -      789 101   828 556   765 956   700 585
+Drawdown          789 101      -         -         -         -
+Capitalized int.     -       39 455      -         -         -
+Repayment            -         -      (62 600)  (65 371)  (68 662)
+SHL EoP           789 101   828 556   765 956   700 585   631 923
+
+Interests payable    -      (39 455)  (41 428)  (38 298)  (35 029)
+Interests payment    -         -      (41 428)  (38 298)  (35 029)
+```
+
+Règles :
+1. **Year -1 (financing)** : drawdown 789 101, pas d'intérêts. EoP = 789 101.
+2. **Year 0 (construction)** : BoP = 789 101. Intérêts dus 39 455 (= 5% × BoP) **CAPITALISÉS**
+   (payment = 0), donc EoP = 789 101 + 39 455 = **828 556**. Pas de remboursement, pas d'exploitation.
+3. **Year 1 (MES) et au-delà** : BoP = EoP précédent. Intérêts dus = 5% × BoP, **PAYÉS**
+   (payment = payable). Remboursement démarre en year 1.
+
+### Waterfall SHL (ordre exact, year 1+)
+
+```
+Cash flow available for SHL          (= cash après service dette senior ; 0 avant MES)
+  − Interest paid on SHL             (5% × BoP, payés en priorité)
+  − Repayment on SHL                 (= RÉSIDU : tout le cash restant)
+  = Cash flow available for dividends (= 0 les premières années)
+```
+
+**Le remboursement n'est PAS un montant fixe** : c'est `cash dispo SHL − intérêts SHL`.
+Tout le cash disponible passe dans le SHL (intérêts + principal) jusqu'à extinction ;
+les dividendes ne démarrent qu'une fois le SHL soldé (vers year 13 sur Baugé). Vérification :
+year 1 `104 028 − 41 428 − 62 600 = 0` ✓. Le remboursement monte dans le temps (62.6 → 65.4 → …)
+parce que les intérêts baissent avec le principal, libérant plus de cash pour le principal.
+
+⚠️ Les valeurs en Period Year -1 sous "Interest paid on SHL (259 106)" et "Repayment on SHL
+(828 556)" ne sont PAS des flux annuels : ce sont les totaux (mise SHL 828 556, intérêts cumulés
+259 106) servant à la ligne de flux du TRI investisseur.
 
 > Note pour le calcul du TRI investisseur : le BP calcule le TRI sur la **mise SHL** (789 k€)
 > et les **dividendes** (cash dispo après remboursement complet du SHL), pas sur le

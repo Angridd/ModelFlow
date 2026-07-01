@@ -140,6 +140,8 @@ export type FinanceEngineInput = FinancialAssumptions & {
   iferRpn?: number | null;
   inflationAurora?: number | null;
   aleasOpexRate?: number | null;
+  ccaApportKeuro?: number | null;
+  ccaRemunRate?: number | null;
 };
 
 export type FinanceEngineResult = {
@@ -189,6 +191,10 @@ export type AnnualCashFlow = {
   ccaRemboursementKeuro: number;
   ccaInteretsKeuro: number;
   ccaOutstandingKeuro: number;
+  ccaBoPKeuro: number;
+  ccaDrawdownKeuro: number;
+  ccaCapitalizedInterestKeuro: number;
+  ccaEoPKeuro: number;
   deficitCumuleKeuro: number;
   resultatCumuleKeuro: number;
   dsraSoldeKeuro: number;
@@ -1539,6 +1545,7 @@ function applyWaterfall(
   effectiveSchedule: DscrTranche[] | null,
   effectiveTenor: number,
   ccaPrincipalKeuro: number,
+  ccaRemunRate: number = 0,
 ): Array<AnnualCashFlow & { cfadsP90AfterTaxKeuro: number }> {
   let ccaOutstanding = Math.max(0, ccaPrincipalKeuro);
   let deficitCumule = 0;
@@ -1556,7 +1563,8 @@ function applyWaterfall(
         ? nextScheduleItem.principal + nextScheduleItem.interest
         : null;
     const debtInterest = scheduleItem?.interest ?? pre.standardDebtInterestKeuro;
-    const ccaInterets = ccaOutstanding * asRate(CCA_REMUN_RATE);
+    const ccaBop = ccaOutstanding;
+    const ccaInterets = ccaOutstanding * ccaRemunRate;
     const interets = debtInterest + ccaInterets;
     const ebit = pre.cashFlowKeuro - pre.amort;
     const ebt = ebit - interets;
@@ -1636,6 +1644,10 @@ function applyWaterfall(
       ccaRemboursementKeuro: ccaRemboursement,
       ccaInteretsKeuro: ccaInterets,
       ccaOutstandingKeuro: ccaOutstanding,
+      ccaBoPKeuro: ccaBop,
+      ccaDrawdownKeuro: 0,
+      ccaCapitalizedInterestKeuro: 0,
+      ccaEoPKeuro: ccaOutstanding,
       deficitCumuleKeuro: deficitCumule,
       resultatCumuleKeuro: resultatCumule,
       dsraSoldeKeuro: dsraSolde,
@@ -1691,6 +1703,10 @@ function zeroAnnualCashFlow(year: number): AnnualCashFlow {
     ccaRemboursementKeuro: 0,
     ccaInteretsKeuro: 0,
     ccaOutstandingKeuro: 0,
+    ccaBoPKeuro: 0,
+    ccaDrawdownKeuro: 0,
+    ccaCapitalizedInterestKeuro: 0,
+    ccaEoPKeuro: 0,
     deficitCumuleKeuro: 0,
     resultatCumuleKeuro: 0,
     dsraSoldeKeuro: 0,
@@ -1706,10 +1722,28 @@ function zeroAnnualCashFlow(year: number): AnnualCashFlow {
 function withConstructionRows(
   rows: AnnualCashFlow[],
   constructionYears: number,
+  ccaDrawdownKeuro: number = 0,
+  ccaRemunRate: number = 0,
 ): AnnualCashFlow[] {
   const constructionRows = Array.from(
     { length: constructionYears + 1 },
-    (_, index) => zeroAnnualCashFlow(-constructionYears + index),
+    (_, index): AnnualCashFlow => {
+      const year = -constructionYears + index;
+      const isFinancingYear = index === 0;
+      // BoP for each year: 0 at financing year, then drawdown × (1+rate)^(i-1)
+      const bop = isFinancingYear ? 0 : ccaDrawdownKeuro * (1 + ccaRemunRate) ** (index - 1);
+      const drawdown = isFinancingYear ? ccaDrawdownKeuro : 0;
+      const capitalizedInt = isFinancingYear ? 0 : bop * ccaRemunRate;
+      const eop = isFinancingYear ? ccaDrawdownKeuro : bop + capitalizedInt;
+      return {
+        ...zeroAnnualCashFlow(year),
+        ccaBoPKeuro: bop,
+        ccaDrawdownKeuro: drawdown,
+        ccaCapitalizedInterestKeuro: capitalizedInt,
+        ccaOutstandingKeuro: eop,
+        ccaEoPKeuro: eop,
+      };
+    },
   );
 
   return [...constructionRows, ...rows];
@@ -1728,8 +1762,13 @@ function calculateFinancing(input: FinanceEngineInput): SizingComputation {
 
   const hasSculpting = effectiveSchedule !== null && effectiveTenor > 0;
 
+  const ccaRemunRate = asRate(input.ccaRemunRate ?? 0);
+  const constructionYears = resolveConstructionYears(input);
+
   if (!hasSculpting) {
     const retainedDebt = initialInvestment * input.debtRate / 100;
+    const ccaDrawdownKeuro = Math.max(0, initialInvestment - retainedDebt);
+    const ccaPrincipalKeuro = ccaDrawdownKeuro * (1 + ccaRemunRate) ** constructionYears;
     const annualCashFlows = applyWaterfall(
       buildPreRows(input, initialInvestment),
       new Map(),
@@ -1737,7 +1776,8 @@ function calculateFinancing(input: FinanceEngineInput): SizingComputation {
       discountRate,
       effectiveSchedule,
       effectiveTenor,
-      Math.max(0, initialInvestment - retainedDebt),
+      ccaPrincipalKeuro,
+      ccaRemunRate,
     );
 
     return {
@@ -1745,7 +1785,9 @@ function calculateFinancing(input: FinanceEngineInput): SizingComputation {
       scheduleByYear: new Map(),
       annualCashFlows: withConstructionRows(
         annualCashFlows,
-        resolveConstructionYears(input),
+        constructionYears,
+        ccaDrawdownKeuro,
+        ccaRemunRate,
       ),
       iterations: 0,
     };
@@ -1770,7 +1812,8 @@ function calculateFinancing(input: FinanceEngineInput): SizingComputation {
           gearingMaxPct,
         );
   const capexEffectif = initialInvestment + marginResult.sizing.margeFactKeuro;
-  const ccaPrincipalKeuro = Math.max(0, capexEffectif - marginResult.sizing.debtRetenuKeuro);
+  const ccaDrawdownKeuro = Math.max(0, capexEffectif - marginResult.sizing.debtRetenuKeuro);
+  const ccaPrincipalKeuro = ccaDrawdownKeuro * (1 + ccaRemunRate) ** constructionYears;
   const annualCashFlows = applyWaterfall(
     buildPreRows(input, capexEffectif),
     marginResult.scheduleByYear,
@@ -1779,6 +1822,7 @@ function calculateFinancing(input: FinanceEngineInput): SizingComputation {
     effectiveSchedule,
     effectiveTenor,
     ccaPrincipalKeuro,
+    ccaRemunRate,
   );
 
   return {
@@ -1786,7 +1830,9 @@ function calculateFinancing(input: FinanceEngineInput): SizingComputation {
     scheduleByYear: marginResult.scheduleByYear,
     annualCashFlows: withConstructionRows(
       annualCashFlows,
-      resolveConstructionYears(input),
+      constructionYears,
+      ccaDrawdownKeuro,
+      ccaRemunRate,
     ),
     iterations: marginResult.sizing.iterationsCount,
   };
