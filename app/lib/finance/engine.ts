@@ -651,7 +651,7 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
   const tauxEURUSD = input.tauxEURUSD ?? TAUX_EUR_USD_FALLBACK;
   const modulePriceEurWc =
     input.prixModuleUSDWc != null && tauxEURUSD > 0
-      ? input.prixModuleUSDWc / 100 / tauxEURUSD
+      ? input.prixModuleUSDWc / tauxEURUSD
       : 0;
   const modulesKeuro = modulePriceEurWc * input.capacityMw * 1_000_000 / 1000;
   const modulesCtWc =
