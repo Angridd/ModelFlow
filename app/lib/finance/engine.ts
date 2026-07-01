@@ -610,7 +610,7 @@ export function calculateTaxesFoncieres(
 ): TaxesFoncieresOpexResult {
   const methode = input.methodeTaxes ?? METHODE_TAXES_FALLBACK;
   const capexTotalEuro = capexTotalKeuro * 1000;
-  const inflationFactor = (1 + asRate(input.inflationTaxes ?? 0.4)) ** year;
+  const inflationFactor = (1 + asRate(input.inflationTaxes ?? 0.4)) ** (year - 1);
 
   if (methode === "appreciation_directe") {
     // Base foncière passible (€) — input direct ou fallback 2.93% du CAPEX
@@ -841,15 +841,18 @@ export function calculateOpexDetails(
   revenueP50Keuro: number,
   productionP50Mwh: number,
   baseCapexKeuro?: number,
+  revenueP50PvKeuro?: number,
 ): OpexDetails {
   const assuranceRate = asRate(input.assuranceRate ?? ASSURANCE_RATE_FALLBACK);
   const inflationAssurance = asRate(
     input.inflationAssurance ?? INFLATION_ASSURANCE_FALLBACK,
   );
+  const inflationOMRate = asRate(input.inflationOM ?? INFLATION_OM_FALLBACK);
   const balancingCost = input.balancingCost ?? BALANCING_COST_FALLBACK;
+  const assuranceBase = revenueP50PvKeuro ?? revenueP50Keuro;
   const assuranceKeuro =
-    assuranceRate * revenueP50Keuro * (1 + inflationAssurance) ** (year - 1);
-  const balancingKeuro = (balancingCost * productionP50Mwh) / 1000;
+    assuranceRate * assuranceBase * (1 + inflationAssurance) ** (year - 1);
+  const balancingKeuro = (balancingCost * productionP50Mwh) / 1000 * (1 + inflationOMRate) ** (year - 1);
   const iferKeuro = calculateIferKeuro(input, year);
   const hasDetailedOpex = hasDetailedOpexInput(input);
   const taxesLocales = calculateTaxesFoncieres(
@@ -1494,17 +1497,17 @@ function buildPreRows(
         revenueP50Total,
         productionP50,
         baseCapexKeuro,
+        revenueP50,
       ).opexTotalKeuro;
 
     // Equity cash-flow (P50) kEUR = revenue P50 - OPEX (project NPV/IRR base).
     const cfadsP50 = revenueP50Total - annualOpex;
 
-    // OPEX P90: same postes as P50 except balancing (prod P90) and aléas (rev P90).
+    // OPEX P90: same postes as P50 except balancing (prod P90). Aléas stays on P50 base.
     const balancingCostVal = input.balancingCost ?? BALANCING_COST_FALLBACK;
-    const aleasRateVal = asRate(input.aleasOpexRate ?? 0.5);
+    const balancingInflFactor = (1 + asRate(input.inflationOM ?? INFLATION_OM_FALLBACK)) ** (year - 1);
     const opexP90Keuro = annualOpex
-      + (balancingCostVal * (productionP90 - productionP50)) / 1000
-      + aleasRateVal * (revenueP90 - revenueP50Total);
+      + (balancingCostVal * (productionP90 - productionP50)) / 1000 * balancingInflFactor;
     // Banking CFADS (P90) kEUR = revenue P90 - OPEX P90 (DSCR sizing base).
     const cfadsP90 = revenueP90 - opexP90Keuro;
 

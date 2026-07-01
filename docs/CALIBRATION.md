@@ -411,15 +411,28 @@ Chaque poste OPEX a son propre taux, tous en `^(year−1)` (an1 = base, an2 = ×
 | PPA 1 (tarif)           | 0.4 %   | (revenu, pas OPEX)                               |
 
 ⚠️ **BALANCING INDEXÉ** : le balancing = `2 €/MWh × production × 1.02^(year−1)`. Le facteur
-d'inflation "Opex excl. Rent" (2%) s'applique AU BALANCING. Formule BP complète :
-`balancing = tarif_base(2) × prod × facteurInflationOpexExclRent(1.02^(y−1))`.
-Le moteur applique `2 × prod` mais PAS le `× 1.02^(y−1)` → dérive croissante du balancing.
-**S'applique en P50 ET P90** (le balancing P50 des années lointaines est aussi trop bas).
-Vérif an3 P90 : 2 × 7736 × 1.02² ≈ 16 097 (BP 15 880, léger écart à affiner).
+d'inflation "Opex excl. Rent" (2%) s'applique AU BALANCING. Le moteur applique `2 × prod` mais
+PAS le `× 1.02^(y−1)` → dérive croissante. **S'applique en P50 ET P90.**
+En year 1, 1.02^0 = 1 → an1 inchangé (16 772 P50 / 15 537 P90 restent calés). Sûr pour l'an1.
 
-⚠️ **ASSURANCE à 3%** : l'assurance s'indexe à 3% (pas 2%). Vérifier que le moteur applique
-bien 3% et pas le taux OPEX général. Elle est aussi = 1.5% × revenu, donc double dépendance
-à vérifier (base revenu + indexation 3%).
+⚠️ **ASSURANCE — base = revenu PV pur, pas total** : le moteur base l'assurance sur le revenu
+P50 TOTAL (635.6, avec capacity+GO), le BP la base sur le revenu PV PUR (628.9). Taux 3% correct.
+Corriger la base → assurance = 1.5% × revenuPV_pur × 1.03^(year−1). Résout les +100€ an1.
+
+⚠️ **TF/CFE en ^year au lieu de ^(year−1)** : les taxes foncières sont sur-indexées d'un an
+(comme l'était l'OPEX avant correction). an1 TF = 2.687 au lieu de 2.634. C'est la source des
++57€/+47€ résiduels sur TF/CFE. Corriger en ^(year−1) : an1 = base sans inflation.
+
+⚠️ **ALÉAS reste sur base P50** : l'aléas = 0.5% × revenu PV **P50** (3.145k), y compris dans
+le CFADS P90. NE PAS le calculer sur revenu P90. (Si une correction aléas-P90 a été faite, l'annuler.)
+
+### Récap des 4 corrections d'indexation (années lointaines)
+1. Balancing : `× 1.02^(year−1)` (P50 et P90) — manque l'inflation OPEX
+2. Assurance : base = revenu PV pur (pas total capacity+GO) — taux 3% déjà bon
+3. TF/CFE : `^(year−1)` au lieu de `^year` — sur-indexés d'un an
+4. Aléas : rester sur revenu P50 (annuler toute correction aléas-P90)
+Toutes sûres pour l'an1 (facteur ^0=1 ou base déjà correcte). Impact : OPEX P90 monte →
+CFADS P90 baisse → dette sculptée baisse → se rapproche de 5217k.
 
 Outputs cibles BP : TRI Investisseur **12.0 %** · VAN brute **1125 k€** · VAN nette **355 k€**
 · Dette **5217 k€** · Gearing **86.86 %** · CCA / Equity **789 k€**
