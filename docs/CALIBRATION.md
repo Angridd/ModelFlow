@@ -159,8 +159,17 @@ Immos foncières non-exonérées          = 145 667 €
 MOD + aléas retraités (fraction)        =  22 590 €
 Total biens passibles                   = 168 257 €
 ```
-Ces montants viennent du retraitement CAPEX du BP. À exposer en input (ou dériver d'un
-ratio « part foncière » du CAPEX, ≈ 2.93 % du total d'immos pour la part taxée).
+Ces montants viennent du retraitement CAPEX du BP. À exposer en input `baseFonciereKeuro`.
+Fallback générique si absent : **base foncière = 2.93 % × total immobilisations** (ratio
+« immobilisations foncières taxées / total » documenté dans le BP, section retraitement CAPEX).
+Décomposition Baugé de la base 145 667 € : BOS divers 98 000 + terrassement/défrichement 21 000
++ bâtiments PTR/PDL 26 667 ; puis + MOD/aléas retraités 22 590 = 168 257 € passibles.
+
+### Trois méthodes de calcul (le BP les calcule toutes, en applique une)
+Le champ `methodeTaxes` pilote le choix par projet :
+- **Appréciation Directe** (Baugé) : taux LF 8 %, donne TF 2 629 € / CFE 2 165 €. ← implémentée
+- **Comptable** (si achat terrain / propriétaire) : taux LF 4 %, TF 1 180 € / CFE 1 450 €.
+- **Grille Tarifaire** : tarif au m² par secteur/catégorie (DEP1, 3 €/m²…) — non implémentée pour l'instant.
 
 ### Calcul TFPB
 ```
@@ -173,13 +182,32 @@ TF = 7 498 × (tauxTFCommune + tauxTFEPCI + tauxTSE + tauxGEMAPI + tauxTEOM) + 7
 ```
 
 ### Calcul CFE
+
+⚠️ **PIÈGE IMPORTANT (vérifié sur le BP Excel, onglet taxes)** : le BP calcule bien un
+« revenu cadastral CFE » de 10 300 € (centrale abattue à 30 % + terrain coef 0.15), MAIS ce
+montant **ne sert PAS** au calcul du CFE dû. Les taux CFE sont appliqués sur la **base TFPB
+(7 498 €)**, exactement la même base que la TF. Vérification au centime depuis le BP :
 ```
-revenu cadastral centrale = 168 257 × 8% × (1 − 30%)                       = 9 422 €
-revenu cadastral terrain  = 75 000 × 8% × 0.15 × (1 − 0%)                  =   878 €
-revenu cadastral total    = 10 300 €
-CFE = 10 300 × (tauxCFECommune + tauxCFEEPCI + tauxTSE_cfe + tauxCCI) + 72 € frais
-    = 10 300 × (0% + 25.94% + 0.86% + 1.12%) + 72                          = 2 165 €  ✅
+CFE EPCI : 7 498 × 25.94% = 1 945.11 €   (BP affiche 1 945.11 €)  ✓
+CFE TSE  : 7 498 × 0.86%  =    64.49 €   (BP affiche    64.49 €)  ✓
+CFE CCI  : 7 498 × 1.12%  =    83.98 €   (BP affiche    83.98 €)  ✓
+frais    :                     72.00 €
+TOTAL    :                  2 165 €  ✅
 ```
+Donc **TF et CFE partagent la même base cadastrale = 7 498 €**. Seules les *sommes de taux*
+diffèrent. La « base CFE 10 300 » est un calcul intermédiaire du BP qui n'entre pas dans le
+montant dû (raison exacte non élucidée, mais le résultat est sans ambiguïté).
+
+```
+base cadastrale commune = 7 498 € (identique TF)
+CFE = 7 498 × (tauxCFECommune + tauxCFEEPCI + tauxTSE_cfe + tauxGEMAPI_cfe + tauxCCI) + 72 €
+    = 7 498 × (0% + 25.94% + 0.86% + 0% + 1.12%) + 72
+    = 7 498 × 27.92% + 72                                                  = 2 165 €  ✅
+```
+
+Taux Baugé (source : base de données taux TF/CFE 2025) :
+- TF  : commune 30.69 %, EPCI 2.87 %, TSE 0.24 %, GEMAPI 0.23 %, TEOM 0 %  → somme 34.03 %
+- CFE : commune 0 %, EPCI 25.94 %, TSE 0.86 %, GEMAPI 0 %, CCI 1.12 %      → somme 27.92 %
 
 ### Constantes
 taux d'intérêt LF Appréciation Directe = **8 %** (méthode comptable = 4 %) ·
@@ -195,11 +223,75 @@ Méthode comptable (si achat terrain) en alternative : taux LF 4 %, donne TF 1 1
 
 ---
 
+## Financing fees Baugé (241 906 €) — formule exacte du BP
+
+Les financing fees sont un **pourcentage du CAPEX pré-financing**, pas un input fixe.
+
+```
+base_ff = (CAPEX_amortissable + Other_expenses) × (1 + tauxFinancingPct) × gearingMax
+        = (5 674 172 + 89 896) × 1.04 × 0.95
+        = 5 764 068 × 1.04 × 0.95
+        = 5 694 900 €
+```
+
+Où `tauxFinancingPct` = 4 % (« Financing fees perc, % of capex »), gearingMax = 0.95.
+
+Sur cette base s'appliquent les frais (somme = 241 906 €) :
+- Agent fee : 1 000 € (fixe)
+- DSRF fees : base × 0.4 % ≈ 22 780 €
+- Legal fees : 10 000 € (fixe)
+- Technical DD : 5 000 € (fixe)
+- Arranger fees : base × 0.8 % ≈ 45 559 €
+- Participant fees : base × 0.4 % ≈ 22 780 €
+- Bank fees PLT doc : 10 500 € (fixe)
+- Interim financing cost : base × 2.5 % ≈ 142 372 €
+- Commitment fees A+B : base × 0.1 % ≈ 5 695 €
+
+Pour une première implémentation, un input direct `financingFeesKeuro: 241.906` suffit à
+débloquer le CAPEX. La formule détaillée pourra être modélisée ensuite (elle dépend du
+CAPEX amortissable et du gearing, mais sans boucle : la base exclut les financing fees).
+
+## Confirmation du sizing (BP, onglet Financing)
+
+Une fois le CAPEX complet (6 005 975 €) et le sizing appliqué :
+```
+Total Debt   : 5 216 873 €   (gearing 86.86 %)
+Total Equity :   789 101 €   = CCA  ✓✓✓
+```
+Ceci valide la Règle 4 : CCA = CAPEX − dette sizée = 789 k€.
+
+## Décomposition CAPEX exacte Baugé (source : onglet CAPEX du BP)
+
+| Poste                    | Montant (€)  | Type D&A            |
+|--------------------------|--------------|---------------------|
+| Modules                  |   905 172    | Type 1 (dégressif)  |
+| BOS                      | 2 499 000    | Type 1 (dégressif)  |
+| Grid connection (raccord)| 1 500 000    | Type 2 (linéaire)   |
+| MOD                      |   770 000    | Type 2 (linéaire)   |
+| Financing fees           |   241 906    | No D&A              |
+| Other expenses           |    89 896    | No D&A              |
+| **Total CAPEX**          | **6 005 975**|                     |
+
+Réconciliation avec les enveloppes D&A (Règle 3) :
+- Type 1 dégressif = Modules 905 172 + BOS 2 499 000 = **3 404 172 €** ✓
+- Type 2 linéaire  = Grid 1 500 000 + MOD 770 000    = **2 270 000 €** ✓
+- No D&A           = Financing fees 241 906 + Other expenses 89 896 = **331 802 €** ✓
+- Total amortissable = 5 674 172 € ✓
+
 ## Corrections d'inputs Baugé (vs valeurs provisoires)
 
-- `otherSoftCapexKeuro` : **50** (et non 90)
+- **BOS** : le BP a **2 499 000 €** (et non 2 450 000). Le moteur calcule 2450k via 35 ct/Wc ×
+  7000 kWc ; il manque 49k. Ajuster le taux BOS ou ajouter un complément pour atteindre 2499k.
+- **MOD** (770 000 €) est du **Type 2 linéaire**, pas du « dev fees ». À reclasser.
+- **Financing fees** (241 906 €) : poste No D&A à ajouter (le moteur retourne 0 aujourd'hui).
+- **Other expenses / otherSoftCapex** : la vraie valeur BP est **89 896 € (≈ 90k)**, PAS 50k.
+  (La note « 50 et non 90 » était erronée — le BP confirme 90k.)
+- Pas de démantèlement ni de land sur Baugé (postes à « - » dans le BP).
 - `yieldMwh` : **1198** (irradiation P50, = 1210 brut × dispo ~99 %)
-- Courbe Aurora : injecter la courbe **brute** ci-dessus (règle 1), pas une version pré-inflatée.
+- Courbe Aurora : injecter la courbe **brute** (règle 1), pas une version pré-inflatée.
+
+Une fois ces postes en place, le CAPEX total atteint 6 005 975 € et le sizing produit
+naturellement **CCA = 789 k€** (= CAPEX − dette sizée), conformément à la Règle 4.
 
 ---
 

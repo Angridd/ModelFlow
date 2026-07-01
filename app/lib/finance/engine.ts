@@ -37,6 +37,13 @@ const ABATT_IMMO = 0.30;
 const COEF_NEUTRAL = 0.14632;
 const FRAIS_TF = [0.03, 0.03, 0.09, 0.03, 0.08] as const;
 const FRAIS_CFE = [0.03, 0.03, 0.09, 0.00, 0.09] as const;
+// Appréciation Directe (Règle 6)
+const ABATT_AD = 0.50;
+const COEF_NEUTRAL_AD = 0.26;
+const RATIO_PART_FONC_AD = 0.0293;
+const VALEUR_VENALE_HA_AD = 5000;
+const FRAIS_TF_EURO = 78;
+const FRAIS_CFE_EURO = 72;
 
 export type FinanceEngineInput = FinancialAssumptions & {
   capacityMw: number;
@@ -120,7 +127,11 @@ export type FinanceEngineInput = FinancialAssumptions & {
   tauxTEOM?: number | null;
   tauxCFECommune?: number | null;
   tauxCFEEPCI?: number | null;
+  tauxTSECfe?: number | null;
+  tauxGEMAPICfe?: number | null;
   tauxCCI?: number | null;
+  baseFonciereKeuro?: number | null;
+  valeurTerrainKeuro?: number | null;
   prixTerrainHa?: number | null;
   abattTerrain?: number | null;
   inflationTaxes?: number | null;
@@ -591,6 +602,46 @@ export function calculateTaxesFoncieres(
 ): TaxesFoncieresOpexResult {
   const methode = input.methodeTaxes ?? METHODE_TAXES_FALLBACK;
   const capexTotalEuro = capexTotalKeuro * 1000;
+  const inflationFactor = (1 + asRate(input.inflationTaxes ?? 0.4)) ** year;
+
+  if (methode === "appreciation_directe") {
+    // Base foncière passible (€) — input direct ou fallback 2.93% du CAPEX
+    const baseFonciereEuro =
+      input.baseFonciereKeuro != null
+        ? input.baseFonciereKeuro * 1000
+        : capexTotalEuro * RATIO_PART_FONC_AD;
+    // Valeur terrain (€) — input direct ou fallback surface × 5000 €/ha
+    const valeurTerrainEuro =
+      input.valeurTerrainKeuro != null
+        ? input.valeurTerrainKeuro * 1000
+        : (input.surfaceHa ?? 0) * VALEUR_VENALE_HA_AD;
+
+    // Base cadastrale commune TF et CFE (Règle 6 — base TFPB confirmée = 7 498 €)
+    const revCadCentrale = baseFonciereEuro * TAUX_LF_AD * (1 - ABATT_AD);
+    const revCadTerrain  = valeurTerrainEuro * TAUX_LF_AD * COEF_NEUTRAL_AD * (1 - ABATT_AD);
+    const baseCadEuro    = revCadCentrale + revCadTerrain;
+
+    // Taux appliqués en décimal (0.3069 = 30.69% — pas de /100)
+    const sommeTF =
+      (input.tauxTFCommune ?? 0) + (input.tauxTFEPCI ?? 0) +
+      (input.tauxTSE ?? 0) + (input.tauxGEMAPI ?? 0) + (input.tauxTEOM ?? 0);
+    const sommeCFE =
+      (input.tauxCFECommune ?? 0) + (input.tauxCFEEPCI ?? 0) +
+      (input.tauxTSECfe ?? 0) + (input.tauxGEMAPICfe ?? 0) + (input.tauxCCI ?? 0);
+
+    const tfAnnuelleKeuro  = (baseCadEuro * sommeTF  + FRAIS_TF_EURO)  / 1000;
+    const cfeAnnuelleKeuro = (baseCadEuro * sommeCFE + FRAIS_CFE_EURO) / 1000;
+
+    return {
+      baseTaxesKeuro: baseCadEuro / 1000,
+      tfAnnuelleKeuro,
+      cfeAnnuelleKeuro,
+      tfKeuro:  tfAnnuelleKeuro  * inflationFactor,
+      cfeKeuro: cfeAnnuelleKeuro * inflationFactor,
+    };
+  }
+
+  // Chemin "comptable" — inchangé (Sigoulès)
   const baseTaxesEuro =
     methode === "comptable"
       ? capexTotalEuro * TAUX_LF_COMPTA * (1 - ABATT_IMMO)
@@ -613,15 +664,14 @@ export function calculateTaxesFoncieres(
     input.tauxGEMAPI,
     input.tauxCCI,
   ].map((taux) => taux ?? 0);
-  const tfAnnuelleKeuro = taxeLocale(baseTaxesEuro, tauxTF, FRAIS_TF) / 1000;
+  const tfAnnuelleKeuro  = taxeLocale(baseTaxesEuro, tauxTF,  FRAIS_TF)  / 1000;
   const cfeAnnuelleKeuro = taxeLocale(baseTaxesEuro, tauxCFE, FRAIS_CFE) / 1000;
-  const inflationFactor = (1 + asRate(input.inflationTaxes ?? 0.4)) ** year;
 
   return {
     baseTaxesKeuro: baseTaxesEuro / 1000,
     tfAnnuelleKeuro,
     cfeAnnuelleKeuro,
-    tfKeuro: tfAnnuelleKeuro * inflationFactor,
+    tfKeuro:  tfAnnuelleKeuro  * inflationFactor,
     cfeKeuro: cfeAnnuelleKeuro * inflationFactor,
   };
 }

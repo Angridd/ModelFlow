@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { calculateAnnualCashFlows, calculateCapexDetails } from "@/app/lib/finance/engine";
+import { calculateAnnualCashFlows, calculateCapexDetails, calculateScenarioMetrics, calculateTaxesFoncieres } from "@/app/lib/finance/engine";
 import type { FinanceEngineInput } from "@/app/lib/finance/engine";
 
 // ---------------------------------------------------------------------------
@@ -58,13 +58,19 @@ function baugeInput(): FinanceEngineInput {
     inflationMRA: 2,
     inflationBackOffice: 2,
     diversOpexKeuro: 8.611,
-    // Taxes
-    methodeTaxes: "comptable",
+    // Taxes — Appréciation Directe (Règle 6, base cadastrale commune = 7498 €)
+    methodeTaxes: "appreciation_directe",
+    baseFonciereKeuro: 168.257,
+    valeurTerrainKeuro: 75,
     tauxTFCommune: 0.3069,
     tauxTFEPCI: 0.0287,
     tauxTSE: 0.0024,
     tauxGEMAPI: 0.0023,
+    tauxTEOM: 0,
+    tauxCFECommune: 0,
     tauxCFEEPCI: 0.2594,
+    tauxTSECfe: 0.0086,
+    tauxGEMAPICfe: 0,
     tauxCCI: 0.0112,
     iferRate1: 3.685,
     iferRate2: 8.854,
@@ -366,5 +372,113 @@ describe("calibration Baugé — ligne par ligne", () => {
       );
     }
 
+  });
+});
+
+describe("calibration Baugé — sizing dette vs BP", () => {
+  it("affiche dette / CCA / gearing moteur vs BP", () => {
+    const input = baugeInput();
+    const capex = calculateCapexDetails(input);
+    const metrics = calculateScenarioMetrics(input);
+    const rows = calculateAnnualCashFlows(input);
+    const sizing = metrics.sizing;
+
+    const capexTotal = capex.capexTotalKeuro;
+    const dette = sizing?.debtRetenuKeuro ?? 0;
+    const cca = capexTotal - dette;
+    const gearing = sizing?.gearingActuel != null ? sizing.gearingActuel * 100 : 0;
+    const ccaOutAn1 = rows.find((r) => r.year === 1)?.ccaOutstandingKeuro ?? 0;
+
+    const BP_SZ = { capex: 6005.975, dette: 5216.873, cca: 789.101, gearing: 86.86, ccaOutAn1: 828.5 };
+
+    console.log("\n=== SIZING — DETTE / CCA / GEARING vs BP ===");
+    console.log(`${"Poste".padEnd(30)} | ${"MF".padStart(10)} | ${"BP".padStart(10)} | ${"Δ".padStart(10)}`);
+    console.log("-".repeat(68));
+    console.log(`${"CAPEX total (k€)".padEnd(30)} | ${capexTotal.toFixed(3).padStart(10)} | ${BP_SZ.capex.toFixed(3).padStart(10)} | ${(capexTotal - BP_SZ.capex).toFixed(3).padStart(10)}`);
+    console.log(`${"Dette retenue (k€)".padEnd(30)} | ${dette.toFixed(3).padStart(10)} | ${BP_SZ.dette.toFixed(3).padStart(10)} | ${(dette - BP_SZ.dette).toFixed(3).padStart(10)}`);
+    console.log(`${"CCA = CAPEX − dette (k€)".padEnd(30)} | ${cca.toFixed(3).padStart(10)} | ${BP_SZ.cca.toFixed(3).padStart(10)} | ${(cca - BP_SZ.cca).toFixed(3).padStart(10)}`);
+    console.log(`${"Gearing effectif (%)".padEnd(30)} | ${gearing.toFixed(2).padStart(10)} | ${BP_SZ.gearing.toFixed(2).padStart(10)} | ${(gearing - BP_SZ.gearing).toFixed(2).padStart(10)}`);
+    console.log(`${"CCA outstanding BoP an1 (k€)".padEnd(30)} | ${ccaOutAn1.toFixed(1).padStart(10)} | ${BP_SZ.ccaOutAn1.toFixed(1).padStart(10)} | ${(ccaOutAn1 - BP_SZ.ccaOutAn1).toFixed(1).padStart(10)}`);
+
+    // Détail sizing
+    console.log(`\n  debtSculptedKeuro  = ${(sizing?.debtSculptedKeuro ?? 0).toFixed(3)} k€`);
+    console.log(`  debtGearingMaxKeuro= ${(sizing?.debtGearingMaxKeuro ?? 0).toFixed(3)} k€  (95% × ${capexTotal.toFixed(3)})`);
+    console.log(`  debtRetenuKeuro    = ${dette.toFixed(3)} k€  (min des deux)`);
+  });
+});
+
+describe("calibration Baugé — CFADS P90 + sculpting DSCR", () => {
+  it("affiche CFADS P90 et service dette par année vs BP", () => {
+    const input = baugeInput();
+    const rows = calculateAnnualCashFlows(input);
+    const ops = rows.filter((r) => r.year >= 1);
+    const metrics = calculateScenarioMetrics(input);
+    const sizing = metrics.sizing;
+
+    // Valeurs BP P50 connues (pour référence) — pas de P90 BP explicite fourni
+    // BP CFADS P50 an1 ≈ 496k ; P90 ≈ P50 × (yieldP90/yieldP50) corrigé prix merchant
+    const watchYears = [1, 2, 5, 10, 21, 24];
+
+    console.log("\n=== CFADS P90 + SCULPTING DSCR (moteur) ===");
+    console.log(`${"an".padStart(3)} | ${"prodP90(MWh)".padStart(12)} | ${"CFADS P90 (k€)".padStart(15)} | ${"DSCR cible".padStart(11)} | ${"dette svc sculpt (k€)".padStart(22)} | ${"CFADS P90/DSCR (k€)".padStart(21)}`);
+    console.log("-".repeat(100));
+
+    for (const y of watchYears) {
+      const r = ops.find((x) => x.year === y);
+      if (!r) continue;
+      const dscrTarget = r.dscrTargetAtYear ?? 1.15;
+      const maxSvc = r.cfadsP90Keuro / dscrTarget;
+      console.log(
+        `${String(y).padStart(3)} | ${(r.productionP90Mwh).toFixed(0).padStart(12)} | ${r.cfadsP90Keuro.toFixed(2).padStart(15)} | ${dscrTarget.toFixed(2).padStart(11)} | ${(r.debtServiceSculptedKeuro ?? 0).toFixed(2).padStart(22)} | ${maxSvc.toFixed(2).padStart(21)}`,
+      );
+    }
+
+    console.log("\n  → dette sculptée totale (NPV services) = sizing.debtSculptedKeuro");
+    console.log(`  debtSculptedKeuro   = ${(sizing?.debtSculptedKeuro ?? 0).toFixed(3)} k€`);
+    console.log(`  debtGearingMaxKeuro = ${(sizing?.debtGearingMaxKeuro ?? 0).toFixed(3)} k€`);
+    console.log(`  debtRetenuKeuro     = ${(sizing?.debtRetenuKeuro ?? 0).toFixed(3)} k€`);
+
+    // Ratio P90/P50 an1 pour comprendre l'amplitude
+    const an1 = ops.find((x) => x.year === 1);
+    if (an1) {
+      console.log(`\n  an1 : prodP50=${an1.productionP50Mwh.toFixed(0)} MWh  prodP90=${an1.productionP90Mwh.toFixed(0)} MWh  ratio=${(an1.productionP90Mwh / an1.productionP50Mwh * 100).toFixed(1)}%`);
+      console.log(`  an1 : CFADS P50=${an1.cashFlowKeuro.toFixed(2)} k€  CFADS P90=${an1.cfadsP90Keuro.toFixed(2)} k€  ratio=${(an1.cfadsP90Keuro / an1.cashFlowKeuro * 100).toFixed(1)}%`);
+      console.log(`  an1 : revenus P50=${an1.revenueP50Keuro.toFixed(2)} k€  revenus P90=${an1.revenueP90Keuro.toFixed(2)} k€`);
+    }
+  });
+});
+
+describe("calibration Baugé — Règle 6 TF/CFE (Appréciation Directe)", () => {
+  it("affiche TF, CFE, OPEX an1, dette et CCA vs BP", () => {
+    const input = baugeInput();
+    const capex = calculateCapexDetails(input);
+    const taxes = calculateTaxesFoncieres(input, capex.capexTotalKeuro, 1);
+    const rows = calculateAnnualCashFlows(input);
+    const metrics = calculateScenarioMetrics(input);
+    const an1 = rows.find((r) => r.year === 1);
+    const sizing = metrics.sizing;
+
+    const tfEuro   = taxes.tfAnnuelleKeuro * 1000;
+    const cfeEuro  = taxes.cfeAnnuelleKeuro * 1000;
+    const baseCad  = taxes.baseTaxesKeuro * 1000;
+
+    console.log("\n=== RÈGLE 6 — TF / CFE (Appréciation Directe) ===");
+    console.log(`  Base cadastrale commune  = ${baseCad.toFixed(0)} €   (BP : 7 498 €)`);
+    console.log(`  TF  calculé              = ${tfEuro.toFixed(0)} €   (BP : 2 629 €,  Δ = ${(tfEuro - 2629).toFixed(0)} €)`);
+    console.log(`  CFE calculé              = ${cfeEuro.toFixed(0)} €   (BP : 2 165 €,  Δ = ${(cfeEuro - 2165).toFixed(0)} €)`);
+    console.log(`  TF + CFE                 = ${(tfEuro + cfeEuro).toFixed(0)} €   (BP : 4 794 €,  Δ = ${(tfEuro + cfeEuro - 4794).toFixed(0)} €)`);
+
+    console.log("\n=== OPEX an1 vs BP ===");
+    console.log(`  OPEX MF an1  = ${(an1?.opexKeuro ?? 0).toFixed(2)} k€   (BP cible : 139.6 k€)`);
+
+    console.log("\n=== SIZING — DETTE / CCA vs BP ===");
+    const capexTotal = capex.capexTotalKeuro;
+    const dette = sizing?.debtRetenuKeuro ?? 0;
+    const cca = capexTotal - dette;
+    const gearing = sizing?.gearingActuel != null ? sizing.gearingActuel * 100 : 0;
+    console.log(`  CAPEX    = ${capexTotal.toFixed(3)} k€   (BP : 6 005.975)`);
+    console.log(`  Dette    = ${dette.toFixed(3)} k€   (BP : 5 216.873,  Δ = ${(dette - 5216.873).toFixed(3)})`);
+    console.log(`  CCA      = ${cca.toFixed(3)} k€   (BP :   789.101,  Δ = ${(cca - 789.101).toFixed(3)})`);
+    console.log(`  Gearing  = ${gearing.toFixed(2)} %    (BP :    86.86 %)`);
   });
 });
