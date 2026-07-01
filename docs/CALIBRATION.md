@@ -399,6 +399,28 @@ Symptôme : tous les postes fixes (O&M, MRA, back-office, divers) sont exactemen
 en an 1. Correction : indexation OPEX en `(1+infl)^(year−1)`, comme le tarif PPA (même bug déjà
 corrigé côté revenus). Vérification : 32.737 / 1.02 = 32.10 = BP ✓ sur tous les postes.
 
+### Table des taux d'indexation OPEX (décodée du BP, section 1.02 "Inflation")
+
+Chaque poste OPEX a son propre taux, tous en `^(year−1)` (an1 = base, an2 = ×taux) :
+
+| Poste OPEX               | Taux BP | Note                                             |
+|-------------------------|---------|--------------------------------------------------|
+| **Opex - excl. Rent**   | **2.0 %** | O&M, back-office, divers, IFER, **BALANCING**, aléas |
+| Rent (loyer)            | 0.4 %   | custom profile 1                                 |
+| Assurance               | **3.0 %** | ⚠️ 3%, PAS 2% — vérifier le moteur                |
+| PPA 1 (tarif)           | 0.4 %   | (revenu, pas OPEX)                               |
+
+⚠️ **BALANCING INDEXÉ** : le balancing = `2 €/MWh × production × 1.02^(year−1)`. Le facteur
+d'inflation "Opex excl. Rent" (2%) s'applique AU BALANCING. Formule BP complète :
+`balancing = tarif_base(2) × prod × facteurInflationOpexExclRent(1.02^(y−1))`.
+Le moteur applique `2 × prod` mais PAS le `× 1.02^(y−1)` → dérive croissante du balancing.
+**S'applique en P50 ET P90** (le balancing P50 des années lointaines est aussi trop bas).
+Vérif an3 P90 : 2 × 7736 × 1.02² ≈ 16 097 (BP 15 880, léger écart à affiner).
+
+⚠️ **ASSURANCE à 3%** : l'assurance s'indexe à 3% (pas 2%). Vérifier que le moteur applique
+bien 3% et pas le taux OPEX général. Elle est aussi = 1.5% × revenu, donc double dépendance
+à vérifier (base revenu + indexation 3%).
+
 Outputs cibles BP : TRI Investisseur **12.0 %** · VAN brute **1125 k€** · VAN nette **355 k€**
 · Dette **5217 k€** · Gearing **86.86 %** · CCA / Equity **789 k€**
 · TRI Projet brut 7.57 % · TRI Projet net 6.21 %.

@@ -421,7 +421,7 @@ describe("calibration Baugé — CFADS P90 + sculpting DSCR", () => {
       1: 446.459,
       2: 443.985,
       3: 441.455,
-      10: 436.222,
+      5: 436.222,
     };
 
     const watchYears = [1, 2, 3, 5, 10];
