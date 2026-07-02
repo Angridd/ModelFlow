@@ -723,7 +723,28 @@ gonfle le cash equity). Les flux ne sont PAS le problème principal.
 Une fois l'architecture métriques corrigée, seul restera l'écart an21+ (énigme OPEX P50) qui
 pèsera un peu sur le TRI/VAN — à traiter après (screenshot C_P50 IFER 20-22).
 
-### ✅ TRI INVESTISSEUR RÉSOLU — BUG B (DSRF+fees) seul. La "zéro-année" est CORRECTE.
+### ✅✅✅ TRI INVESTISSEUR BAUGÉ CALÉ (commit BUG B) — investorIrr 12.04% vs BP 12.03% (Δ 0.01pp)
+Fix : inputs dsrfAnnuelKeuro (2.718) + agentFeeAnnuelKeuro (1.0/an), déduits du flux equity après
+service dette (engine.ts:1733). Zéro-année GARDÉE (correcte, 2 ans mise→MES). BUG A reverté
+(engine.ts:2051, faux diagnostic). Série equity calée au centime sur ancres an1/5/13. Sizing 5218
+inchangé, Sigoulès vert, rétrocompat (inputs null→0).
+Résidu an19 −11.8k (timing-IS an16-24) : n'impacte pas le TRI (déjà 0.01pp), à caler avec ligne
+Corporate tax du fichier waterfall pour série equity exacte an-par-an.
+→ CAUSE RACINE (fichier waterfall) : décalage du CALENDRIER D&A. IS BP monte progressivement
+(0 jusqu'~an16, puis 31→45→48→48 an17-20, saut 83-90 en merchant an21+). Le moteur bascule plus
+tôt/brutalement (~48 dès an16). Le PPE du BP vaut 215.1k à an21, 0 à an22 → le BP amortit jusqu'à
+an22 (linéaire 20 ans depuis MES). Le moteur a amort=0 dès an21 → résultat imposable trop haut trop
+tôt → IS payé trop tôt. FIX (si on veut la série equity exacte) : aligner le calendrier D&A
+(linéaire 20 ans, fin an22) sur le BP. COSMÉTIQUE : n'affecte ni TRI (0.01pp) ni sizing (P90).
+
+### 🏁 BAUGÉ CALÉ DE BOUT EN BOUT
+CAPEX Δ0 · OPEX P50/P90 au centime (35 ans) · Sizing dette 5218 vs 5217 (0.03%) · TRI investisseur
+12.04% vs 12.03% (0.01pp). Objectif central du projet ATTEINT. Restent (cosmétique/complétude) :
+série equity an16-24 (timing-IS, fichier waterfall), VAN brute/nette + réintégrations, Project IRR.
+Puis recalibrer Sigoulès et Digoin avec leurs BP (moteur désormais validé mécanisme par mécanisme).
+
+
+### 📋 Détail TRI investisseur — mécanique validée
 ⚠️ CORRECTION d'une erreur d'analyse antérieure (j'avais supposé un décalage 1 an mise→flux et
 inventé une "couche réintégration" à 3 niveaux — FAUX). Vérifié empiriquement (Sonnet) + au calcul :
 
