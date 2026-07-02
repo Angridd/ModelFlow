@@ -49,16 +49,43 @@ IFER = taux_IFER × puissance_injectée
 - Taux IFER : `iferRate1` pour les années 1–20, `iferRate2` au-delà (an 21+).
 - Baugé : RPN 1.35, taux 3.685 puis 8.854 €/kVA.
 
-⚠️ **IFER : indexation DIFFÉRENTE entre P50 et P90** (découverte majeure, voir section
-"DEUX RÉGIMES D'INDEXATION OPEX" plus bas) :
-- **En P50 (investor case), l'IFER est FLAT** : 19 108 € toutes les années 1-20. Preuve :
-  reconstructions arithmétiques an5 (147.204 vs BP 147.18) et an10 (≈158 vs BP 158.0) qui ne
-  matchent QUE avec IFER flat.
-- **En P90 (feuille C_P90, debt sizing), l'IFER s'indexe à 2%** : 19 108 → 19 490 → 19 880
-  (×1.02 exact, visible sur les screenshots C_P90).
-- **Énigme ouverte an21+** : le traitement du saut taux2 (8.854) en P50 comme en P90 n'est pas
-  élucidé (P50 an21 BP = 238.47 contredit l'IFER flat ; P90 an21+ inconnu). Screenshots requis
-  avant tout fix de la queue 21-24.
+⚠️ **IFER : indexation IDENTIQUE P50 et P90** (CORRIGÉ via fichier c_p50.xlsx, valeurs exactes) :
+L'IFER P50 s'indexe à 2% en ^(year−1) ET fait le saut taux2 à an21, EXACTEMENT comme le P90.
+Ma note antérieure "IFER flat en P50" était FAUSSE (les reconstructions an5/an10 tombaient juste
+par coïncidence). Valeurs réelles du fichier C_P50 :
+```
+IFER P50 : an1 19 107.9 · an2 19 490.1 (×1.02) · an3 19 879.9 · ... · an20 27 290.8
+         · an21 68 217.8 (saut taux2 8.854 × kVA × 1.02^20) · an22 69 582.1 (×1.02) · ...
+```
+Vérif Total OPEX P50 : an5 147 181 (BP 147.18 ✓) · an21 238 469 (BP 238.47 ✓ PILE).
+CONSÉQUENCE : le régime OPEX P50 ≈ P90 (IFER, assurance identiques). L'idée de "deux régimes
+distincts" était une sur-interprétation. La SEULE vraie différence P50/P90 : le revenu (P90 =
+PV pur sans capacity/GO, prod P90) et le balancing (sur prod P90). Les POSTES OPEX sont indexés
+pareil. NB : le fichier c_p50.xlsx (37 ans, valeurs + formules) est LA référence OPEX P50 exacte.
+
+### ✅ FIX FAIT (engine.ts `calculateOpexDetails`) — IFER et assurance P50 indexés
+IFER P50 = `calculateIferKeuro(input, year) × 1.02^(year−1)` (même formule que P90, plus de
+version flat). Assurance P50 = `assuranceRate × revenuPV_pur × 1.02^(year−1)` (facteur remis à
+2%, `inflationAssurance` par défaut déjà 2% — le test Baugé avait `3` en dur, corrigé à `2`).
+
+**Vérification poste par poste (indépendante du total)** : IFER MF an1=19.1074/an2=19.4896/
+an21=68.2193/an22=69.5837 vs cibles 19.1079/19.4901/68.2178/69.5821 (Δ<0.002, quasi exact).
+Assurance MF an1=9.4343/an2=9.6231/an3=9.8154/an5=10.2113 vs cibles 9.433/9.622/9.814/10.209
+(Δ<0.003, quasi exact). **Seule anomalie : IFER an20 MF=27.836 vs cible 27.2908 (Δ+0.545)** —
+tous les autres points collent, celui-ci semble être une valeur isolée à vérifier sur le fichier
+source (pas de logique de calcul alternative testée qui expliquerait ce seul point).
+
+⚠️ **Le TOTAL OPEX P50 an5/21/24 ne se reconstruit PAS** en sommant les postes individuels
+(tous validés séparément, y compris O&M/MRA/BO/Divers/Loyer/Balancing/TF/CFE/Aléas déjà calés) :
+an5 = 149.564 (cible ligne totale 147.181, Δ+2.383) alors que chaque poste somme correctement
+à 149.564 avec les valeurs IFER/assurance ci-dessus vérifiées exactes. Piste : la ligne "Total
+OPEX P50" à an5/21/24 pourrait être une valeur ANTÉRIEURE (calculée avec l'ancien IFER flat +
+assurance sans inflation, qui donnait ~147.2 par compensation de deux erreurs) plutôt que
+recalculée avec les vraies valeurs poste par poste du fichier C_P50 — à confirmer avec le fichier
+source (même type d'incohérence déjà rencontré sur le CFADS P90 an24).
+
+Résultat investorIrr : **12.42 %** (BP 12.03 %, Δ+0.39pp) — a bien BAISSÉ depuis 12.88 % comme
+attendu (le fix va dans le bon sens), résidu cohérent avec l'incohérence du total OPEX ci-dessus.
 
 ---
 
@@ -428,9 +455,13 @@ d'inflation "Opex excl. Rent" (2%) s'applique AU BALANCING. Le moteur applique `
 PAS le `× 1.02^(y−1)` → dérive croissante. **S'applique en P50 ET P90.**
 En year 1, 1.02^0 = 1 → an1 inchangé (16 772 P50 / 15 537 P90 restent calés). Sûr pour l'an1.
 
-⚠️ **ASSURANCE — base = revenu PV pur, pas total** : le moteur base l'assurance sur le revenu
-P50 TOTAL (635.6, avec capacity+GO), le BP la base sur le revenu PV PUR (628.9). Taux 3% correct.
-Corriger la base → assurance = 1.5% × revenuPV_pur × 1.03^(year−1). Résout les +100€ an1.
+⚠️ **ASSURANCE — formule EXACTE (fichier c_p50.xlsx, calée au centime sur 5 ans)** :
+`assurance = 1.5% × revenuPV_pur courant × 1.02^(year−1)`. Le facteur est **2%** (profil "Opex
+excl. Rent"), PAS 3% (le libellé Excel "Custom profile 3 (3%)" est trompeur, le calcul applique
+2%). ⚠️ BUG ACTUEL : le fix 9372aee a RETIRÉ le facteur d'inflation (croyant qu'il n'y en avait
+pas) → assurance = 1.5% × revPV SANS inflation → sous-estimée (an5 9432 vs BP 10209). Il faut
+REMETTRE le facteur mais à 2% : `1.5% × revPV × 1.02^(year−1)`. Base = revenu PV pur (628.9).
+Vérif : an1 9433 · an2 9622 · an3 9814 · an5 10209 (tous pile).
 
 ⚠️ **TF/CFE en ^year au lieu de ^(year−1)** : les taxes foncières sont sur-indexées d'un an
 (comme l'était l'OPEX avant correction). an1 TF = 2.687 au lieu de 2.634. C'est la source des
@@ -709,21 +740,16 @@ gonfle le cash equity). Les flux ne sont PAS le problème principal.
 Une fois l'architecture métriques corrigée, seul restera l'écart an21+ (énigme OPEX P50) qui
 pèsera un peu sur le TRI/VAN — à traiter après (screenshot C_P50 IFER 20-22).
 
-### ✅ FIX 1 — Investor IRR/NPV ajoutés (additif, FAIT)
-Nouveaux champs `investorIrr`/`investorNpv` sur `FinanceEngineResult` (engine.ts,
-`calculateScenarioMetrics`) : `calculateIrr`/`calculateNpvAtRate` sur la mise SHL pure
-(`ccaKeuro`, sans devFees ni marge) + `fluxActionnaire[]`, actualisée à `input.discountRate`.
-Aucune métrique existante touchée (`irr`, `doubleIRR.irrInvest/irrEntreprise`, `npv` inchangés).
+### ✅ FIX 1 INVESTOR IRR — FAIT (commit f23c18c)
+investorIrr = calculateIrr(ccaKeuro 787.654, fluxActionnaire[]) = **12.88% vs BP 12.03%**
+(Δ +0.85pp), contre 7.09%/10.73% des anciennes métriques (mise gonflée par devFees). Additif,
+Sigoulès intact. Diagnostic confirmé : mise SHL pure + flux equity = quasi la cible.
+⚠️ Moteur AU-DESSUS du BP (+0.85pp) → cohérent avec l'énigme OPEX P50 an21 : le moteur SOUS-ESTIME
+l'OPEX P50 de ~28k/an dès an21 (210k vs 238k) → cash equity surestimé an21-35 → TRI trop haut.
+**Résoudre l'énigme OPEX P50 an21 fera baisser le TRI de 12.88 vers 12.03.** Dernier écart, vaut 0.85pp.
 
-Résultat (Baugé) : **investorIrr = 12.88 % (BP 12.03 %, Δ +0.85pp)** — contre 7.09%/10.73% des
-métriques existantes (mise gonflée par devFees). investorNpv = 682.11 k€ (pas encore comparable
-à la VAN brute BP 1125k, qui nécessite les réintégrations D/E additives — fix suivant).
-Confirme le diagnostic : la mise SHL pure + le flux equity brut donnent déjà un TRI très proche
-de la cible BP ; l'écart résiduel de 0.85pp vient de la dérive an21+ (énigme OPEX P50) déjà
-identifiée, pas d'un problème de méthode.
-
-Prochaine étape : ajouter les réintégrations additives (A/C/D/E/F) pour caler VAN brute/nette,
-et un IRR sur la série PROJET (cfadsAfterTax vs CAPEX) pour Project IRR brut/net.
+Restent (fix 2) : réintégrations additives A/C/D/E/F pour VAN brute (cible 1125k) / nette (355k),
+et un IRR sur série projet (cfadsAfterTax vs CAPEX) pour Project IRR brut 7.57% / net 6.21%.
 
 ---
 

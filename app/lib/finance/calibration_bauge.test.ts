@@ -58,7 +58,8 @@ function baugeInput(): FinanceEngineInput {
     mraEuroKwc: 1.157,
     backOfficeKeuro: 22.5,
     assuranceRate: 1.5,
-    inflationAssurance: 3,
+    // Fichier c_p50.xlsx exact : facteur d'inflation assurance = 2%, pas 3% (cf CALIBRATION.md).
+    inflationAssurance: 2,
     balancingCost: 2,
     surfaceHa: 15,
     loyerMode: "euroParHa",
@@ -443,6 +444,31 @@ describe("calibration Baugé — Investor IRR/NPV (mise SHL pure)", () => {
       const bp = BP_EQUITY[y];
       console.log(`  an${String(y).padStart(2)} : fluxActionnaire MF = ${r.fluxActionnaire.toFixed(3).padStart(9)}   BP = ${bp.toFixed(3).padStart(9)}   Δ = ${(r.fluxActionnaire - bp).toFixed(3)}`);
     }
+  });
+});
+
+describe("calibration Baugé — IFER/assurance P50 (fichier c_p50.xlsx)", () => {
+  it("affiche IFER et assurance P50 vs les valeurs exactes du fichier C_P50", () => {
+    const input = baugeInput();
+    const rows = calculateAnnualCashFlows(input);
+
+    // OPEX total P50 vs cible (fichier C_P50 exact, cf CALIBRATION.md Règle 2).
+    const OPEX_TARGET: Record<number, number> = {
+      1: 139.590, 5: 147.181, 21: 238.469, 24: 251.358,
+    };
+    console.log("\n=== OPEX TOTAL P50 — IFER + assurance indexés (^(year-1), saut taux2 an21) ===");
+    for (const y of [1, 5, 21, 24]) {
+      const r = rows.find((x) => x.year === y)!;
+      const bp = OPEX_TARGET[y];
+      console.log(`  an${y} : opexKeuro MF = ${r.opexKeuro.toFixed(3)} k€   cible C_P50 = ${bp.toFixed(3)} k€   Δ = ${(r.opexKeuro - bp).toFixed(3)}`);
+    }
+    console.log(
+      "  NOTE : IFER et assurance vérifiés individuellement à <0.01k des cibles poste par poste " +
+      "(an1/2/21/22 IFER, an1/2/3/5 assurance — cf commit). L'écart résiduel sur le TOTAL an5/21/24 " +
+      "ne se reconstruit pas en sommant les postes déjà validés (O&M/MRA/BO/Divers/Loyer/Balancing/TF/CFE/Aléas " +
+      "identiques au BP) + IFER/assurance corrigés — probable incohérence entre cette ligne totale C_P50 " +
+      "et les cibles poste par poste (à confirmer par le fichier source).",
+    );
   });
 });
 

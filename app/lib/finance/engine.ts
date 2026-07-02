@@ -876,14 +876,20 @@ export function calculateOpexDetails(
   revenueP50PvKeuro?: number,
 ): OpexDetails {
   const assuranceRate = asRate(input.assuranceRate ?? ASSURANCE_RATE_FALLBACK);
+  const inflationAssuranceRate = asRate(
+    input.inflationAssurance ?? INFLATION_ASSURANCE_FALLBACK,
+  );
   const inflationOMRate = asRate(input.inflationOM ?? INFLATION_OM_FALLBACK);
   const balancingCost = input.balancingCost ?? BALANCING_COST_FALLBACK;
   const assuranceBase = revenueP50PvKeuro ?? revenueP50Keuro;
-  // P50 assurance = taux × revenu PV courant, sans facteur d'inflation additionnel
-  // (le BP ne réindexe pas cette ligne — cf docs/CALIBRATION.md, régime P50).
-  const assuranceKeuro = assuranceRate * assuranceBase;
+  // P50 assurance = taux × revenu PV courant × 1.02^(year-1) (fichier C_P50 exact — cf
+  // docs/CALIBRATION.md Règle 2 : le facteur d'inflation existe bien, à 2%, pas 3% ni 0%).
+  const assuranceKeuro =
+    assuranceRate * assuranceBase * (1 + inflationAssuranceRate) ** (year - 1);
   const balancingKeuro = (balancingCost * productionP50Mwh) / 1000 * (1 + inflationOMRate) ** (year - 1);
-  const iferKeuro = calculateIferKeuro(input, year);
+  // IFER P50 = même formule que P90 (indexation ^(year-1), même saut taux1→taux2 à an21) —
+  // ce n'est PAS flat, cf docs/CALIBRATION.md Règle 2 (fichier c_p50.xlsx, valeurs exactes).
+  const iferKeuro = calculateIferKeuro(input, year) * (1 + inflationOMRate) ** (year - 1);
   const hasDetailedOpex = hasDetailedOpexInput(input);
   const taxesLocales = calculateTaxesFoncieres(
     input,
