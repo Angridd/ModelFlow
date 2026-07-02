@@ -844,14 +844,12 @@ export function calculateOpexDetails(
   revenueP50PvKeuro?: number,
 ): OpexDetails {
   const assuranceRate = asRate(input.assuranceRate ?? ASSURANCE_RATE_FALLBACK);
-  const inflationAssurance = asRate(
-    input.inflationAssurance ?? INFLATION_ASSURANCE_FALLBACK,
-  );
   const inflationOMRate = asRate(input.inflationOM ?? INFLATION_OM_FALLBACK);
   const balancingCost = input.balancingCost ?? BALANCING_COST_FALLBACK;
   const assuranceBase = revenueP50PvKeuro ?? revenueP50Keuro;
-  const assuranceKeuro =
-    assuranceRate * assuranceBase * (1 + inflationAssurance) ** (year - 1);
+  // P50 assurance = taux × revenu PV courant, sans facteur d'inflation additionnel
+  // (le BP ne réindexe pas cette ligne — cf docs/CALIBRATION.md, régime P50).
+  const assuranceKeuro = assuranceRate * assuranceBase;
   const balancingKeuro = (balancingCost * productionP50Mwh) / 1000 * (1 + inflationOMRate) ** (year - 1);
   const iferKeuro = calculateIferKeuro(input, year);
   const hasDetailedOpex = hasDetailedOpexInput(input);

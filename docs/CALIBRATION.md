@@ -49,6 +49,17 @@ IFER = taux_IFER × puissance_injectée
 - Taux IFER : `iferRate1` pour les années 1–20, `iferRate2` au-delà (an 21+).
 - Baugé : RPN 1.35, taux 3.685 puis 8.854 €/kVA.
 
+⚠️ **IFER : indexation DIFFÉRENTE entre P50 et P90** (découverte majeure, voir section
+"DEUX RÉGIMES D'INDEXATION OPEX" plus bas) :
+- **En P50 (investor case), l'IFER est FLAT** : 19 108 € toutes les années 1-20. Preuve :
+  reconstructions arithmétiques an5 (147.204 vs BP 147.18) et an10 (≈158 vs BP 158.0) qui ne
+  matchent QUE avec IFER flat.
+- **En P90 (feuille C_P90, debt sizing), l'IFER s'indexe à 2%** : 19 108 → 19 490 → 19 880
+  (×1.02 exact, visible sur les screenshots C_P90).
+- **Énigme ouverte an21+** : le traitement du saut taux2 (8.854) en P50 comme en P90 n'est pas
+  élucidé (P50 an21 BP = 238.47 contredit l'IFER flat ; P90 an21+ inconnu). Screenshots requis
+  avant tout fix de la queue 21-24.
+
 ---
 
 ## Règle 3 — Amortissement (D&A) par type de CAPEX
@@ -426,13 +437,69 @@ Corriger la base → assurance = 1.5% × revenuPV_pur × 1.03^(year−1). Résou
 ⚠️ **ALÉAS reste sur base P50** : l'aléas = 0.5% × revenu PV **P50** (3.145k), y compris dans
 le CFADS P90. NE PAS le calculer sur revenu P90. (Si une correction aléas-P90 a été faite, l'annuler.)
 
-### Récap des 4 corrections d'indexation (années lointaines)
-1. Balancing : `× 1.02^(year−1)` (P50 et P90) — manque l'inflation OPEX
-2. Assurance : base = revenu PV pur (pas total capacity+GO) — taux 3% déjà bon
-3. TF/CFE : `^(year−1)` au lieu de `^year` — sur-indexés d'un an
-4. Aléas : rester sur revenu P50 (annuler toute correction aléas-P90)
-Toutes sûres pour l'an1 (facteur ^0=1 ou base déjà correcte). Impact : OPEX P90 monte →
-CFADS P90 baisse → dette sculptée baisse → se rapproche de 5217k.
+### Récap des 4 corrections d'indexation — FAITES (commit 5ffd791)
+1. Balancing : `× 1.02^(year−1)` (P50 et P90) ✓
+2. Assurance : base = revenu PV pur (pas total capacity+GO) ✓ — MAIS voir ci-dessous : le
+   facteur `×1.03^(year−1)` doit être RETIRÉ en P50 (bug préexistant, double comptage)
+3. TF/CFE : `^(year−1)` au lieu de `^year` ✓ (résiduels +57/+47€ résolus)
+4. Aléas : resté sur revenu P50 ✓
+Résultat : OPEX an1 = 139.699 (BP 139.6), CFADS P90 an1 = 446.498 (BP 446.459),
+dette = 5204.56 (BP 5216.873, Δ −12.3k). Dérive résiduelle CFADS P90 : +0.04 (an1) → +1.52 (an5).
+
+### ⚠️ DÉCOUVERTE MAJEURE — DEUX RÉGIMES D'INDEXATION OPEX (P50 ≠ P90)
+
+Le BP n'applique PAS les mêmes règles d'indexation dans la feuille P50 (investor case) et la
+feuille C_P90 (debt sizing). C'est LA cause du paradoxe de la dette (−34k au lieu de −21k).
+
+**Régime P90 (C_P90, sizing)** = panier an1 × 1.02^(year−1) UNIFORME sur presque tous les
+postes (loyer à 0.4%). Preuves arithmétiques (screenshots C_P90) :
+```
+IFER      : 19 108 → 19 490 → 19 880   (×1.02 exact)
+Insurance :  9 433 →  9 622 →  9 814   (×1.02 exact — PAS 3%)
+Aléas     :  3 178 →  3 241 →  3 306   (×1.02 exact — base an1 FIGÉE, ne suit pas le revenu)
+TF        :  2 629 →  2 682            (×1.02)
+Balancing :  2 × prodP90(t) × 1.02^(t−1)
+```
+
+**Régime P50 (investor case)** = règles PAR POSTE :
+- Assurance = 1.5% × revenu PV courant, **SANS facteur d'inflation supplémentaire**.
+  Preuve : reconstruction an5 = 147.204 vs BP 147.18 et an10 ≈ 158.0 vs BP 158.0 (au 0.02k
+  près) avec assurance 9.438 = 1.5% × revPV(an5) sans ×1.03. Le facteur 3% de la table
+  d'inflation N'EST PAS appliqué à la ligne assurance en P50.
+- IFER FLAT (19 108, années 1-20).
+- Aléas = 0.5% × revenu P50 total courant (suit le revenu).
+- O&M/MRA/BO/Divers/TF/CFE = base an1 × 1.02^(year−1) (identiques P90).
+- Balancing = 2 × prodP50(t) × 1.02^(t−1) (identique en mécanique au P90).
+
+**Conséquences pour le moteur :**
+(a) L'architecture `opexP90 = opexP50 + delta balancing` est STRUCTURELLEMENT FAUSSE →
+    il faut un **OPEX P90 dédié** : chaque poste = valeur an1 × 1.02^(year−1) (loyer 0.4%,
+    balancing sur prodP90).
+(b) Bug préexistant P50 : retirer le facteur `×(1+inflationAssurance)^(year−1)` de l'assurance
+    (engine.ts ~851). Assurance P50 = 1.5% × revPV courant, rien d'autre.
+(c) Vérification prédictive du fix OPEX P90 dédié à an5 : IFER +1.575, aléas +0.26,
+    assurance −0.41 → OPEX P90 +1.43 → dérive CFADS P90 passe de +1.52 à ≈ +0.09. CALÉ an 1-20.
+
+**Queue 21-24 ÉLUCIDÉE (screenshot C_P90 années 19-30) — règles complètes de l'OPEX P90 :**
+- **IFER P90** : `taux(t) × kVA × 1.02^(year−1)` avec saut taux2 à an21 ET inflation cumulée.
+  Preuves : y19 27 291 = 19 108×1.02^18 ✓ ; y21 68 218 = 8.854×5185×1.02^20 ✓ ; y22 = ×1.02 ✓.
+- **Balancing y20+** : MÊME mécanique que y1-20 (ligne Excel séparée seulement) :
+  `2 €/MWh × prodP90(t) × 1.02^(t−1)`. Preuve : y21 21 322/1.486 = 14 349 ≈ 2×7175.
+- **Assurance P90** : `1.5% × revenuPV_P50(t) COURANT × 1.02^(year−1)` — suit le revenu P50,
+  PAS base figée. Preuve : baisse à y21 (13 699→13 276) ; 13 276/1.486 = 8 934 = 1.5%×595 600 ✓.
+- **Aléas P90** : base an1 FIGÉE `3 178 × 1.02^(y−1)` — aucune rupture à y21 (4 722 = continuation).
+- **Dismantling** : 14 000 €/an années 25-30 (hors tenor dette ; impacte le TRI).
+
+Cibles OPEX P90 : y5 148 559 · y19 190 743 · y20 194 205 · y21 236 864 · y22 240 883
+· y23 245 341 · y24 249 677. EBITDA P90 y21 = 520 954 − 236 864 = 284 090.
+Revenus P90 merchant : y21 520 954 · y22 504 296 · y23 509 396 · y24 505 007
+(vérifie la Règle 1 côté P90 : 2049 → 44.33 × 1.02^25 ≈ 72.7 €/MWh × prodP90).
+
+⚠️ Énigme restante (NON bloquante pour le sizing) : l'OPEX **P50** an21 (BP 238.47) n'est pas
+entièrement reconstruit (avec IFER saut inflaté 68.2 on obtient ≈232.6, reste ~5.7k inexpliqué).
+N'affecte QUE le waterfall P50/TRI. Screenshot C_P50 années 20-22 à demander plus tard.
+NOTE : le P50 semble donc AUSSI appliquer le saut IFER inflaté à an21+ (sinon gap de 28k) —
+mais IFER FLAT années 1-20 en P50 reste prouvé (reconstructions an5/an10).
 
 Outputs cibles BP : TRI Investisseur **12.0 %** · VAN brute **1125 k€** · VAN nette **355 k€**
 · Dette **5217 k€** · Gearing **86.86 %** · CCA / Equity **789 k€**
