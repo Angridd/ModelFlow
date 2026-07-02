@@ -502,24 +502,104 @@ Cibles OPEX P90 : y5 148 559 · y19 190 743 · y20 194 205 · y21 236 864 · y22
 Revenus P90 merchant : y21 520 954 · y22 504 296 · y23 509 396 · y24 505 007
 (vérifie la Règle 1 côté P90 : 2049 → 44.33 × 1.02^25 ≈ 72.7 €/MWh × prodP90).
 
+### ⭐ RÉFÉRENCE SIZING — CFADS P90 + Target Debt Service BP (24 ans, ligne "CFADS PV during repayment period")
+
+Le BP fournit le CFADS P90 ET le service de dette cible année par année. C'est LA référence
+de validation du sizing. Formule de sculpting VÉRIFIÉE : `DebtService(t) = CFADS_P90(t) / DSCR(t)`.
+```
+an  | CFADS P90  | DSCR  | Target Debt Service   (vérif : CFADS/DSCR = DS)
+ 1  |  446 459   | 1.15  |  388 225   (446459/1.15 = 388225 ✓)
+ 2  |  443 985   | 1.15  |  386 074
+ 3  |  441 455   | 1.15  |  383 874
+ 4  |  438 867   | 1.15  |  381 624
+ 5  |  436 222   | 1.15  |  379 323
+ 6  |  433 517   | 1.15  |  376 971
+ 7  |  430 751   | 1.15  |  374 566
+ 8  |  427 924   | 1.15  |  372 108
+ 9  |  425 035   | 1.15  |  369 596
+10  |  422 082   | 1.15  |  367 028
+11  |  419 064   | 1.15  |  364 404
+12  |  415 981   | 1.15  |  361 723
+13  |  412 831   | 1.15  |  358 983
+14  |  409 613   | 1.15  |  356 185
+15  |  406 325   | 1.15  |  353 326
+16  |  402 967   | 1.15  |  350 406
+17  |  399 537   | 1.15  |  347 424
+18  |  396 034   | 1.15  |  344 378
+19  |  392 457   | 1.15  |  341 267
+20  |  388 805   | 1.15  |  338 091
+21  |  284 089   | 1.40  |  202 921   (284089/1.40 = 202921 ✓, chute PPA→merchant + saut IFER)
+22  |  263 412   | 1.40  |  188 152
+23  |  264 055   | 1.40  |  188 611
+24  |  240 201   | 1.40  |  171 572
+25+ |     0      |  —    |     0      (dette éteinte, tenor 24 ans)
+```
+Total Target Debt Service = 8 046 831 €. Total CFADS P90 repayment = 9 441 670 €.
+La dette (5 216 873) = somme actualisée des composantes principal de ce service. Une fois le
+CFADS P90 du moteur calé sur ces 24 valeurs, la dette DOIT tomber sur 5 216 873 si le mécanisme
+de sculpting (actualisation, split intérêt/principal, timing) est correct. Sinon → l'écart
+résiduel est dans le MÉCANISME, pas les flux.
+
+### État après fix queue IFER (commit db4f898) — DERNIER MAILLON : revenu P90 merchant
+OPEX P90 calé sur 24 ans (Δ +0.15k, résidu an1 connu). Saut IFER an21 OK. MAIS le CFADS P90
+de la queue est trop HAUT : an21 286 441 vs BP 284 089 (+2.35k), an24 258 121 vs 255 330 (+2.79k).
+OPEX étant calé, l'écart vient du REVENU P90 merchant 21-24 (trop haut de ~+2.5k/an).
+Dette = 5151.54 (Δ −65.3k). Le sculpting est borné par la tranche DSCR 1.40 (an22-24, extinction
+an24) → le CFADS de queue détermine directement la dette. DERNIER FIX AVANT SIZING BOUCLÉ :
+caler le tarif merchant P90. Hypothèse : le tarif merchant est le même prix qu'en P50 (prix de
+marché, indépendant du scénario prod) ; seule la prod diffère. OU courbe Aurora P90 distincte.
+Revenu P90 merchant BP : an21 520 954 · an22 504 296 · an23 509 396 · an24 505 007. À observer.
+
+### ✅ CAUSE TROUVÉE (screenshot C_P90 production) — dégradation TABULÉE, pas exponentielle
+Le moteur calcule la prod P90 par exponentiel constant `(1−0.4%)^(year−1)`. Le BP utilise une
+COURBE DE DÉGRADATION TABULÉE (garantie fabricant), année par année, PAS un exponentiel lisse.
+Preuve : prod P90 décalée d'un an aux années lointaines (MF an24 7112 = BP an23 7112).
+
+**Courbe "Annual production PV" P90 exacte du BP (base 7798, an1→an37)** :
+```
+an1  7798 · an2  7767 · an3  7736 · an4  7705 · an5  7674 · an6  7642 · an7  7611
+an8  7580 · an9  7549 · an10 7518 · an11 7486 · an12 7455 · an13 7424 · an14 7393
+an15 7362 · an16 7330 · an17 7299 · an18 7268 · an19 7237 · an20 7206 · an21 7174
+an22 7143 · an23 7112 · an24 7081 · an25 7050 · an26 7018 · an27 6987 · an28 6956
+an29 6925 · an30 6894 · an31 6863 · an32 6831 · an33 6800 · an34 6769 · an35 6738
+```
+(La prod P50 suit la même courbe de dégradation, base 8385.) Le % "Yield degradation" affiché
+est arrondi à l'entier (an5 "99%" mais réel 7674/7798 = 0.9841). L'exponentiel 0.996 colle
+an1-5 par coïncidence puis diverge → erreurs P50/P90 de signe opposé aux années lointaines.
+
+**FIX** : injecter la courbe de dégradation tabulée (ou la prod annuelle) en input, au lieu de
+recalculer par exponentiel. Le ratio P90/P50 reste 0.93 (7798/8385 = 0.9300 exact) — c'est la
+COURBE de dégradation qui était fausse, pas le ratio. Après fix : prod P90 an21 → 7174,
+revenu merchant an21 → 520 954, CFADS P90 an21 → 284 089, et la dette devrait se caler.
+Vérifier que P50 an21 tombe aussi sur 7782 (= 8385 × même coef dégradation).
+
 ⚠️ Énigme restante (NON bloquante pour le sizing) : l'OPEX **P50** an21 (BP 238.47) n'est pas
 entièrement reconstruit (avec IFER saut inflaté 68.2 on obtient ≈232.6, reste ~5.7k inexpliqué).
 N'affecte QUE le waterfall P50/TRI. Screenshot C_P50 années 20-22 à demander plus tard.
 NOTE : le P50 semble donc AUSSI appliquer le saut IFER inflaté à an21+ (sinon gap de 28k) —
 mais IFER FLAT années 1-20 en P50 reste prouvé (reconstructions an5/an10).
 
-### ✅ FIX QUEUE 21-24 — FAIT (buildPreRows) : IFER = calculateIferKeuro(year) × 1.02^(year−1)
-(saut taux1→taux2 + inflation cumulée, remplace la réindexation depuis le panier an1) ; assurance
-P90 = taux × revenuPV_P50(t) COURANT × 1.02^(year−1) (dé-figée du panier an1) ; balancing/aléas
-inchangés (déjà corrects). Résultat OPEX P90 vs cibles : y19 190.845 (Δ+0.10), y20 194.319
-(Δ+0.11), y21 237.012 (Δ+0.15), y22 241.044 (Δ+0.16), y24 249.870 (Δ+0.19) — dérive résiduelle
-homogène (~+0.1 à +0.2 k€, cohérente avec le résidu OPEX an1 déjà connu de +0.099k, hors scope).
-Dette sculptée = 5151.540 k€ (BP 5216.873, Δ −65.3k, écart en hausse — attendu : les années
-1-20 sont calées, tout l'écart vient maintenant de la queue 21-24 restant à raffiner). Le
-sculpting est borné par la tranche DSCR 1.40 des années 22-24 (dscrRealisé = 1.40 pile, contre
-1.15 pile sur 1-19) avec amortissement total exact à l'an24 (outstanding = 0) : c'est cette
-tranche, resserrée par la correction IFER, qui pilote désormais le montant de dette — pas
-l'année 1. Restent ouverts : OPEX **P50** an21 (énigme ligne 505) et dismantling (non traité).
+### ✅ FIX COURBE DE DÉGRADATION TABULÉE — FAIT (engine.ts `resolveDegradationFactor` + input
+`degradationCurve`). Prod P90 calée au MWh près sur toute la plage tabulée (an1 7799≈7798,
+an5 7675≈7674, an10 7518.9≈7518, an21 7172.9≈7174, an24 7079.8≈7081). Revenu merchant P90 an21
+521.611 vs BP 520.954 (Δ+0.657, contre +2.5k avant fix) ; CFADS P90 an21 284.721 vs BP 284.089
+(Δ+0.632). Dette sculptée 5145.750 k€ (BP 5216.873), gearing 85.68 % (BP 86.86 %), sculpting
+toujours borné par la tranche DSCR 1.40 (an22-24, extinction an24, outstanding=0).
+
+⚠️ **Deux incohérences observées, à trancher avec un nouveau screenshot** (non corrigées ici,
+hors périmètre "ne rien casser") :
+1. **P50 an21** : la courbe tabulée donne `8385 × 0.91972 = 7712.8`, PAS 7782 (valeur de
+   référence historique de ce doc, ligne "Production P50 (MWh)"). Le ratio P90/P50=0.93 reste
+   exact (7172.9/7712.8=0.9300), donc soit 7782 était une approximation antérieure (avant la
+   courbe tabulée), soit le P50 a sa PROPRE courbe tabulée distincte de celle du P90 (à vérifier
+   au screenshot C_P50 production).
+2. **CFADS P90 an24, DEUX cibles BP contradictoires dans ce même doc** : la table "⭐ RÉFÉRENCE
+   SIZING" (ligne `24 | 240 201 | 1.40 | 171 572`) donne 240.201, alors que
+   `revenuP90(an24) − opexP90(an24) = 505.007 − 249.677 = 255.330` (cohérent avec les années
+   21-23 où les deux sources concordent au k€ près). Le moteur calcule 255.975 (Δ+0.645 vs
+   255.330, cohérent avec la dérive homogène des années 21-23), mais diverge de 15.8k vs la
+   table sizing (240.201). Un des deux chiffres BP est probablement une erreur de saisie —
+   an24 est la seule année où les deux tables sizing/revenu-opex ne se recoupent pas.
 
 Outputs cibles BP : TRI Investisseur **12.0 %** · VAN brute **1125 k€** · VAN nette **355 k€**
 · Dette **5217 k€** · Gearing **86.86 %** · CCA / Equity **789 k€**

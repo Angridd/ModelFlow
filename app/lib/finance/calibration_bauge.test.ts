@@ -22,6 +22,13 @@ function baugeInput(): FinanceEngineInput {
     contractDuration: 20,
     projectLifeYears: 35,
     degradationRate: 0.4,
+    // Courbe de dégradation tabulée BP (garantie fabricant), base 1.0, an1→an24.
+    // Source : screenshot C_P90 "Annual production PV", vérifiée 7798×0.91972=7174=BP an21.
+    degradationCurve: [
+      1.0000, 0.99603, 0.99205, 0.98808, 0.98410, 0.98000, 0.97602, 0.97205, 0.96807, 0.96409,
+      0.95999, 0.95602, 0.95204, 0.94807, 0.94409, 0.94000, 0.93601, 0.93203, 0.92806, 0.92408,
+      0.91972, 0.91575, 0.91177, 0.90779,
+    ],
     discountRate: 7.5,
     debtInterestRate: 4.2,
     debtMaturityYears: 24,
@@ -524,6 +531,62 @@ describe("calibration Baugé — OPEX P90 queue 21-24", () => {
       if (r.year < 18 || r.year > 24) continue;
       console.log(
         `${String(r.year).padStart(3)} | ${r.cfadsP90Keuro.toFixed(2).padStart(10)} | ${(r.debtServiceSculptedKeuro ?? r.debtServiceKeuro).toFixed(2).padStart(16)} | ${r.debtOutstandingKeuro.toFixed(2).padStart(12)} | ${r.dscrTargetAtYear != null ? r.dscrTargetAtYear.toFixed(2).padStart(10) : "        —"} | ${r.dscrRealized != null ? r.dscrRealized.toFixed(4).padStart(11) : "         —"}`,
+      );
+    }
+  });
+});
+
+describe("calibration Baugé — dégradation tabulée (fix courbe P90/P50)", () => {
+  it("affiche production P50/P90, revenu merchant, CFADS P90 et sizing vs BP", () => {
+    const input = baugeInput();
+    const rows = calculateAnnualCashFlows(input);
+    const metrics = calculateScenarioMetrics(input);
+    const sizing = metrics.sizing;
+
+    const BP_PROD_P50: Record<number, number> = { 1: 8385, 5: 8251, 10: 8083, 21: 7782, 24: null as unknown as number };
+    const BP_PROD_P90: Record<number, number> = { 1: 7798, 5: 7674, 10: 7518, 21: 7174, 24: 7081 };
+
+    console.log("\n=== PRODUCTION P50 / P90 — courbe tabulée vs BP (MWh) ===");
+    console.log(
+      `${"an".padStart(3)} | ${"prodP50 MF".padStart(10)} | ${"prodP50 BP".padStart(10)} | ${"prodP90 MF".padStart(10)} | ${"prodP90 BP".padStart(10)} | ${"ratio P90/P50".padStart(13)}`,
+    );
+    console.log("-".repeat(75));
+    for (const y of [1, 5, 10, 21, 24]) {
+      const r = rows.find((x) => x.year === y)!;
+      const bp50 = BP_PROD_P50[y];
+      const bp90 = BP_PROD_P90[y];
+      console.log(
+        `${String(y).padStart(3)} | ${r.productionP50Mwh.toFixed(1).padStart(10)} | ${bp50 != null ? bp50.toFixed(0).padStart(10) : "         —"} | ${r.productionP90Mwh.toFixed(1).padStart(10)} | ${bp90 != null ? bp90.toFixed(0).padStart(10) : "         —"} | ${(r.productionP90Mwh / r.productionP50Mwh).toFixed(4).padStart(13)}`,
+      );
+    }
+
+    const r21 = rows.find((x) => x.year === 21)!;
+    console.log("\n=== REVENU MERCHANT P90 an21 vs BP ===");
+    console.log(`  revenueP90Keuro MF = ${r21.revenueP90Keuro.toFixed(3)} k€   (BP : 520.954 k€)`);
+    console.log(`  cfadsP90Keuro   MF = ${r21.cfadsP90Keuro.toFixed(3)} k€   (BP : 284.089 k€)`);
+
+    console.log("\n=== SIZING — dette après fix courbe dégradation tabulée ===");
+    console.log(`  debtSculptedKeuro = ${(sizing?.debtSculptedKeuro ?? 0).toFixed(3)} k€  (BP : 5 216.873)`);
+    console.log(`  debtRetenuKeuro   = ${(sizing?.debtRetenuKeuro ?? 0).toFixed(3)} k€`);
+    console.log(`  gearingActuel     = ${((sizing?.gearingActuel ?? 0) * 100).toFixed(2)} %  (BP : 86.86 %)`);
+    console.log(`  bindingConstraint = ${sizing?.bindingConstraint ?? "—"}`);
+
+    const boundYears = rows
+      .filter((r) => r.year >= 1 && r.year <= 24)
+      .filter((r) => r.dscrRealized !== null && r.dscrTargetAtYear !== null
+        && Math.abs(r.dscrRealized - r.dscrTargetAtYear) < 0.001)
+      .map((r) => r.year);
+    console.log(`  années au DSCR cible exact (bornantes) = [${boundYears.join(", ")}]`);
+
+    console.log("\n=== CFADS P90 — TOUTE LA QUEUE 18-24 vs cible sculpting BP (k€) ===");
+    const BP_CFADS_SCULPT: Record<number, number> = {
+      18: 396.034, 19: 392.457, 20: 388.805, 21: 284.089, 22: 263.412, 23: 264.055, 24: 240.201,
+    };
+    for (const r of rows) {
+      if (r.year < 18 || r.year > 24) continue;
+      const bp = BP_CFADS_SCULPT[r.year];
+      console.log(
+        `  an${String(r.year).padStart(2)} : cfadsP90 MF = ${r.cfadsP90Keuro.toFixed(3).padStart(10)} k€   BP = ${bp.toFixed(3).padStart(10)} k€   Δ = ${(r.cfadsP90Keuro - bp).toFixed(3)}`,
       );
     }
   });

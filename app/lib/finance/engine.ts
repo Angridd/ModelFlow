@@ -52,6 +52,11 @@ export type FinanceEngineInput = FinancialAssumptions & {
   opex: number;
   yieldMwh: number;
   yieldP90Mwh?: number | null;
+  // Courbe de dégradation tabulée (garantie fabricant), normalisée base 1.0, indexée
+  // an1..N (degradationCurve[0] = an1). Remplace l'exponentiel (1-degradationRate)^(year-1)
+  // quand fournie ; au-delà de sa longueur, l'exponentiel prend le relais depuis le dernier
+  // coefficient tabulé. Absente → comportement exponentiel inchangé (Sigoulès).
+  degradationCurve?: number[] | null;
   tariff: number;
   debtRate: number;
   dscrTarget?: number | null;
@@ -473,6 +478,24 @@ function resolveSchedule(input: FinanceEngineInput): DscrTranche[] | null {
 
 function resolveGearingMaxPct(input: FinanceEngineInput) {
   return input.gearingMaxPct ?? input.gearingMax ?? null;
+}
+
+// Dégradation an N : courbe tabulée si fournie (garantie fabricant, non-exponentielle),
+// sinon exponentiel (1-degradationRate)^(year-1). Au-delà de la courbe tabulée, l'exponentiel
+// prend le relais depuis le dernier coefficient connu.
+function resolveDegradationFactor(
+  degradationCurve: number[] | null | undefined,
+  degradationRate: number,
+  year: number,
+) {
+  if (degradationCurve != null && degradationCurve.length > 0) {
+    if (year <= degradationCurve.length) {
+      return degradationCurve[year - 1];
+    }
+    const lastCoef = degradationCurve[degradationCurve.length - 1];
+    return lastCoef * (1 - degradationRate) ** (year - degradationCurve.length);
+  }
+  return (1 - degradationRate) ** (year - 1);
 }
 
 function resolveConstructionYears(input: Pick<FinanceEngineInput, "constructionYears">) {
@@ -1435,7 +1458,11 @@ function buildPreRows(
   let opexP90Basket: OpexDetails | null = null;
 
   for (let year = 1; year <= input.projectLifeYears; year += 1) {
-    const degradationFactor = (1 - degradationRate) ** (year - 1);
+    const degradationFactor = resolveDegradationFactor(
+      input.degradationCurve,
+      degradationRate,
+      year,
+    );
 
     // P50 production year N = yield P50 MWh/MW/year * MW * annual degradation.
     const productionP50 = input.yieldMwh * input.capacityMw * degradationFactor;
