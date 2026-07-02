@@ -39,7 +39,7 @@ const FRAIS_TF = [0.03, 0.03, 0.09, 0.03, 0.08] as const;
 const FRAIS_CFE = [0.03, 0.03, 0.09, 0.00, 0.09] as const;
 // Appréciation Directe (Règle 6)
 const ABATT_AD = 0.50;
-const COEF_NEUTRAL_AD = 0.26;
+const COEF_NEUTRAL_AD = 0.256066; // coef de neutralisation TFPB exact (grille tarifaire, BP §3.01)
 const RATIO_PART_FONC_AD = 0.0293;
 const VALEUR_VENALE_HA_AD = 5000;
 // Frais de gestion (Appréciation Directe), calculés par composante : 3% sur les taxes
@@ -153,6 +153,14 @@ export type FinanceEngineInput = FinancialAssumptions & {
   tauxGEMAPICfe?: number | null;
   tauxCCI?: number | null;
   baseFonciereKeuro?: number | null;
+  // Base foncière CALCULÉE (Fix 2) quand baseFonciereKeuro est absent : immo soumises =
+  // fonciereBienEuroWc × puissance(Wc) + batimentsFonciersKeuro, puis + MOD retraité au prorata
+  // foncier des immobilisations physiques (modRetraitementKeuro × immo/immobilisations).
+  // Tous absents → fallback CAPEX × RATIO_PART_FONC_AD (comportement inchangé). baseFonciereKeuro
+  // fourni → override (rétrocompat : Baugé le fournit, donc inchangé).
+  fonciereBienEuroWc?: number | null;
+  batimentsFonciersKeuro?: number | null;
+  modRetraitementKeuro?: number | null;
   valeurTerrainKeuro?: number | null;
   prixTerrainHa?: number | null;
   abattTerrain?: number | null;
@@ -649,6 +657,29 @@ function calculateIferKeuro(input: FinanceEngineInput, year: number) {
   return puissanceInjectee * iferRate;
 }
 
+// Base foncière passible (€) calculée depuis les données brutes (Fix 2, cf BP §3.02) :
+//   immo soumises = fonciereBienEuroWc × puissance(Wc) + batimentsFonciersKeuro
+//   MOD retraité  = (immo soumises / immobilisations physiques) × frais MOD
+//   base passible = immo soumises + MOD retraité
+// "Immobilisations physiques" = construction (modules + BoS + contingency) + raccordement +
+// apport affaire (hors dev fees, financing fees, indemnités, taxes) — le dénominateur du prorata
+// foncier du BP. Appel à calculateCapexDetails sûr (pas de récursion : capexDetails n'appelle
+// pas les taxes foncières).
+function computeBaseFonciereEuro(input: FinanceEngineInput): number {
+  const immoSoumisesEuro =
+    (input.fonciereBienEuroWc ?? 0) * input.capacityMw * 1_000_000 +
+    (input.batimentsFonciersKeuro ?? 0) * 1000;
+  const capex = calculateCapexDetails(input);
+  const immobilisationsEuro =
+    (capex.modulesKeuro + capex.boSKeuro + capex.contingencyKeuro +
+      capex.raccordementKeuro + capex.apportAffaireKeuro) * 1000;
+  const modRetraiteEuro =
+    immobilisationsEuro > 0
+      ? (immoSoumisesEuro / immobilisationsEuro) * (input.modRetraitementKeuro ?? 0) * 1000
+      : 0;
+  return immoSoumisesEuro + modRetraiteEuro;
+}
+
 export function calculateTaxesFoncieres(
   input: FinanceEngineInput,
   capexTotalKeuro: number,
@@ -659,11 +690,14 @@ export function calculateTaxesFoncieres(
   const inflationFactor = (1 + asRate(input.inflationTaxes ?? 0.4)) ** (year - 1);
 
   if (methode === "appreciation_directe") {
-    // Base foncière passible (€) — input direct ou fallback 2.93% du CAPEX
+    // Base foncière passible (€) — override direct, sinon calcul depuis €/Wc (Fix 2),
+    // sinon fallback 2.93% du CAPEX (comportement historique).
     const baseFonciereEuro =
       input.baseFonciereKeuro != null
         ? input.baseFonciereKeuro * 1000
-        : capexTotalEuro * RATIO_PART_FONC_AD;
+        : input.fonciereBienEuroWc != null || input.batimentsFonciersKeuro != null
+          ? computeBaseFonciereEuro(input)
+          : capexTotalEuro * RATIO_PART_FONC_AD;
     // Valeur terrain (€) — input direct ou fallback surface × 5000 €/ha
     const valeurTerrainEuro =
       input.valeurTerrainKeuro != null
