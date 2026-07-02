@@ -418,6 +418,34 @@ describe("calibration Baugé — sizing dette vs BP", () => {
   });
 });
 
+describe("calibration Baugé — Investor IRR/NPV (mise SHL pure)", () => {
+  it("affiche investorIrr/investorNpv vs BP + série equity an0-35", () => {
+    const input = baugeInput();
+    const capex = calculateCapexDetails(input);
+    const metrics = calculateScenarioMetrics(input);
+    const rows = calculateAnnualCashFlows(input);
+    const dette = metrics.sizing?.debtRetenuKeuro ?? 0;
+    const miseSHL = capex.capexTotalKeuro - dette;
+
+    console.log("\n=== INVESTOR IRR/NPV — mise SHL pure (sans devFees/marge au dénominateur) ===");
+    console.log(`  miseSHL (ccaKeuro) = ${miseSHL.toFixed(3)} k€   (BP mise SHL : 789.101 k€)`);
+    console.log(`  investorIrr        = ${metrics.investorIrr} %   (BP Investor IRR : 12.03 %)`);
+    console.log(`  investorNpv        = ${metrics.investorNpv} k€   (avant réintégrations D/E/F — pas encore une cible BP directe)`);
+    console.log(`  [pour référence, anciennes métriques inchangées : irrInvest=${metrics.doubleIRR?.irrInvest}%  irrEntreprise=${metrics.doubleIRR?.irrEntreprise}%]`);
+
+    console.log("\n=== SÉRIE EQUITY (fluxActionnaire) MF vs BP 'CFs Photosol IRR' ===");
+    const BP_EQUITY: Record<number, number> = {
+      0: -789.101, 1: 104.028, 5: 103.213, 10: 96.122, 13: 112.426, 19: 80.782, 24: 82.35, 35: 300.398,
+    };
+    console.log(`  an0 (mise) : MF = ${(-miseSHL).toFixed(3)}   BP = ${BP_EQUITY[0]}   Δ = ${(-miseSHL - BP_EQUITY[0]).toFixed(3)}`);
+    for (const y of [1, 5, 10, 13, 19, 24, 35]) {
+      const r = rows.find((x) => x.year === y)!;
+      const bp = BP_EQUITY[y];
+      console.log(`  an${String(y).padStart(2)} : fluxActionnaire MF = ${r.fluxActionnaire.toFixed(3).padStart(9)}   BP = ${bp.toFixed(3).padStart(9)}   Δ = ${(r.fluxActionnaire - bp).toFixed(3)}`);
+    }
+  });
+});
+
 describe("calibration Baugé — CFADS P90 + sculpting DSCR", () => {
   it("affiche CFADS P90 et service dette par année vs BP", () => {
     const input = baugeInput();

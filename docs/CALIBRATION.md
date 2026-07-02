@@ -589,6 +589,17 @@ an24 : rev 505 007 − opex 249 677 = 255 330 MAIS ligne CFADS BP repayment = 24
 ```
 (Anomalie an24 secondaire — voir cause PRINCIPALE ci-dessous.)
 
+### ✅✅ SIZING BAUGÉ BOUCLÉ (commit 8847c55)
+Fix : le sizing utilisait cfadsP90AfterTaxKeuro (IS-P90 explosant à ~62k/an dès an22). Basculé
+sur cfadsP90Keuro PRÉ-IS + nouvelle fonction resolveCfadsSizingKeuro qui soustrait
+taxeFinaleSizingKeuro (15.129 pour Baugé) UNIQUEMENT à l'an24 (year===tenorYears). Input à 0
+par défaut (Sigoulès inchangé). cfadsP90AfterTaxKeuro reste affiché dans l'UI.
+RÉSULTAT : dette 5218.320 vs BP 5216.873 (Δ +1.4k, 0.03%) · gearing 86.885% vs 86.86% ·
+principal an1 169.090 vs 169.117 · intérêts an1 219.169 vs 219.109 · outstanding an24 = 0 exact.
+Les 24 années au DSCR cible pile. Résidu +1.4k = arrondi cumulé, sous tolérance. CLASSÉ.
+NOTE : taxeFinaleSizingKeuro = 15.129 est hardcodé en input ; c'est le vrai IS P&L de l'an24
+(ligne "Taxes P&L" du BP). À terme le moteur devrait le CALCULER (P&L P90 an24), pas le figer.
+
 ### 🎯 MÉCANISME DE SCULPTING COMPLET — décodé du BP (onglet Debt Sizing, sections 1.02-1.06)
 
 **La dette = NPV du Target Debt Service, actualisé au taux all-in 4.20%.** Formule complète :
@@ -626,22 +637,6 @@ Une fois le CFADS_sizing corrigé (pré-IS + 15 129 an24), la dette DOIT tomber 
 si le moteur actualise le Target Debt Service à 4.20%. À VÉRIFIER : le moteur fait-il bien une
 NPV du service de dette à 4.20%, ou une bissection différente ?
 
-### ✅ FIX SIZING PRÉ-IS — FAIT (engine.ts `resolveCfadsSizingKeuro`, `debtScheduleFromRetainedDebt`,
-`presentValueDebtCapacity`). Le sizing sculpte désormais sur `cfadsP90Keuro` (pré-IS) pour
-an1..tenor-1, et sur `cfadsP90Keuro − taxeFinaleSizingKeuro` (nouvel input, 15.129 k€ pour
-Baugé) à la dernière année du tenor uniquement. `cfadsP90AfterTaxKeuro` (chemin after-tax P90)
-n'est plus utilisé pour la bissection de dette — le champ reste affiché dans l'UI à titre
-informatif. `dscr`/`dscrRealized` suivent la même base pré-IS pour rester cohérents avec ce qui
-est réellement sculpté.
-
-Résultat (Baugé) : **dette sculptée 5218.320 k€ (BP 5216.873, Δ +1.4k, 0.03 %)** · gearing
-86.885 % (BP 86.86 %) · toutes les années 1-24 sont pile au DSCR cible (1.15 puis 1.40) ·
-principal an1 169.090 k€ (BP 169.117) · intérêts an1 219.169 k€ (BP 219.109) · outstanding
-an24 = 0.000 (extinction exacte, BP aussi 0). Sizing bouclé.
-
-Sigoulès reste dans ses tolérances (`taxeFinaleSizingKeuro` absent → 0, pas de retranchement,
-comportement de sizing pré-IS déjà correct pour ce projet — pas de courbe tabulée non plus).
-
 ⚠️ Énigme restante (NON bloquante pour le sizing) : l'OPEX **P50** an21 (BP 238.47) n'est pas
 entièrement reconstruit (avec IFER saut inflaté 68.2 on obtient ≈232.6, reste ~5.7k inexpliqué).
 N'affecte QUE le waterfall P50/TRI. Screenshot C_P50 années 20-22 à demander plus tard.
@@ -651,6 +646,84 @@ mais IFER FLAT années 1-20 en P50 reste prouvé (reconstructions an5/an10).
 Outputs cibles BP : TRI Investisseur **12.0 %** · VAN brute **1125 k€** · VAN nette **355 k€**
 · Dette **5217 k€** · Gearing **86.86 %** · CCA / Equity **789 k€**
 · TRI Projet brut 7.57 % · TRI Projet net 6.21 %.
+
+### ⚠️⚠️ TRI/VAN CASSÉ — CAUSE : le moteur n'a PAS de CASH POOLING (découverte screenshot 4.04)
+État actuel : VAN brute MF −497k vs BP +1125k (écart 1.6M€), TRI ~7-11% vs 12%. Problème
+STRUCTUREL, pas calage fin.
+
+⚠️ CORRECTION (trace code applyWaterfall) : le flux equity du moteur N'EST PAS troué. 
+`fluxActionnaire = dividende + ccaRemb + ccaInterets + cashBloqué` — le cash SORT chaque année,
+"cashBloqué" est une étiquette comptable (résultat cumulé < 0 → pas qualifié "dividende"), PAS une
+rétention de trésorerie. Le SHL s'éteint an10, bascule dividende à an16. Donc l'hypothèse "cash
+pooling manquant / cash bloqué 11 ans" est FAUSSE — le flux equity sort bien en continu.
+
+**VRAIE CAUSE : DÉFINITIONS DE VAN INCOMPATIBLES (equity vs projet).** Le `npv` top-level du
+moteur (−497k) est calculé sur le cash-flow PROJET (cfadsAfterTax avant service dette, vs CAPEX
+6006k). La "VAN BRUT" du BP (+1 124 903) est calculée sur les flux EQUITY (mise SHL −789k + FCF
+after debt service). Ce ne sont PAS les mêmes objets → l'écart 1.6M€ n'est pas un bug, c'est une
+comparaison choux/carottes.
+
+**Définitions exactes du BP (section 5.01 IRR & NPV) — à répliquer :**
+```
+Project IRR BRUT  7.57% (35a) · Project IRR NET 6.21%   → sur CFs projet post-tax (−CAPEX + FCADS)
+Investor IRR     12.03%                                  → sur EQUITY : mise SHL −789 101 + FCF
+                                                            after debt service (104k, 103k...300k)
+VAN BRUT   1 124 903 (7.5%, 35a) → VAN de "Photosol IRR (equity IRR + D)", D = frais réintégrés
+VAN NETTE    354 903             → equity + D + E (E = frais de dev 770k)
+```
+Série equity BP (= "CFs Photosol IRR", ligne 5.01) : an0 −789 101 · an1 104 028 · an5 103 213
+· an10 96 122 · an13 112 426 · an19 80 782 · an24 82 350 · an35 300 398. TRI = 12.03%.
+Réintégrations : (A) financing fees 241 906 · (C) MOD 770 000 · (D) platform 0 · (E) dev 770 000
+· (F) marge fact 0. IS sur refac interne MOD = −192 500 → (D) additionnel = +577 500.
+
+**FIX** : le moteur a déjà les bons TRI equity (doubleIRR.irrEntreprise = 10.73%, le plus proche
+du 12% BP). Aligner : (1) identifier quelle métrique moteur = "Investor IRR" BP (equity, mise SHL
++ FCF after debt service) ; (2) le `npv` top-level affiché comme "VAN Brute" doit être la VAN
+EQUITY (série Photosol IRR) à 7.5%, pas la VAN projet ; (3) vérifier les réintégrations D/E/F.
+D'abord OBSERVER quelle série alimente chaque métrique doubleIRR et matcher aux définitions BP.
+
+### 🎯 DIAGNOSTIC FINAL TRI/VAN — les FLUX sont bons, les MÉTRIQUES sont mal architecturées
+Vérifié (trace code) : la série equity du moteur COLLE au BP. Mise MF −787.654 vs BP −789.101
+(Δ +1.4k). Flux an1-19 à quelques % (résidus connus). L'écart se creuse an21+ (+27k an24, +50k
+an35) = énigme OPEX P50 an21 déjà connue (moteur sous-estime OPEX P50 de ~28k/an dès an21 →
+gonfle le cash equity). Les flux ne sont PAS le problème principal.
+
+**3 bugs dans la COUCHE MÉTRIQUES (pas les flux) :**
+1. **Aucune métrique n'utilise la mise SHL pure (−787.654).** irrInvest/irrEntreprise utilisent
+   une mise GONFLÉE (1557 / 980k) en ajoutant devFees (770k) AU DÉNOMINATEUR de l'IRR. Mise
+   doublée + mêmes flux → TRI écrasé (7-11% au lieu de 12%). Le TRI Investisseur BP 12.03% =
+   `calculateIrr(787.654, fluxActionnaire[])` PUR — jamais calculé aujourd'hui.
+2. **Réintégrations mal appliquées.** BP = "equity IRR NPV **+ D**" : calcule la VAN equity pure
+   PUIS ajoute D/E/F additivement. Le moteur GONFLE la mise avec devFees. Additif ≠ gonflement
+   du dénominateur → méthode structurellement différente.
+3. **`npv` top-level (−497k) = VAN PROJET** (série cfadsAfterTax, mise CAPEX) mais étiquetée
+   "VAN Brute" alors que VAN brute BP = VAN EQUITY. Aucun IRR n'est calculé sur la série projet.
+
+**PLAN DE FIX (couche métriques, NE PAS toucher aux flux) — répliquer la méthode BP :**
+- **Investor IRR** = calculateIrr(miseSHL 787.654, fluxActionnaire[]) PUR, sans devFees. Cible 12.03%.
+- **Project IRR brut/net** = IRR sur la série PROJET post-tax (−CAPEX + CFADS après IS). Cibles 7.57%/6.21%.
+- **VAN brute** = VAN equity(7.5%) PUIS + réintégrations D additives. Cible 1 124 903.
+- **VAN nette** = VAN brute + E (dev 770k). Cible 354 903.
+- Réintégrations BP (additives, pas au dénominateur) : A financing 241.906 · C MOD 770 · D platform 0
+  (+577.5 avec IS refac MOD) · E dev 770 · F marge 0.
+Une fois l'architecture métriques corrigée, seul restera l'écart an21+ (énigme OPEX P50) qui
+pèsera un peu sur le TRI/VAN — à traiter après (screenshot C_P50 IFER 20-22).
+
+### ✅ FIX 1 — Investor IRR/NPV ajoutés (additif, FAIT)
+Nouveaux champs `investorIrr`/`investorNpv` sur `FinanceEngineResult` (engine.ts,
+`calculateScenarioMetrics`) : `calculateIrr`/`calculateNpvAtRate` sur la mise SHL pure
+(`ccaKeuro`, sans devFees ni marge) + `fluxActionnaire[]`, actualisée à `input.discountRate`.
+Aucune métrique existante touchée (`irr`, `doubleIRR.irrInvest/irrEntreprise`, `npv` inchangés).
+
+Résultat (Baugé) : **investorIrr = 12.88 % (BP 12.03 %, Δ +0.85pp)** — contre 7.09%/10.73% des
+métriques existantes (mise gonflée par devFees). investorNpv = 682.11 k€ (pas encore comparable
+à la VAN brute BP 1125k, qui nécessite les réintégrations D/E additives — fix suivant).
+Confirme le diagnostic : la mise SHL pure + le flux equity brut donnent déjà un TRI très proche
+de la cible BP ; l'écart résiduel de 0.85pp vient de la dérive an21+ (énigme OPEX P50) déjà
+identifiée, pas d'un problème de méthode.
+
+Prochaine étape : ajouter les réintégrations additives (A/C/D/E/F) pour caler VAN brute/nette,
+et un IRR sur la série PROJET (cfadsAfterTax vs CAPEX) pour Project IRR brut/net.
 
 ---
 

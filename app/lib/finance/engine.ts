@@ -155,6 +155,12 @@ export type FinanceEngineInput = FinancialAssumptions & {
 export type FinanceEngineResult = {
   npv: number;
   irr: number;
+  // "Investor IRR" BP : IRR de la mise SHL pure (ccaKeuro, sans devFees ni marge réintégrés
+  // au dénominateur) + fluxActionnaire. Cf CALIBRATION.md, "DIAGNOSTIC FINAL TRI/VAN".
+  investorIrr: number;
+  // VAN de cette même série equity pure, actualisée à input.discountRate (avant réintégrations
+  // additives D/E/F, qui restent à ajouter dans un fix ultérieur).
+  investorNpv: number;
   lcoe: number;
   dscr: number | null;
   debtAmountKeuro: number | null;
@@ -2013,6 +2019,12 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
     ...postInvestmentZeroFlows,
     ...operatingCashFlows.map((row) => row.fluxActionnaire),
   ];
+  // Investor IRR/NPV BP : mise SHL pure (ccaKeuro), sans devFees ni marge au dénominateur —
+  // par opposition à miseNetteInvest/miseNetteEntrep qui les y ajoutent (cf diagnostic doc).
+  const investorIrr = round(calculateIrr(ccaKeuro, shareholderFlows) * 100);
+  const investorNpv = round(
+    calculateNpvAtRate(ccaKeuro, shareholderFlows, asRate(input.discountRate)),
+  );
   const shouldCalculateDoubleIrr =
     retainedDebt > 0 ||
     ccaKeuro > 0 ||
@@ -2037,6 +2049,8 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
   return {
     npv: round(npv),
     irr: round(calculateIrr(miseNetteInvest, shareholderFlows) * 100),
+    investorIrr,
+    investorNpv,
     lcoe: round(lcoe),
     dscr: dscr !== null ? round(dscr) : null,
     debtAmountKeuro: sizing !== null ? round(sizing.debtRetenuKeuro) : null,
