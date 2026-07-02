@@ -52,6 +52,10 @@ export type FinanceEngineInput = FinancialAssumptions & {
   opex: number;
   yieldMwh: number;
   yieldP90Mwh?: number | null;
+  // Indisponibilité (fraction, ex. 0.01 = 1%). Défaut 0 → production inchangée (rétrocompatible).
+  // Production = yield × MW × dégradation × (1 − unavailability). Permet de fournir un yield BRUT et
+  // de le disponibiliser dans le moteur. Baugé garde yieldMwh 1198 (déjà net) + unavailability 0.
+  unavailability?: number | null;
   // Courbe de dégradation tabulée (garantie fabricant), normalisée base 1.0, indexée
   // an1..N (degradationCurve[0] = an1). Remplace l'exponentiel (1-degradationRate)^(year-1)
   // quand fournie ; au-delà de sa longueur, l'exponentiel prend le relais depuis le dernier
@@ -1505,6 +1509,8 @@ function buildPreRows(
   const baseCapexKeuro = resolveBaseCapexKeuro(input);
   // P90 yield: use provided value or fall back to P50 * 0.93.
   const effectiveYieldP90 = input.yieldP90Mwh ?? input.yieldMwh * 0.93;
+  // Facteur de disponibilité appliqué à la production P50 et P90. Défaut 0 → facteur 1 → inchangé.
+  const availabilityFactor = 1 - (input.unavailability ?? 0);
 
   const preRows: PreRow[] = [];
   // Panier an1 du régime P90 (C_P90) : seul l'aléas y reste figé (base an1 × 1.02^(year-1),
@@ -1518,11 +1524,13 @@ function buildPreRows(
       year,
     );
 
-    // P50 production year N = yield P50 MWh/MW/year * MW * annual degradation.
-    const productionP50 = input.yieldMwh * input.capacityMw * degradationFactor;
+    // P50 production year N = yield P50 MWh/MW/year * MW * annual degradation * availability.
+    const productionP50 =
+      input.yieldMwh * input.capacityMw * degradationFactor * availabilityFactor;
 
-    // P90 production year N = yield P90 MWh/MW/year * MW * annual degradation.
-    const productionP90 = effectiveYieldP90 * input.capacityMw * degradationFactor;
+    // P90 production year N = yield P90 MWh/MW/year * MW * annual degradation * availability.
+    const productionP90 =
+      effectiveYieldP90 * input.capacityMw * degradationFactor * availabilityFactor;
 
     const contractedTariff = input.tariff * (1 + tariffInflationRate) ** (year - 1);
     const merchantPrices = resolveMerchantPrices(
