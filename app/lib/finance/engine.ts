@@ -874,6 +874,10 @@ export function calculateOpexDetails(
   productionP50Mwh: number,
   baseCapexKeuro?: number,
   revenueP50PvKeuro?: number,
+  // Base aléas an1 figée (0.5% × revenu total an1), fournie par l'appelant pour year > 1 —
+  // cf docs/CALIBRATION.md Règle 2 : aléas P50 = base an1 × 1.02^(year-1), comme le P90,
+  // PAS 0.5% du revenu courant. Absente → recalculée sur revenueP50Keuro (cas year=1).
+  aleasBaseKeuro?: number,
 ): OpexDetails {
   const assuranceRate = asRate(input.assuranceRate ?? ASSURANCE_RATE_FALLBACK);
   const inflationAssuranceRate = asRate(
@@ -897,7 +901,13 @@ export function calculateOpexDetails(
     year,
   );
 
-  const aleasKeuro = asRate(input.aleasOpexRate ?? 0.5) * revenueP50Keuro;
+  // Aléas P50 = base an1 FIGÉE × 1.02^(year-1) (fichier c_p50.xlsx exact), pas 0.5% du revenu
+  // courant — même mécanique que l'aléas P90 (base an1 figée). an1 : les deux formules
+  // coïncident puisque ^0=1, d'où aleasBaseKeuro absent au premier appel.
+  const aleasKeuro =
+    aleasBaseKeuro != null
+      ? aleasBaseKeuro * (1 + inflationOMRate) ** (year - 1)
+      : asRate(input.aleasOpexRate ?? 0.5) * revenueP50Keuro;
 
   if (!hasDetailedOpex) {
     const legacyOpexKeuro =
@@ -1563,6 +1573,7 @@ function buildPreRows(
       productionP50,
       baseCapexKeuro,
       revenueP50,
+      opexP90Basket?.aleasKeuro,
     );
     const annualOpex = opexDetailsP50.opexTotalKeuro;
 

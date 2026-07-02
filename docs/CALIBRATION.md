@@ -57,35 +57,33 @@ par coïncidence). Valeurs réelles du fichier C_P50 :
 IFER P50 : an1 19 107.9 · an2 19 490.1 (×1.02) · an3 19 879.9 · ... · an20 27 290.8
          · an21 68 217.8 (saut taux2 8.854 × kVA × 1.02^20) · an22 69 582.1 (×1.02) · ...
 ```
-Vérif Total OPEX P50 : an5 147 181 (BP 147.18 ✓) · an21 238 469 (BP 238.47 ✓ PILE).
+Vérif Total OPEX P50 (fichier exact) : an5 149 809 · an21 238 469 · an24 251 358 (moteur c88cebb :
+an5 149 564 Δ−0.2k, an21 236 924 Δ−1.5k — quasi calé, petit résidu an21+ à finir).
 CONSÉQUENCE : le régime OPEX P50 ≈ P90 (IFER, assurance identiques). L'idée de "deux régimes
 distincts" était une sur-interprétation. La SEULE vraie différence P50/P90 : le revenu (P90 =
 PV pur sans capacity/GO, prod P90) et le balancing (sur prod P90). Les POSTES OPEX sont indexés
 pareil. NB : le fichier c_p50.xlsx (37 ans, valeurs + formules) est LA référence OPEX P50 exacte.
 
-### ✅ FIX FAIT (engine.ts `calculateOpexDetails`) — IFER et assurance P50 indexés
-IFER P50 = `calculateIferKeuro(input, year) × 1.02^(year−1)` (même formule que P90, plus de
-version flat). Assurance P50 = `assuranceRate × revenuPV_pur × 1.02^(year−1)` (facteur remis à
-2%, `inflationAssurance` par défaut déjà 2% — le test Baugé avait `3` en dur, corrigé à `2`).
+### ✅ FIX FAIT — Aléas P50 = base an1 figée × 1.02^(year−1) (comme le P90)
+Dernier résidu OPEX P50 an21 (Δ−1.5k) identifié poste par poste : SEUL l'aléas déviait (MF 3.152
+vs cible 4.722, tous les autres postes <0.02k). Le moteur suivait le revenu courant
+(`0.5% × revenu(t)`), coïncidant avec la cible à l'an1 puis divergeant. La vraie formule (fichier
+C_P50, calée au centime sur 37 ans) : `aléas = aléas_an1(3.178) × 1.02^(year−1)`, base FIGÉE —
+identique à l'aléas P90 déjà implémenté (`opexP90Basket.aleasKeuro × opexInflFactor`).
 
-**Vérification poste par poste (indépendante du total)** : IFER MF an1=19.1074/an2=19.4896/
-an21=68.2193/an22=69.5837 vs cibles 19.1079/19.4901/68.2178/69.5821 (Δ<0.002, quasi exact).
-Assurance MF an1=9.4343/an2=9.6231/an3=9.8154/an5=10.2113 vs cibles 9.433/9.622/9.814/10.209
-(Δ<0.003, quasi exact). **Seule anomalie : IFER an20 MF=27.836 vs cible 27.2908 (Δ+0.545)** —
-tous les autres points collent, celui-ci semble être une valeur isolée à vérifier sur le fichier
-source (pas de logique de calcul alternative testée qui expliquerait ce seul point).
+Fix (engine.ts `calculateOpexDetails`) : nouveau paramètre optionnel `aleasBaseKeuro`. Si fourni,
+`aléas = aleasBaseKeuro × 1.02^(year−1)` ; sinon (appel year=1, ou tout appelant qui ne le fournit
+pas) fallback sur l'ancienne formule `0.5% × revenu courant`, qui donne exactement la même valeur
+à l'an1 (^0=1). `buildPreRows` capture la base à l'an1 via `opexP90Basket` (déjà utilisé pour le
+P90) et la réinjecte pour year>1. Le P90 était déjà correct — aucun changement côté P90/sizing.
 
-⚠️ **Le TOTAL OPEX P50 an5/21/24 ne se reconstruit PAS** en sommant les postes individuels
-(tous validés séparément, y compris O&M/MRA/BO/Divers/Loyer/Balancing/TF/CFE/Aléas déjà calés) :
-an5 = 149.564 (cible ligne totale 147.181, Δ+2.383) alors que chaque poste somme correctement
-à 149.564 avec les valeurs IFER/assurance ci-dessus vérifiées exactes. Piste : la ligne "Total
-OPEX P50" à an5/21/24 pourrait être une valeur ANTÉRIEURE (calculée avec l'ancien IFER flat +
-assurance sans inflation, qui donnait ~147.2 par compensation de deux erreurs) plutôt que
-recalculée avec les vraies valeurs poste par poste du fichier C_P50 — à confirmer avec le fichier
-source (même type d'incohérence déjà rencontré sur le CFADS P90 an24).
+Vérification aléas seul : an1=3.178/an5=3.440/an10=3.798/an21=4.723/an35=6.231 vs cibles
+3.178/3.440/3.798/4.722/6.231 (Δ≤0.001, quasi exact). **OPEX P50 total désormais calé** : an1
+139.599 (cible 139.590, Δ0.009) · an5 149.823 (cible 149.809, Δ0.014) · an21 238.494 (cible
+238.469, Δ0.025) · an24 251.387 (cible 251.358, Δ0.029).
 
-Résultat investorIrr : **12.42 %** (BP 12.03 %, Δ+0.39pp) — a bien BAISSÉ depuis 12.88 % comme
-attendu (le fix va dans le bon sens), résidu cohérent avec l'incohérence du total OPEX ci-dessus.
+investorIrr = **12.38 %** (BP 12.03 %, Δ0.35pp) — baisse depuis 12.42 % comme attendu. Dette
+P90 sculptée inchangée à 5218.320 k€ (vérifié : ce fix ne touche que la branche P50).
 
 ---
 
@@ -386,7 +384,9 @@ Revenus GO (k€)      : an1 0 · ... · an21 11.5 (démarre en merchant)
 Ne PAS comparer le total MF (635.6) au PV pur BP (628.9) : ce sont des périmètres différents.
 Le revenu P50 est calé ; les résiduels de sizing (+5.5k) et de cash SHL (+4.8k) viennent d'ailleurs
 (sculpting P90 et/ou écart cash-available du BP), pas du revenu P50.
-Total OPEX (k€)      : an1 139.59 · an5 147.18 · an10 158.0 · an21 238.47
+Total OPEX P50 (k€, EXACT fichier c_p50.xlsx) : an1 139.59 · an5 **149.81** · an10 **163.72**
+· an21 238.47 · an24 251.36 · an35 310.45  (⚠️ les anciennes valeurs an5 147.18 / an10 158.0
+étaient FAUSSES — lecture d'une colonne décalée. Le moteur était en fait calé, pas divergent.)
 EBITDA (k€)          : an1 495.97 · an5 488.81 · an10 471.98 · an21 391.14
 
 ### Scénario P90 (debt sizing) — onglet C_P90 du BP
@@ -467,8 +467,12 @@ Vérif : an1 9433 · an2 9622 · an3 9814 · an5 10209 (tous pile).
 (comme l'était l'OPEX avant correction). an1 TF = 2.687 au lieu de 2.634. C'est la source des
 +57€/+47€ résiduels sur TF/CFE. Corriger en ^(year−1) : an1 = base sans inflation.
 
-⚠️ **ALÉAS reste sur base P50** : l'aléas = 0.5% × revenu PV **P50** (3.145k), y compris dans
-le CFADS P90. NE PAS le calculer sur revenu P90. (Si une correction aléas-P90 a été faite, l'annuler.)
+⚠️ **ALÉAS — base an1 FIGÉE × 1.02^(year−1)** (fichier c_p50.xlsx, calé au centime sur 37 ans) :
+`aléas = 3177.80 × 1.02^(year−1)`, PAS 0.5% du revenu courant. Le moteur le calcule sur le revenu
+courant → colle à an1 (0.5% × 635.56 = 3.178) par coïncidence puis dérive (an21 moteur 3.152 vs
+fichier 4.722, Δ −1.57k = quasi tout le résidu OPEX P50 an21). MÊME formule que l'aléas P90 (base
+an1 fixe × 1.02). FIX : aléas = aléas_an1 (3.178) × 1.02^(year−1), en P50 comme en P90. an1 inchangé.
+Vérif : an5 3.440 · an10 3.798 · an21 4.722 · an35 6.231 (tous pile).
 
 ### Récap des 4 corrections d'indexation — FAITES (commit 5ffd791)
 1. Balancing : `× 1.02^(year−1)` (P50 et P90) ✓

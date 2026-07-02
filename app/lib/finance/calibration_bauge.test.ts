@@ -447,28 +447,43 @@ describe("calibration Baugé — Investor IRR/NPV (mise SHL pure)", () => {
   });
 });
 
-describe("calibration Baugé — IFER/assurance P50 (fichier c_p50.xlsx)", () => {
-  it("affiche IFER et assurance P50 vs les valeurs exactes du fichier C_P50", () => {
+describe("calibration Baugé — IFER/assurance/aléas P50 (fichier c_p50.xlsx)", () => {
+  it("affiche IFER, assurance, aléas P50 + OPEX total vs les valeurs exactes du fichier C_P50", () => {
     const input = baugeInput();
     const rows = calculateAnnualCashFlows(input);
 
-    // OPEX total P50 vs cible (fichier C_P50 exact, cf CALIBRATION.md Règle 2).
+    // OPEX total P50 vs cible (fichier C_P50 exact, cf CALIBRATION.md Règle 2). an5 corrigé à
+    // 149.809 (la référence "147.18" était une colonne décalée dans le fichier BP).
     const OPEX_TARGET: Record<number, number> = {
-      1: 139.590, 5: 147.181, 21: 238.469, 24: 251.358,
+      1: 139.590, 5: 149.809, 21: 238.469, 24: 251.358,
     };
-    console.log("\n=== OPEX TOTAL P50 — IFER + assurance indexés (^(year-1), saut taux2 an21) ===");
+    console.log("\n=== OPEX TOTAL P50 — IFER + assurance + aléas indexés (fichier C_P50 exact) ===");
     for (const y of [1, 5, 21, 24]) {
       const r = rows.find((x) => x.year === y)!;
       const bp = OPEX_TARGET[y];
       console.log(`  an${y} : opexKeuro MF = ${r.opexKeuro.toFixed(3)} k€   cible C_P50 = ${bp.toFixed(3)} k€   Δ = ${(r.opexKeuro - bp).toFixed(3)}`);
     }
-    console.log(
-      "  NOTE : IFER et assurance vérifiés individuellement à <0.01k des cibles poste par poste " +
-      "(an1/2/21/22 IFER, an1/2/3/5 assurance — cf commit). L'écart résiduel sur le TOTAL an5/21/24 " +
-      "ne se reconstruit pas en sommant les postes déjà validés (O&M/MRA/BO/Divers/Loyer/Balancing/TF/CFE/Aléas " +
-      "identiques au BP) + IFER/assurance corrigés — probable incohérence entre cette ligne totale C_P50 " +
-      "et les cibles poste par poste (à confirmer par le fichier source).",
-    );
+
+    // Aléas P50 = base an1 figée × 1.02^(year-1), comme l'aléas P90 (pas 0.5% du revenu courant).
+    // La base an1 doit être calculée une fois (year=1, aleasBaseKeuro absent) puis réinjectée
+    // pour year>1 — exactement le mécanisme utilisé dans buildPreRows via opexP90Basket.
+    const ALEAS_TARGET: Record<number, number> = { 1: 3.178, 5: 3.440, 10: 3.798, 21: 4.722, 35: 6.231 };
+    const r1 = rows.find((x) => x.year === 1)!;
+    const revenuePvPur1 = (r1.productionP50Mwh * r1.annualTariff) / 1000;
+    const aleasBaseKeuro = calculateOpexDetails(
+      input, 1, r1.revenueP50Keuro, r1.productionP50Mwh, undefined, revenuePvPur1,
+    ).aleasKeuro;
+    console.log("\n=== ALÉAS P50 — base an1 figée × 1.02^(year-1) (comme le P90) ===");
+    for (const y of [1, 5, 10, 21, 35]) {
+      const r = rows.find((x) => x.year === y)!;
+      const revenuePvPur = (r.productionP50Mwh * r.annualTariff) / 1000;
+      const opex = calculateOpexDetails(
+        input, y, r.revenueP50Keuro, r.productionP50Mwh, undefined, revenuePvPur,
+        y === 1 ? undefined : aleasBaseKeuro,
+      );
+      const bp = ALEAS_TARGET[y];
+      console.log(`  an${y} : aleasKeuro MF = ${opex.aleasKeuro.toFixed(3)} k€   cible C_P50 = ${bp.toFixed(3)} k€   Δ = ${(opex.aleasKeuro - bp).toFixed(3)}`);
+    }
   });
 });
 
