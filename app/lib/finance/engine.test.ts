@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { sculptDebt } from "@/app/lib/finance/engine";
+import { calculateTaxesFoncieres, sculptDebt } from "@/app/lib/finance/engine";
+import type { FinanceEngineInput } from "@/app/lib/finance/engine";
 import type { DscrTranche } from "@/app/lib/finance/types";
 
 // Helpers to build minimal cash-flow rows for testing.
@@ -99,3 +100,76 @@ describe("sculptDebt", () => {
 function lastOutstanding(schedule: { outstanding: number }[]) {
   return schedule.at(-1)?.outstanding ?? NaN;
 }
+
+// Tests de PROPRIÉTÉ du chemin fiscal "comptable" (seul chemin qui exerçait TF/CFE
+// comptable avant le retrait des calibrations Sigoulès ; Baugé utilise "appreciation_directe").
+// On ne cale AUCUNE valeur BP : on vérifie la structure du calcul (linéarité base × taux),
+// pas des montants figés — pour ne pas tester le moteur contre lui-même.
+describe("calculateTaxesFoncieres — méthode comptable (propriétés)", () => {
+  // Input minimal : seuls la méthode, le CAPEX et les taux influent ici.
+  function comptableInput(over: Partial<FinanceEngineInput> = {}): FinanceEngineInput {
+    return {
+      capacityMw: 10,
+      capex: 0,
+      opex: 0,
+      yieldMwh: 1500,
+      yieldP90Mwh: 1350,
+      tariff: 80,
+      debtRate: 0,
+      projectLifeYears: 25,
+      degradationRate: 0.4,
+      discountRate: 6,
+      debtInterestRate: 4,
+      debtMaturityYears: 15,
+      tariffInflationRate: 0,
+      opexInflationRate: 0,
+      methodeTaxes: "comptable",
+      ...over,
+    };
+  }
+
+  it("TF et CFE proportionnels à la base : doubler le CAPEX double la taxe", () => {
+    const input = comptableInput({ tauxTFCommune: 25, tauxCFECommune: 20 });
+    const capexKeuro = 6000;
+
+    const simple = calculateTaxesFoncieres(input, capexKeuro);
+    const doubled = calculateTaxesFoncieres(input, 2 * capexKeuro);
+
+    // Base comptable = CAPEX × 4% × (1−30%) → strictement linéaire en CAPEX.
+    expect(doubled.baseTaxesKeuro).toBeCloseTo(2 * simple.baseTaxesKeuro, 6);
+    expect(doubled.tfAnnuelleKeuro).toBeCloseTo(2 * simple.tfAnnuelleKeuro, 6);
+    expect(doubled.cfeAnnuelleKeuro).toBeCloseTo(2 * simple.cfeAnnuelleKeuro, 6);
+
+    // Non trivial : taxes strictement positives.
+    expect(simple.tfAnnuelleKeuro).toBeGreaterThan(0);
+    expect(simple.cfeAnnuelleKeuro).toBeGreaterThan(0);
+  });
+
+  it("TF et CFE proportionnels au taux : doubler le taux double la taxe", () => {
+    const capexKeuro = 6000;
+
+    const simple = calculateTaxesFoncieres(
+      comptableInput({ tauxTFCommune: 20, tauxCFECommune: 15 }),
+      capexKeuro,
+    );
+    const doubled = calculateTaxesFoncieres(
+      comptableInput({ tauxTFCommune: 40, tauxCFECommune: 30 }),
+      capexKeuro,
+    );
+
+    expect(doubled.tfAnnuelleKeuro).toBeCloseTo(2 * simple.tfAnnuelleKeuro, 6);
+    expect(doubled.cfeAnnuelleKeuro).toBeCloseTo(2 * simple.cfeAnnuelleKeuro, 6);
+  });
+
+  it("CFE = base × taux exactement quand le seul taux ne porte aucun frais de gestion (CCI)", () => {
+    // Le slot CCI a un frais de gestion nul : la CFE vaut alors base × taux pur,
+    // ce qui valide littéralement la relation base × taux sans figer de frais.
+    const capexKeuro = 6000;
+    const tauxCCI = 30; // %
+
+    const res = calculateTaxesFoncieres(comptableInput({ tauxCCI }), capexKeuro);
+
+    expect(res.cfeAnnuelleKeuro).toBeCloseTo(res.baseTaxesKeuro * (tauxCCI / 100), 9);
+    expect(res.cfeAnnuelleKeuro).toBeGreaterThan(0);
+  });
+});
