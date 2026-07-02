@@ -42,8 +42,12 @@ const ABATT_AD = 0.50;
 const COEF_NEUTRAL_AD = 0.26;
 const RATIO_PART_FONC_AD = 0.0293;
 const VALEUR_VENALE_HA_AD = 5000;
-const FRAIS_TF_EURO = 78;
-const FRAIS_CFE_EURO = 72;
+// Frais de gestion (Appréciation Directe), calculés par composante : 3% sur les taxes
+// principales (commune + EPCI + GEMAPI + TEOM), 9% sur TSE et CCI. Règle BP générique —
+// remplace les ex-forfaits FRAIS_TF_EURO=78 / FRAIS_CFE_EURO=72 (qui étaient les frais de
+// gestion CALCULÉS de Baugé, gelés en dur → violation du principe générique).
+const FRAIS_GESTION_PRINCIPALES = 0.03;
+const FRAIS_GESTION_TSE_CCI = 0.09;
 
 export type FinanceEngineInput = FinancialAssumptions & {
   capacityMw: number;
@@ -671,16 +675,24 @@ export function calculateTaxesFoncieres(
     const revCadTerrain  = valeurTerrainEuro * TAUX_LF_AD * COEF_NEUTRAL_AD * (1 - ABATT_AD);
     const baseCadEuro    = revCadCentrale + revCadTerrain;
 
-    // Taux appliqués en décimal (0.3069 = 30.69% — pas de /100)
-    const sommeTF =
-      (input.tauxTFCommune ?? 0) + (input.tauxTFEPCI ?? 0) +
-      (input.tauxTSE ?? 0) + (input.tauxGEMAPI ?? 0) + (input.tauxTEOM ?? 0);
-    const sommeCFE =
-      (input.tauxCFECommune ?? 0) + (input.tauxCFEEPCI ?? 0) +
-      (input.tauxTSECfe ?? 0) + (input.tauxGEMAPICfe ?? 0) + (input.tauxCCI ?? 0);
+    // Taux appliqués en décimal (0.3069 = 30.69% — pas de /100). Frais de gestion CALCULÉS
+    // par composante : 3% sur les taxes principales, 9% sur TSE/CCI (cf FRAIS_GESTION_*).
+    const partPrincipalesTF =
+      baseCadEuro *
+      ((input.tauxTFCommune ?? 0) + (input.tauxTFEPCI ?? 0) +
+        (input.tauxGEMAPI ?? 0) + (input.tauxTEOM ?? 0));
+    const partTseTF = baseCadEuro * (input.tauxTSE ?? 0);
+    const fraisTF =
+      partPrincipalesTF * FRAIS_GESTION_PRINCIPALES + partTseTF * FRAIS_GESTION_TSE_CCI;
+    const tfAnnuelleKeuro = (partPrincipalesTF + partTseTF + fraisTF) / 1000;
 
-    const tfAnnuelleKeuro  = (baseCadEuro * sommeTF  + FRAIS_TF_EURO)  / 1000;
-    const cfeAnnuelleKeuro = (baseCadEuro * sommeCFE + FRAIS_CFE_EURO) / 1000;
+    const partPrincipalesCFE =
+      baseCadEuro *
+      ((input.tauxCFECommune ?? 0) + (input.tauxCFEEPCI ?? 0) + (input.tauxGEMAPICfe ?? 0));
+    const partTseCciCFE = baseCadEuro * ((input.tauxTSECfe ?? 0) + (input.tauxCCI ?? 0));
+    const fraisCFE =
+      partPrincipalesCFE * FRAIS_GESTION_PRINCIPALES + partTseCciCFE * FRAIS_GESTION_TSE_CCI;
+    const cfeAnnuelleKeuro = (partPrincipalesCFE + partTseCciCFE + fraisCFE) / 1000;
 
     return {
       baseTaxesKeuro: baseCadEuro / 1000,
