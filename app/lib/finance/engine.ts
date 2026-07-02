@@ -1430,6 +1430,9 @@ function buildPreRows(
   const effectiveYieldP90 = input.yieldP90Mwh ?? input.yieldMwh * 0.93;
 
   const preRows: PreRow[] = [];
+  // Panier an1 du régime P90 (C_P90) : IFER/assurance/aléas y sont re-indexés
+  // uniformément à partir de leur valeur an1, indépendamment de leur formule P50.
+  let opexP90Basket: OpexDetails | null = null;
 
   for (let year = 1; year <= input.projectLifeYears; year += 1) {
     const degradationFactor = (1 - degradationRate) ** (year - 1);
@@ -1488,24 +1491,45 @@ function buildPreRows(
     const revenueP50Total = revenueP50 + revenueCapacityKeuro + revenueGoKeuro;
     const revenueP90 = (productionP90 * annualTariffP90) / 1000;
 
-    const annualOpex =
-      calculateOpexDetails(
-        input,
-        year,
-        revenueP50Total,
-        productionP50,
-        baseCapexKeuro,
-        revenueP50,
-      ).opexTotalKeuro;
+    const opexDetailsP50 = calculateOpexDetails(
+      input,
+      year,
+      revenueP50Total,
+      productionP50,
+      baseCapexKeuro,
+      revenueP50,
+    );
+    const annualOpex = opexDetailsP50.opexTotalKeuro;
 
     // Equity cash-flow (P50) kEUR = revenue P50 - OPEX (project NPV/IRR base).
     const cfadsP50 = revenueP50Total - annualOpex;
 
-    // OPEX P90: same postes as P50 except balancing (prod P90). Aléas stays on P50 base.
+    if (opexP90Basket === null) {
+      opexP90Basket = opexDetailsP50;
+    }
+
+    // OPEX P90 (C_P90, debt sizing) : régime dédié, PAS opexP50 + delta balancing.
+    // IFER/assurance/aléas repartent de leur valeur an1 (panier P50 an1) et sont
+    // ré-indexés uniformément au taux "Opex excl. Rent" ; O&M/MRA/BO/Divers/TF/CFE/
+    // loyer sont identiques au P50 (déjà correctement indexés côté P50).
     const balancingCostVal = input.balancingCost ?? BALANCING_COST_FALLBACK;
-    const balancingInflFactor = (1 + asRate(input.inflationOM ?? INFLATION_OM_FALLBACK)) ** (year - 1);
-    const opexP90Keuro = annualOpex
-      + (balancingCostVal * (productionP90 - productionP50)) / 1000 * balancingInflFactor;
+    const opexInflFactor = (1 + asRate(input.inflationOM ?? INFLATION_OM_FALLBACK)) ** (year - 1);
+    const iferP90Keuro = opexP90Basket.iferKeuro * opexInflFactor;
+    const assuranceP90Keuro = opexP90Basket.assuranceKeuro * opexInflFactor;
+    const aleasP90Keuro = opexP90Basket.aleasKeuro * opexInflFactor;
+    const balancingP90Keuro = (balancingCostVal * productionP90) / 1000 * opexInflFactor;
+    const opexP90Keuro =
+      opexDetailsP50.omKeuro +
+      opexDetailsP50.mraKeuro +
+      opexDetailsP50.backOfficeKeuro +
+      opexDetailsP50.diversKeuro +
+      opexDetailsP50.loyerKeuro +
+      assuranceP90Keuro +
+      balancingP90Keuro +
+      iferP90Keuro +
+      opexDetailsP50.tfKeuro +
+      opexDetailsP50.cfeKeuro +
+      aleasP90Keuro;
     // Banking CFADS (P90) kEUR = revenue P90 - OPEX P90 (DSCR sizing base).
     const cfadsP90 = revenueP90 - opexP90Keuro;
 
