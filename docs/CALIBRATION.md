@@ -200,6 +200,10 @@ Le `GO start year` (21) et le `prix_GO_base` (1 €/MWh) sont des inputs modulab
 
 ## Règle 6 — Taxes foncières (TF / CFE) — méthode Appréciation Directe
 
+> 📄 **Spec complète du BP Sigoulès** (inputs, mécanismes, formules vérifiées à l'euro, bancs de
+> calibration, gaps G1-G10) : [`docs/SPEC_BP_SIGOULES.md`](SPEC_BP_SIGOULES.md) — extraite du
+> xlsm le 02/07/2026. C'est la source de vérité Sigoulès ; les blocs ci-dessous en sont des extraits.
+
 > ✅ **RÉSOLU — FIX 1 taxes (commit `d113e05`).** Les ⚠️ historiques ci-dessous décrivent l'état
 > ANTÉRIEUR du moteur ; l'état actuel est validé à l'euro sur Baugé ET Sigoulès. Acquis :
 >
