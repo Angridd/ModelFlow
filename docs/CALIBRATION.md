@@ -446,6 +446,13 @@ le CFADS P90. NE PAS le calculer sur revenu P90. (Si une correction aléas-P90 a
 Résultat : OPEX an1 = 139.699 (BP 139.6), CFADS P90 an1 = 446.498 (BP 446.459),
 dette = 5204.56 (BP 5216.873, Δ −12.3k). Dérive résiduelle CFADS P90 : +0.04 (an1) → +1.52 (an5).
 
+### ✅ FIX OPEX P90 DÉDIÉ — FAIT (commits 9372aee assurance + afddcb1 OPEX P90)
+Années 1-20 CALÉES : CFADS P90 Δ +0.039 (an1) → +0.092 (an5), dérive quasi nulle.
+Dette après fix = 5190.92 (BP 5216.873, Δ −25.95k). L'écart s'est CREUSÉ (attendu) : les flux
+1-20 étant maintenant identiques au BP, l'écart de dette vient ENTIÈREMENT de la queue 21-24
+(non encore traitée). NOTE : assurance/aléas P90 figés sur panier an1 dans ce commit — OK pour
+1-20 mais l'assurance doit être dé-figée pour an21+ (suit le revenu P50 courant, cf queue).
+
 ### ⚠️ DÉCOUVERTE MAJEURE — DEUX RÉGIMES D'INDEXATION OPEX (P50 ≠ P90)
 
 Le BP n'applique PAS les mêmes règles d'indexation dans la feuille P50 (investor case) et la
@@ -500,6 +507,19 @@ entièrement reconstruit (avec IFER saut inflaté 68.2 on obtient ≈232.6, rest
 N'affecte QUE le waterfall P50/TRI. Screenshot C_P50 années 20-22 à demander plus tard.
 NOTE : le P50 semble donc AUSSI appliquer le saut IFER inflaté à an21+ (sinon gap de 28k) —
 mais IFER FLAT années 1-20 en P50 reste prouvé (reconstructions an5/an10).
+
+### ✅ FIX QUEUE 21-24 — FAIT (buildPreRows) : IFER = calculateIferKeuro(year) × 1.02^(year−1)
+(saut taux1→taux2 + inflation cumulée, remplace la réindexation depuis le panier an1) ; assurance
+P90 = taux × revenuPV_P50(t) COURANT × 1.02^(year−1) (dé-figée du panier an1) ; balancing/aléas
+inchangés (déjà corrects). Résultat OPEX P90 vs cibles : y19 190.845 (Δ+0.10), y20 194.319
+(Δ+0.11), y21 237.012 (Δ+0.15), y22 241.044 (Δ+0.16), y24 249.870 (Δ+0.19) — dérive résiduelle
+homogène (~+0.1 à +0.2 k€, cohérente avec le résidu OPEX an1 déjà connu de +0.099k, hors scope).
+Dette sculptée = 5151.540 k€ (BP 5216.873, Δ −65.3k, écart en hausse — attendu : les années
+1-20 sont calées, tout l'écart vient maintenant de la queue 21-24 restant à raffiner). Le
+sculpting est borné par la tranche DSCR 1.40 des années 22-24 (dscrRealisé = 1.40 pile, contre
+1.15 pile sur 1-19) avec amortissement total exact à l'an24 (outstanding = 0) : c'est cette
+tranche, resserrée par la correction IFER, qui pilote désormais le montant de dette — pas
+l'année 1. Restent ouverts : OPEX **P50** an21 (énigme ligne 505) et dismantling (non traité).
 
 Outputs cibles BP : TRI Investisseur **12.0 %** · VAN brute **1125 k€** · VAN nette **355 k€**
 · Dette **5217 k€** · Gearing **86.86 %** · CCA / Equity **789 k€**

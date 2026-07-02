@@ -1430,8 +1430,8 @@ function buildPreRows(
   const effectiveYieldP90 = input.yieldP90Mwh ?? input.yieldMwh * 0.93;
 
   const preRows: PreRow[] = [];
-  // Panier an1 du régime P90 (C_P90) : IFER/assurance/aléas y sont re-indexés
-  // uniformément à partir de leur valeur an1, indépendamment de leur formule P50.
+  // Panier an1 du régime P90 (C_P90) : seul l'aléas y reste figé (base an1 × 1.02^(year-1),
+  // sans rupture à an21) ; IFER/assurance/balancing suivent leur propre règle par année.
   let opexP90Basket: OpexDetails | null = null;
 
   for (let year = 1; year <= input.projectLifeYears; year += 1) {
@@ -1509,13 +1509,18 @@ function buildPreRows(
     }
 
     // OPEX P90 (C_P90, debt sizing) : régime dédié, PAS opexP50 + delta balancing.
-    // IFER/assurance/aléas repartent de leur valeur an1 (panier P50 an1) et sont
-    // ré-indexés uniformément au taux "Opex excl. Rent" ; O&M/MRA/BO/Divers/TF/CFE/
-    // loyer sont identiques au P50 (déjà correctement indexés côté P50).
+    // O&M/MRA/BO/Divers/TF/CFE/loyer sont identiques au P50 (déjà correctement indexés
+    // côté P50). IFER/assurance/balancing/aléas suivent chacun leur propre règle P90
+    // (queue 21-24 élucidée via screenshots C_P90 années 19-30, cf CALIBRATION.md) :
+    //  - IFER   : taux courant (saut taux1→taux2 an21, calculateIferKeuro) × 1.02^(year-1).
+    //  - Assurance : taux × revenu PV P50 COURANT (suit la baisse an21 au merchant) × 1.02^(year-1).
+    //  - Balancing : 2 €/MWh × prodP90(t) × 1.02^(year-1), aucune règle spéciale en 21+.
+    //  - Aléas  : base an1 FIGÉE (panier P50 an1) × 1.02^(year-1), aucune rupture à an21.
     const balancingCostVal = input.balancingCost ?? BALANCING_COST_FALLBACK;
     const opexInflFactor = (1 + asRate(input.inflationOM ?? INFLATION_OM_FALLBACK)) ** (year - 1);
-    const iferP90Keuro = opexP90Basket.iferKeuro * opexInflFactor;
-    const assuranceP90Keuro = opexP90Basket.assuranceKeuro * opexInflFactor;
+    const assuranceRateP90 = asRate(input.assuranceRate ?? ASSURANCE_RATE_FALLBACK);
+    const iferP90Keuro = calculateIferKeuro(input, year) * opexInflFactor;
+    const assuranceP90Keuro = assuranceRateP90 * revenueP50 * opexInflFactor;
     const aleasP90Keuro = opexP90Basket.aleasKeuro * opexInflFactor;
     const balancingP90Keuro = (balancingCostVal * productionP90) / 1000 * opexInflFactor;
     const opexP90Keuro =

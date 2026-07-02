@@ -417,14 +417,19 @@ describe("calibration Baugé — CFADS P90 + sculpting DSCR", () => {
     const sizing = metrics.sizing;
 
     // BP CFADS P90 (k€) — onglet sizing DSCR BP Excel (EBITDA P90 = revPV P90 − OPEX P90)
+    // Années 21-24 : cible = revenu P90 BP − OPEX P90 BP (queue élucidée, cf CALIBRATION.md).
     const BP_CFADS_P90: Record<number, number> = {
       1: 446.459,
       2: 443.985,
       3: 441.455,
       5: 436.222,
+      21: 520.954 - 236.864,
+      22: 504.296 - 240.883,
+      23: 509.396 - 245.341,
+      24: 505.007 - 249.677,
     };
 
-    const watchYears = [1, 2, 3, 5, 10];
+    const watchYears = [1, 2, 3, 5, 10, 19, 20, 21, 22, 24];
 
     console.log("\n=== CFADS P90 — DÉCOMPOSITION vs BP (k€) ===");
     console.log(
@@ -458,6 +463,69 @@ describe("calibration Baugé — CFADS P90 + sculpting DSCR", () => {
       : 0;
     console.log(`  gearingActuel       = ${((sizing?.gearingActuel ?? 0) * 100).toFixed(2)} %  (BP : 86.86 %)`);
     console.log(`\n  an1 : CFADS P50=${ops.find(r => r.year === 1)?.cashFlowKeuro.toFixed(2)} k€  CFADS P90=${ops.find(r => r.year === 1)?.cfadsP90Keuro.toFixed(3)} k€`);
+  });
+});
+
+describe("calibration Baugé — OPEX P90 queue 21-24", () => {
+  it("affiche OPEX P90 / CFADS P90 années 19-24 vs BP + année bornant le sculpting", () => {
+    const input = baugeInput();
+    const rows = calculateAnnualCashFlows(input);
+    const ops = rows.filter((r) => r.year >= 1);
+    const metrics = calculateScenarioMetrics(input);
+    const sizing = metrics.sizing;
+
+    // OPEX P90 BP (k€) — queue élucidée via screenshots C_P90 années 19-30 (cf CALIBRATION.md).
+    const BP_OPEX_P90: Record<number, number> = {
+      5: 148.559,
+      19: 190.743,
+      20: 194.205,
+      21: 236.864,
+      22: 240.883,
+      23: 245.341,
+      24: 249.677,
+    };
+
+    console.log("\n=== OPEX P90 — QUEUE 21-24 vs BP (k€) ===");
+    console.log(
+      `${"an".padStart(3)} | ${"opexP90 MF".padStart(10)} | ${"opexP90 BP".padStart(10)} | ${"Δ".padStart(7)} | ${"cfadsP90 MF".padStart(12)}`,
+    );
+    console.log("-".repeat(60));
+    for (const y of [5, 19, 20, 21, 22, 23, 24]) {
+      const r = ops.find((x) => x.year === y);
+      if (!r) continue;
+      const opexP90MF = r.revenueP90Keuro - r.cfadsP90Keuro;
+      const bpVal = BP_OPEX_P90[y];
+      const delta = bpVal != null ? opexP90MF - bpVal : null;
+      console.log(
+        `${String(y).padStart(3)} | ${opexP90MF.toFixed(3).padStart(10)} | ${bpVal != null ? bpVal.toFixed(3).padStart(10) : "         —"} | ${delta != null ? delta.toFixed(3).padStart(7) : "      —"} | ${r.cfadsP90Keuro.toFixed(3).padStart(12)}`,
+      );
+    }
+
+    console.log("\n=== SIZING — dette après fix queue 21-24 ===");
+    console.log(`  debtSculptedKeuro = ${(sizing?.debtSculptedKeuro ?? 0).toFixed(3)} k€  (BP : 5 216.873)`);
+    console.log(`  debtRetenuKeuro   = ${(sizing?.debtRetenuKeuro ?? 0).toFixed(3)} k€`);
+    console.log(`  bindingConstraint = ${sizing?.bindingConstraint ?? "—"}`);
+
+    // Le sculpting fixe le service de dette de CHAQUE année pile sur son DSCR cible tant que
+    // l'amortissement le permet : "l'année qui borne" n'est donc pas un minimum isolé, mais la
+    // dernière tranche où le DSCR réalisé colle exactement à la cible ET où l'outstanding
+    // s'annule pile au dernier exercice du tenor (an24) — cf table détaillée ci-dessous.
+    const boundYears = rows
+      .filter((r) => r.year >= 1 && r.year <= 24)
+      .filter((r) => r.dscrRealized !== null && r.dscrTargetAtYear !== null
+        && Math.abs(r.dscrRealized - r.dscrTargetAtYear) < 0.001)
+      .map((r) => r.year);
+    console.log(`  années au DSCR cible exact (bornantes) = [${boundYears.join(", ")}]`);
+
+    console.log("\n=== OUTSTANDING / SERVICE DETTE — QUEUE 18-24 (k€) ===");
+    console.log(`${"an".padStart(3)} | ${"cfadsP90".padStart(10)} | ${"debtSvc sculpté".padStart(16)} | ${"outstanding".padStart(12)} | ${"dscrTarget".padStart(10)} | ${"dscrRealisé".padStart(11)}`);
+    console.log("-".repeat(75));
+    for (const r of rows) {
+      if (r.year < 18 || r.year > 24) continue;
+      console.log(
+        `${String(r.year).padStart(3)} | ${r.cfadsP90Keuro.toFixed(2).padStart(10)} | ${(r.debtServiceSculptedKeuro ?? r.debtServiceKeuro).toFixed(2).padStart(16)} | ${r.debtOutstandingKeuro.toFixed(2).padStart(12)} | ${r.dscrTargetAtYear != null ? r.dscrTargetAtYear.toFixed(2).padStart(10) : "        —"} | ${r.dscrRealized != null ? r.dscrRealized.toFixed(4).padStart(11) : "         —"}`,
+      );
+    }
   });
 });
 
