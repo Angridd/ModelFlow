@@ -258,6 +258,35 @@ Le `GO start year` (21) et le `prix_GO_base` (1 €/MWh) sont des inputs modulab
 >   son propre `diversOpexKeuro = 8.611` (inchangé). Valeur = donnée de config (DB/scénario), pas
 >   un champ moteur à modifier.
 
+> 🏁 **CLÔTURE SESSION — état Sigoulès après Fix 3 (validé au centime, aucun code).**
+> `diversOpexKeuro = 10.833` est une **donnée de config** (routage moteur déjà correct : P50 +
+> sizing P90, indexé 2%). Vérifié à l'euro sur la spec :
+> - OPEX P50 an1 **230 243,5** · OPEX sizing **227 981,5** · CFADS P90 an1 **868 903,6** — tous
+>   = BP à **±0,1 €**. P50 − sizing = 2 262 € = balancing seul (§2.3).
+> - **Dette 10 338 390 €** vs cible 10 323 840 (**+0,14%** ; était +2,56% en début de calibration).
+>   CAPEX / TF / CFE exacts. **Baugé intact** (dette 5218,44).
+> - Sizing ne déduit **NI agent fee NI DSRF** (conforme spec §2.1) : `dsrf/agentFeeDeduction`
+>   sortent du waterfall equity [engine.ts ~1790], jamais du CFADS de sizing.
+>
+> **Résiduel dette +14 550 € — décomposé (deux conventions moteur ≠ template BP) :**
+> - **G8a — index des courbes** : le BP utilise une **série IMF stockée** (index 2029/an1 =
+>   **1,10245**, puis ×1,02/an) ; le moteur fait `1,02^5 = 1,10408` (**+0,148%** sur le prix). Spec §2.2.
+> - **G8b (NOUVEAU) — dégradation LINÉAIRE** : le BP fait `prod(y) = init × (1 − 0,004×(y−1))`
+>   (vérifié à l'euro : an21 = 16 156,8 × 0,92 = **14 864,26** = série BP ; le composé donnerait
+>   14 911,9). **Le moteur compose** `(1−0,004)^(y−1)` → **+0,32%** de prod en an21.
+> - Somme : 0,148% + 0,32% = **0,47%** = l'écart de revenu an21 constaté (moteur 1 008,5 vs BP
+>   1 003,8 k€). Le « micro-diff prix merchant 72.72 vs 72.61 » noté plus haut = la part G8a.
+> - ⚠️ **Les deux fixes toucheront AUSSI Baugé** (même template, même MES 2029) : sa dette
+>   (Δ actuel +1,567 k€ vs 5 216,873) doit se **RAPPROCHER** de la cible — c'est le critère de validation.
+>
+> **PROCHAINE SESSION (ordre) :**
+> 1. **Fix 4a** — dégradation linéaire (G8b) → puis **Fix 4b** — `curveIndexAn1 = 1,10245` (G8a).
+>    Cible : dette à l'euro sur les **DEUX** projets (Sigoulès ET Baugé).
+> 2. **Chantier TRI** (cible Investisseur **7,42%**, banc spec §3.1) : **G4** D&A dégressif Type 1
+>    (coef 2,25) → **G3** IS = `25% × MIN(EBT, cumEBT)` (report déficitaire, §2.6) → **G5** intérêts
+>    SHL capitalisés an0 → **G2** flux actionnaire = FCF after debt service (mise 2 827 258, dès an1).
+> - Source de vérité : [`docs/SPEC_BP_SIGOULES.md`](SPEC_BP_SIGOULES.md) (formules exactes + bancs).
+
 **[HISTORIQUE — voir RÉSOLU FIX 1 ci-dessus]** Le calcul du moteur (`calculateTaxesFoncieres`) était faux sur deux points :
 1. Il applique les taux à un % du **CAPEX total**, alors que le BP les applique au **revenu
    cadastral** (≈ 7.5–10 k€), pas au CAPEX.
