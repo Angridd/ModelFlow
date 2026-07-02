@@ -854,6 +854,21 @@ Restent aussi (fix ultérieur) : réintégrations additives A/C/D/E/F pour VAN b
 
 ---
 
+## Test de cohérence (sensibilité puissance) — moteur validé
+Test : changer puissance sur Baugé et comparer la réaction au BP. Résultat : à taille + site égaux
+(6 MWc, yield disponibilisé), le moteur reproduit le BP à **0.07%** (dette 4576.5 vs BP 4579.7).
+Le moteur scale correctement (postes CAPEX variables scalent, raccordement fixe reste fixe, dette
+via CFADS). ⚠️ Deux pièges de test identifiés :
+- **Raccordement FIXE** : le BP fige le raccordement (1 500 000, fonction de la distance 8 km, PAS
+  de la puissance), vérifié à 6 ET 7 MWc. Le moteur a raison de le figer. NE PAS le passer en per-MW.
+- **Indisponibilité (unavailability) NON gérée par le moteur** : elle est PRÉ-CUITE dans le yield
+  d'entrée. Baugé nominal : yieldMwh 1198 = 1210 brut × 0.99. Chaîne BP : yield_brut → ×0.93 (P90)
+  → ×0.99 (indispo). Le moteur fait yield × puissance × dégradation, PAS de ×(1−indispo). Donc pour
+  tout nouveau projet : ENTRER LE YIELD NET D'INDISPO (brut × 0.99), sinon sur-production +1% →
+  CFADS/dette gonflés +1%. Amélioration future recommandée : ajouter un param `unavailability`
+  explicite (entrer yield brut + indispo), plus proche du BP et moins d'erreurs de saisie
+  (vérifier alors que Baugé nominal reste calé : repasser yield en brut 1210 + indispo 1%).
+
 ## Ordre de travail recommandé
 
 1. ✅ Règle 1 (Aurora) — FAIT. Tarif merchant an 21 = 77.3 €/MWh, revenu 598 k€ (BP 595.6).
