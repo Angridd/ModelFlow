@@ -64,27 +64,6 @@ distincts" était une sur-interprétation. La SEULE vraie différence P50/P90 : 
 PV pur sans capacity/GO, prod P90) et le balancing (sur prod P90). Les POSTES OPEX sont indexés
 pareil. NB : le fichier c_p50.xlsx (37 ans, valeurs + formules) est LA référence OPEX P50 exacte.
 
-### ✅ FIX FAIT — Aléas P50 = base an1 figée × 1.02^(year−1) (comme le P90)
-Dernier résidu OPEX P50 an21 (Δ−1.5k) identifié poste par poste : SEUL l'aléas déviait (MF 3.152
-vs cible 4.722, tous les autres postes <0.02k). Le moteur suivait le revenu courant
-(`0.5% × revenu(t)`), coïncidant avec la cible à l'an1 puis divergeant. La vraie formule (fichier
-C_P50, calée au centime sur 37 ans) : `aléas = aléas_an1(3.178) × 1.02^(year−1)`, base FIGÉE —
-identique à l'aléas P90 déjà implémenté (`opexP90Basket.aleasKeuro × opexInflFactor`).
-
-Fix (engine.ts `calculateOpexDetails`) : nouveau paramètre optionnel `aleasBaseKeuro`. Si fourni,
-`aléas = aleasBaseKeuro × 1.02^(year−1)` ; sinon (appel year=1, ou tout appelant qui ne le fournit
-pas) fallback sur l'ancienne formule `0.5% × revenu courant`, qui donne exactement la même valeur
-à l'an1 (^0=1). `buildPreRows` capture la base à l'an1 via `opexP90Basket` (déjà utilisé pour le
-P90) et la réinjecte pour year>1. Le P90 était déjà correct — aucun changement côté P90/sizing.
-
-Vérification aléas seul : an1=3.178/an5=3.440/an10=3.798/an21=4.723/an35=6.231 vs cibles
-3.178/3.440/3.798/4.722/6.231 (Δ≤0.001, quasi exact). **OPEX P50 total désormais calé** : an1
-139.599 (cible 139.590, Δ0.009) · an5 149.823 (cible 149.809, Δ0.014) · an21 238.494 (cible
-238.469, Δ0.025) · an24 251.387 (cible 251.358, Δ0.029).
-
-investorIrr = **12.38 %** (BP 12.03 %, Δ0.35pp) — baisse depuis 12.42 % comme attendu. Dette
-P90 sculptée inchangée à 5218.320 k€ (vérifié : ce fix ne touche que la branche P50).
-
 ---
 
 ## Règle 3 — Amortissement (D&A) par type de CAPEX
@@ -744,16 +723,113 @@ gonfle le cash equity). Les flux ne sont PAS le problème principal.
 Une fois l'architecture métriques corrigée, seul restera l'écart an21+ (énigme OPEX P50) qui
 pèsera un peu sur le TRI/VAN — à traiter après (screenshot C_P50 IFER 20-22).
 
-### ✅ FIX 1 INVESTOR IRR — FAIT (commit f23c18c)
-investorIrr = calculateIrr(ccaKeuro 787.654, fluxActionnaire[]) = **12.88% vs BP 12.03%**
-(Δ +0.85pp), contre 7.09%/10.73% des anciennes métriques (mise gonflée par devFees). Additif,
-Sigoulès intact. Diagnostic confirmé : mise SHL pure + flux equity = quasi la cible.
-⚠️ Moteur AU-DESSUS du BP (+0.85pp) → cohérent avec l'énigme OPEX P50 an21 : le moteur SOUS-ESTIME
-l'OPEX P50 de ~28k/an dès an21 (210k vs 238k) → cash equity surestimé an21-35 → TRI trop haut.
-**Résoudre l'énigme OPEX P50 an21 fera baisser le TRI de 12.88 vers 12.03.** Dernier écart, vaut 0.85pp.
+### ✅ TRI INVESTISSEUR RÉSOLU — BUG B (DSRF+fees) seul. La "zéro-année" est CORRECTE.
+⚠️ CORRECTION d'une erreur d'analyse antérieure (j'avais supposé un décalage 1 an mise→flux et
+inventé une "couche réintégration" à 3 niveaux — FAUX). Vérifié empiriquement (Sonnet) + au calcul :
 
-Restent (fix 2) : réintégrations additives A/C/D/E/F pour VAN brute (cible 1125k) / nette (355k),
-et un IRR sur série projet (cfadsAfterTax vs CAPEX) pour Project IRR brut 7.57% / net 6.21%.
+**La timeline BP a 2 ANS entre la mise et le premier cash** : SHL drawdown Year −1 (financing 2027)
+· construction Year 0 (2028) · MES Year +1 (2029). La "zéro-année" du moteur (mise t0, ZÉRO t1
+construction, 1er flux t2) modélise ça CORRECTEMENT. Ce n'était PAS un bug.
+```
+Série equity BP (mise 789.101 + FCF after debt service) :
+  décalage 1 an (mise t0, flux t1)  → 13.40%  ← mon hypothèse FAUSSE
+  décalage 2 ans (zéro t1, flux t2) → 12.044% ← convention BP réelle = cible 12.03 ✓
+```
+
+**UN SEUL FIX RÉEL : BUG B — déduire DSRF + other/agent fees du flux equity.** Confirmé au centime
+(DSRF+fees an1 3718 vs delta equity 3736). Le moteur les déduisait déjà du CFADS P90 (sizing) mais
+pas du flux equity P50. Résultat mesuré : investorIrr passe de 12.38% (avant) à **12.043%** vs BP
+12.03% (Δ +0.01pp) EN GARDANT la zéro-année. Il n'y a NI bug de convention, NI couche réintégration
+pour l'Investor IRR. **Décision : commit BUG B seul, garder la zéro-année.**
+
+Résidus mineurs restants (n'affectent quasi pas le TRI, à finir avec le fichier waterfall) :
+- an19 : MF flux 69.007 vs BP 80.782 (−11.8k) = timing-IS (moteur paie 0 IS an1-15 via amort
+  dégressif, puis 48-49k dès an16 quand le déficit s'épuise ; le BP étale différemment). Localisé
+  an16-24. Besoin ligne "Corporate tax" du BP (fichier waterfall) pour caler.
+- an25+ : merchant P50 (courbe investisseur) EBITDA MF +15k an25 → +4k an35. Séparé.
+Ces deux résidus sont petits (années lointaines actualisées) → le TRI est déjà à 0.01pp. Les caler
+rendra la série equity exacte an par an mais ne bougera le TRI que de quelques centièmes de pp.
+NB : BP "Photosol IRR" 35.82% = perspective développeur (recette distincte), NE PAS confondre.
+
+### ⚠️⚠️⚠️ [OBSOLÈTE — voir correction ci-dessus] TRI 12.38% — analyse "TROIS COUCHES" ERRONÉE
+Cette analyse (zéro-année = bug A, couche réintégration niveau 2) était FAUSSE : elle supposait un
+décalage 1 an. En réalité la timeline BP est à 2 ans (zéro-année correcte) et BUG B seul cale le TRI.
+Conservé pour trace mais NE PAS suivre. Le vrai plan = commit BUG B, garder zéro-année.
+
+**NIVEAU 0 — Convention IRR (BUG A, structurel).** engine.ts:1974 insère une année ZÉRO entre
+la mise et le 1er flux equity. Effet −1.44pp. Sans le zéro, le moteur reporte sa série brute à
+**13.82%** (pas 12.38%). FIX : retirer le zéro fantôme (mise t0, fluxActionnaire[0] en t1).
+
+**NIVEAU 1 — Série equity BRUTE (mise SHL + FCF after debt service).** Cible : BP raw = **13.40%**
+(mise 789.101 + FCF after debt service an1-35). Le moteur brut (après fix A) = 13.82%. Gap +0.42pp,
+deux composantes :
+  • **B1 (an1-24) : DSRF expense + other/agent fees non déduits du flux equity.** Confirmé au
+    centime : DSRF+fees an1 3718 vs delta 3736 (résidu +18€), an5 3737 vs 3768 (+31€), an13 3781
+    vs 3763 (−18€). Le "FCF after debt service" BP = CFADS_post-IS − principal − intérêts − **DSRF
+    − other fees**. Le moteur oublie les 2 derniers. Ce sont les MÊMES DSRF+agentFee déjà déduits
+    du CFADS P90 pour le sizing → incohérence sizing/waterfall. FIX : les déduire aussi du flux equity.
+  • **B2 (an25+) : merchant P50 (courbe investisseur) trop haut.** EBITDA P50 MF an25 337.63 vs BP
+    322.67 (+15k), se résorbe à +4.4k an35. Séparé de la dette (post-tenor). Cause probable : tarif
+    merchant P50 ~77.5 vs BP ~75.5 €/MWh à an25 (courbe investisseur late-year). À vérifier moteur.
+
+**NIVEAU 2 — Réintégrations D/E/F (IRR reporté).** Le BP passe de la série brute (13.40%) à
+l'**Investor IRR reporté 12.03%** via des réintégrations (financing fees 241.9k, MOD net 577.5k,
+dev fees 770k). Le moteur `investorIrr` est BRUT (aucune réintégration) → il ne tombera JAMAIS sur
+12.03% sans cette couche, même flux parfaits. ⚠️ Recette exacte des réintégrations PAS
+reconstructible depuis le paste (mise donnant 12.03% = 885.211, ne mappe aucun combo propre).
+NÉCESSITE l'onglet "IRR & NPV" du BP en .xlsx pour caler au centime.
+NB : BP "Photosol IRR" 35.82% = perspective développeur (autre recette, mise nette très faible) —
+NE PAS confondre avec Investor IRR 12.03%.
+
+**PLAN DURABLE (ordre) :**
+1. Fix A (retirer zéro) + Fix B1 (déduire DSRF+agentFee du flux equity, cohérent avec le sizing).
+   → série brute moteur doit tomber sur ~13.40% (= BP raw). C'est la cible VÉRIFIABLE maintenant.
+2. Vérifier B2 (merchant P50 an25+) — comparer tarif merchant P50 moteur vs courbe investisseur.
+3. Implémenter la couche réintégration (niveau 2) pour reporter 12.03% — APRÈS avoir obtenu
+   l'onglet IRR du BP en .xlsx. Sans lui, viser le niveau 1 (13.40% brut) comme jalon propre.
+⚠️ NE JAMAIS "ajuster pour afficher 12.03" sans les 3 niveaux — ce serait un 4e faux-match.
+
+### ✅ FIX 1 INVESTOR IRR — FAIT (commit f23c18c), puis OPEX P50 calé (a2d2f33) → investorIrr 12.38%
+
+### ⚠️⚠️ TRI 12.38% EST TROMPEUR — DEUX BUGS OPPOSÉS ~1.5pp SE COMPENSENT (observation post-aléas)
+Après OPEX P50 calé (IFER/assurance/aléas), investorIrr = 12.38% vs BP 12.03%. Ce n'est PAS un
+résidu propre — c'est le net de deux erreurs opposées :
+```
+Convention IRR (année zéro fantôme insérée)  : −1.44pp
+Série equity trop haute (+3.7k/an, timing IS): +1.79pp
+Timing SHL an10 vs an13                       : ~0 (SHL = flux equity, re-labellisation seulement)
+Effet mise (787.65 vs 789.10)                 : −0.02pp
+──────────────────────────────────────────────────────
+Net                                           : +0.35pp (12.38 vs 12.03)
+```
+⚠️ NE PAS se fier au 12.38%. Corriger UN bug isolément fera "diverger" le TRI (ex : fix conv IRR
+seul → 13.8%). C'est normal et attendu. Corriger les DEUX.
+
+**BUG A — convention IRR (structurel, −1.44pp).** engine.ts ~1975/2035 : shareholderFlows =
+[...postInvestmentZeroFlows(=[0]), ...fluxActionnaire]. calculateIrr place mise t0, ZÉRO t1
+(année construction), flux t2+. Le BP met mise t0 + premier flux t1 (pas de trou). Vérifié :
+conv BP → 13.819% · conv moteur → 12.378%. FIX : retirer l'année zéro entre mise et 1er flux.
+
+**BUG B — série equity +3.7k/an trop haute (+1.79pp).** Sous conv BP correcte, flux moteur →
+13.82% vs BP 12.03%. ⭐ CAUSE IDENTIFIÉE (waterfall BP) : ce n'est PAS l'IS (Sonnet l'a prouvé :
+an1 IS=0 des deux côtés, EBITDA/service dette calés, pourtant +3.7k). C'est que le moteur ne
+déduit PAS du flux equity le **DSRF** (réserve service dette) ni les **Other fees** (agent fee
+annuel) que le BP retire chaque année :
+```
+BP DSRF       : an1 −2 718 · an2 −2 703 · ... (décroît avec la dette)
+BP Other fees : an1 −1 000 · an2 −1 020 · ... (agent fee, croît 2%)
+Somme an1 = 2 718 + 1 000 = 3 718 ≈ +3.7k  ← PILE l'écart equity/an
+```
+Actif pendant la vie de la dette (an1-24), disparaît après → cohérent avec le motif observé
+(+3.7k an1-15, variations an19-24 mêlées à l'IS-timing, ~0 après extinction dette).
+Le "FCF after debt service" du BP = CFADS − principal − intérêts − **DSRF − other fees**. Le
+moteur oublie les deux derniers termes. FIX : déduire DSRF + agent fee annuel du flux equity.
+Réf exacte : fichier cash waterfall BP (lignes DSRF, Other fees, FCF after debt service) — à
+fournir en .xlsx pour caler au centime. NB : le −8k an19-20 résiduel = IS-timing (à vérifier
+après le fix DSRF/fees, probablement un petit décalage de bascule du bouclier fiscal).
+
+Restent aussi (fix ultérieur) : réintégrations additives A/C/D/E/F pour VAN brute (1125k) / nette
+(355k), et IRR sur série projet (cfadsAfterTax vs CAPEX) pour Project IRR brut 7.57% / net 6.21%.
 
 ---
 

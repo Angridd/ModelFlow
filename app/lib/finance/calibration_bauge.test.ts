@@ -96,6 +96,10 @@ function baugeInput(): FinanceEngineInput {
     // SHL / CCA
     ccaApportKeuro: 789,
     ccaRemunRate: 5,
+    // BUG B (CALIBRATION.md "DEUX BUGS OPPOSÉS") : DSRF + agent fee retirés chaque année du flux
+    // equity comme le BP (DSRF an1 2 718 + agent fee 1 000 = 3 718 ≈ +3.7k pile).
+    dsrfAnnuelKeuro: 2.718,
+    agentFeeAnnuelKeuro: 1.0,
     // Aurora (year, central, low)
     inflationAurora: 2,
     capacityCertificateMw: 0.2,

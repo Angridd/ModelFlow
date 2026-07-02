@@ -74,6 +74,12 @@ export type FinanceEngineInput = FinancialAssumptions & {
   capexType2Keuro?: number | null;
   margeDevKeuro?: number | null;
   dsraMonths?: number | null;
+  // BUG B (cf CALIBRATION.md "DEUX BUGS OPPOSÉS") : le BP retire chaque année du flux equity le
+  // DSRF (réserve service dette) et les other fees (agent fee) — "FCF after debt service =
+  // CFADS − principal − intérêts − DSRF − other fees". dsrfAnnuelKeuro déduit pendant le tenor,
+  // agentFeeAnnuelKeuro chaque année d'exploitation. Absent/null → 0 → comportement inchangé.
+  dsrfAnnuelKeuro?: number | null;
+  agentFeeAnnuelKeuro?: number | null;
   devFeesKEuroPerMW?: number | null;
   tauxISEntreprise?: number | null;
   contingencyRate?: number | null;
@@ -1652,7 +1658,10 @@ function taxAmount(ebt: number, tauxIS: number | null | undefined) {
 function applyWaterfall(
   preRows: PreRow[],
   scheduleByYear: Map<number, RetainedDebtScheduleItem>,
-  input: Pick<FinanceEngineInput, "tauxIS" | "dsraMonths" | "taxeFinaleSizingKeuro">,
+  input: Pick<
+    FinanceEngineInput,
+    "tauxIS" | "dsraMonths" | "taxeFinaleSizingKeuro" | "dsrfAnnuelKeuro" | "agentFeeAnnuelKeuro"
+  >,
   discountRate: number,
   effectiveSchedule: DscrTranche[] | null,
   effectiveTenor: number,
@@ -1720,6 +1729,13 @@ function applyWaterfall(
     const dsraDepot = Math.min(cashAvailable, Math.max(0, dsraTarget - dsraSolde));
     dsraSolde += dsraDepot;
     cashAvailable -= dsraDepot;
+
+    // BUG B : DSRF + agent fee sortent du flux equity avant la cascade SHL/dividendes, comme le
+    // BP ("FCF after debt service = CFADS − principal − intérêts − DSRF − other fees"). DSRF
+    // pendant le tenor de la dette ; agent fee chaque année d'exploitation. Cf CALIBRATION.md BUG B.
+    const dsrfDeduction = pre.year <= effectiveTenor ? (input.dsrfAnnuelKeuro ?? 0) : 0;
+    const agentFeeDeduction = input.agentFeeAnnuelKeuro ?? 0;
+    cashAvailable = Math.max(0, cashAvailable - dsrfDeduction - agentFeeDeduction);
 
     const cashAfterCcaInterest = Math.max(0, cashAvailable - ccaInterets);
     const ccaRemboursement = Math.min(ccaOutstanding, cashAfterCcaInterest);
@@ -2032,6 +2048,10 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
     ccaKeuro + devFeesKeuro + margeDev * (1 - asRate(input.tauxIS ?? 0));
   const miseNetteEntrep =
     miseNetteInvest - margeDev * netEntrepriseFactor - devFeesKeuro * netEntrepriseFactor;
+  // Le TRI investisseur conserve la zéro-année de construction (postInvestmentZeroFlows) : le BP
+  // tire le SHL en Period Year −1 et démarre l'exploitation en Period Year +1, soit 2 ans d'écart,
+  // que cette zéro-année modélise correctement. Vérifié : avec la déduction DSRF/fees (BUG B),
+  // cette convention donne investorIrr 12.04% ≈ BP 12.03%. Cf CALIBRATION.md "DEUX BUGS OPPOSÉS".
   const shareholderFlows = [
     ...postInvestmentZeroFlows,
     ...operatingCashFlows.map((row) => row.fluxActionnaire),
