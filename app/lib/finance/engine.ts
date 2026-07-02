@@ -61,6 +61,9 @@ export type FinanceEngineInput = FinancialAssumptions & {
   debtRate: number;
   dscrTarget?: number | null;
   debtTenorYears?: number | null;
+  // "Taxes P&L" BP : IS soustrait du CFADS de sizing SEULEMENT à la dernière année du tenor
+  // (an1..tenor-1 sculptent pré-IS). Absent/0 → comportement inchangé (pas de retranchement).
+  taxeFinaleSizingKeuro?: number | null;
   dscrSchedule?: DscrTranche[] | null;
   gearingMaxPct?: number | null;
   gearingMax?: number | null;
@@ -1094,12 +1097,26 @@ export function sculptDebt(
   return { debtAmountKeuro, schedule: result.schedule };
 }
 
+// CFADS de sizing BP = pré-IS pour an1..tenor-1, moins la "Taxes P&L" de la dernière année du
+// tenor uniquement (seul IS injecté dans le repayment ; les IS des années suivantes tombent
+// hors tenor et n'affectent pas le sizing). Cf CALIBRATION.md, "MÉCANISME DE SCULPTING COMPLET".
+function resolveCfadsSizingKeuro(
+  row: { year: number; cfadsP90Keuro: number },
+  tenorYears: number,
+  taxeFinaleSizingKeuro: number,
+) {
+  return row.year === tenorYears
+    ? row.cfadsP90Keuro - taxeFinaleSizingKeuro
+    : row.cfadsP90Keuro;
+}
+
 function debtScheduleFromRetainedDebt(
-  cashFlows: ReadonlyArray<{ year: number; cfadsP90AfterTaxKeuro: number }>,
+  cashFlows: ReadonlyArray<{ year: number; cfadsP90Keuro: number }>,
   dscrSchedule: DscrTranche[],
   debtInterestRatePercent: number,
   tenorYears: number,
   debtRetenuKeuro: number,
+  taxeFinaleSizingKeuro: number,
 ) {
   const debtRate = asRate(debtInterestRatePercent);
   const schedule = new Map<number, RetainedDebtScheduleItem>();
@@ -1113,7 +1130,8 @@ function debtScheduleFromRetainedDebt(
 
     const interest = outstanding * debtRate;
     const targetDebtService =
-      row.cfadsP90AfterTaxKeuro / dscrForYear(row.year, dscrSchedule);
+      resolveCfadsSizingKeuro(row, tenorYears, taxeFinaleSizingKeuro) /
+      dscrForYear(row.year, dscrSchedule);
     const principal = Math.min(Math.max(0, targetDebtService - interest), outstanding);
 
     outstanding = Math.max(0, outstanding - principal);
@@ -1124,10 +1142,11 @@ function debtScheduleFromRetainedDebt(
 }
 
 function presentValueDebtCapacity(
-  cashFlows: ReadonlyArray<{ year: number; cfadsP90AfterTaxKeuro: number }>,
+  cashFlows: ReadonlyArray<{ year: number; cfadsP90Keuro: number }>,
   dscrSchedule: DscrTranche[],
   debtInterestRatePercent: number,
   tenorYears: number,
+  taxeFinaleSizingKeuro: number,
 ) {
   const debtRate = asRate(debtInterestRatePercent);
 
@@ -1136,7 +1155,9 @@ function presentValueDebtCapacity(
     cashFlows
       .filter((row) => row.year <= tenorYears)
       .reduce((pv, row) => {
-        const service = row.cfadsP90AfterTaxKeuro / dscrForYear(row.year, dscrSchedule);
+        const service =
+          resolveCfadsSizingKeuro(row, tenorYears, taxeFinaleSizingKeuro) /
+          dscrForYear(row.year, dscrSchedule);
         return pv + service / (1 + debtRate) ** row.year;
       }, 0),
   );
@@ -1160,6 +1181,7 @@ function sizingWithFacturableMargin(
   const capexEffectifKeuro = capexTotalKeuro + margeFactKeuro;
   const debtGearingMaxKeuro =
     gearingMaxPct !== null ? capexEffectifKeuro * gearingMaxPct / 100 : null;
+  const taxeFinaleSizingKeuro = input.taxeFinaleSizingKeuro ?? 0;
   let debtRetenuKeuro = 0;
   let scheduleByYear = new Map<number, RetainedDebtScheduleItem>();
   let preRows = buildPreRows(input, capexEffectifKeuro);
@@ -1183,6 +1205,7 @@ function sizingWithFacturableMargin(
       input.debtInterestRate,
       debtTenorYears,
       debtRetenuKeuro,
+      taxeFinaleSizingKeuro,
     );
     preRows = buildPreRows(input, capexEffectifKeuro);
     taxRows = applyWaterfall(
@@ -1199,6 +1222,7 @@ function sizingWithFacturableMargin(
       dscrSchedule,
       input.debtInterestRate,
       debtTenorYears,
+      taxeFinaleSizingKeuro,
     );
 
     const nextDebtRetenuKeuro =
@@ -1220,6 +1244,7 @@ function sizingWithFacturableMargin(
     input.debtInterestRate,
     debtTenorYears,
     debtRetenuKeuro,
+    taxeFinaleSizingKeuro,
   );
   preRows = buildPreRows(input, capexEffectifKeuro);
   taxRows = applyWaterfall(
@@ -1236,6 +1261,7 @@ function sizingWithFacturableMargin(
     dscrSchedule,
     input.debtInterestRate,
     debtTenorYears,
+    taxeFinaleSizingKeuro,
   );
 
   const gearingActuel =
@@ -1603,7 +1629,7 @@ function taxAmount(ebt: number, tauxIS: number | null | undefined) {
 function applyWaterfall(
   preRows: PreRow[],
   scheduleByYear: Map<number, RetainedDebtScheduleItem>,
-  input: Pick<FinanceEngineInput, "tauxIS" | "dsraMonths">,
+  input: Pick<FinanceEngineInput, "tauxIS" | "dsraMonths" | "taxeFinaleSizingKeuro">,
   discountRate: number,
   effectiveSchedule: DscrTranche[] | null,
   effectiveTenor: number,
@@ -1615,6 +1641,7 @@ function applyWaterfall(
   let deficitCumuleP90 = 0;
   let resultatCumule = 0;
   let dsraSolde = 0;
+  const taxeFinaleSizingKeuro = input.taxeFinaleSizingKeuro ?? 0;
 
   return preRows.map((pre) => {
     const scheduleItem = scheduleByYear.get(pre.year) ?? null;
@@ -1718,15 +1745,17 @@ function applyWaterfall(
       dsraRetraitKeuro: dsraRetrait,
       cashBloqueKeuro: cashBloque,
       cfadsP90AfterTaxKeuro: pre.cfadsP90Keuro - isP90,
-      // Standard DSCR: after-tax P90 CFADS / constant-annuity service.
+      // Standard DSCR: CFADS P90 de sizing (pré-IS, sauf "Taxes P&L" an tenor final) /
+      // constant-annuity service. Cf CALIBRATION.md, "MÉCANISME DE SCULPTING COMPLET".
       dscr:
         pre.debtServiceKeuro > 0
-          ? (pre.cfadsP90Keuro - isP90) / pre.debtServiceKeuro
+          ? resolveCfadsSizingKeuro(pre, effectiveTenor, taxeFinaleSizingKeuro) /
+            pre.debtServiceKeuro
           : null,
-      // Realized DSCR: after-tax P90 CFADS / retained sculpted service.
+      // Realized DSCR: CFADS P90 de sizing / service retenu (sculpté).
       dscrRealized:
         debtService > 0
-          ? (pre.cfadsP90Keuro - isP90) / debtService
+          ? resolveCfadsSizingKeuro(pre, effectiveTenor, taxeFinaleSizingKeuro) / debtService
           : null,
       // Target DSCR for this year from the schedule (null when no sculpting or beyond tenor).
       dscrTargetAtYear:

@@ -348,7 +348,9 @@ naturellement **CCA = 789 k€** (= CAPEX − dette sizée), conformément à la
 
 ## Valeurs de référence BP Baugé (pour la validation ligne par ligne)
 
-Production P50 (MWh) : an1 8385 · an2 8352 · an5 8251 · an10 8083 · an21 7782 · an35 7346
+Production P50 (MWh) : an1 8385 · an2 8352 · an5 8251 · an10 8083 · an21 ~7714 · an35 7346
+(an21 : la courbe tabulée donne 8385 × 0.91972 = 7714 ; l'ancienne note "7782" était approximative,
+antérieure à l'obtention de la courbe de dégradation exacte — voir "CAUSE TROUVÉE" plus bas).
 Revenus PV (k€)      : an1 628.9 · an5 628.8 · an10 628.4 · an21 595.6  (PV pur seul, ligne "Revenues PV" du BP)
 Revenus capacity (k€): an1 6.66 · an5 7.16 · an10 1.40 · an21 22.5  (ligne séparée "Revenues capacity certificate")
 Revenus GO (k€)      : an1 0 · ... · an21 11.5 (démarre en merchant)
@@ -571,35 +573,80 @@ an1-5 par coïncidence puis diverge → erreurs P50/P90 de signe opposé aux ann
 recalculer par exponentiel. Le ratio P90/P50 reste 0.93 (7798/8385 = 0.9300 exact) — c'est la
 COURBE de dégradation qui était fausse, pas le ratio. Après fix : prod P90 an21 → 7174,
 revenu merchant an21 → 520 954, CFADS P90 an21 → 284 089, et la dette devrait se caler.
-Vérifier que P50 an21 tombe aussi sur 7782 (= 8385 × même coef dégradation).
+Vérifier que P50 an21 tombe sur ~7714 (= 8385 × 0.91972, même coef dégradation que P90).
+
+### ✅ FIX COURBE DÉGRADATION — FAIT (commit 1de9abc). Production P90 calée au MWh sur 24 ans.
+Revenu merchant an21 521.611 (BP 520.954, Δ +0.66) · CFADS P90 an21 284.721 (BP 284.089, Δ +0.63).
+Dette = 5145.75 (BP 5216.873, Δ −71k). Flux calés partout MAIS dette encore basse → l'écart
+est désormais dans le MÉCANISME de sculpting, pas les flux (comme prévu).
+
+### ⚠️ INCOHÉRENCE CFADS P90 an24 — piste du mécanisme
+Un poste retire ~15k au CFADS P90 de la DERNIÈRE année du tenor, côté BP :
+```
+an22 : rev 504 296 − opex 240 883 = 263 413 = ligne CFADS BP 263 412 ✓
+an23 : rev 509 396 − opex 245 341 = 264 055 = ligne CFADS BP 264 055 ✓
+an24 : rev 505 007 − opex 249 677 = 255 330 MAIS ligne CFADS BP repayment = 240 201 (Δ −15 129)
+```
+(Anomalie an24 secondaire — voir cause PRINCIPALE ci-dessous.)
+
+### 🎯 MÉCANISME DE SCULPTING COMPLET — décodé du BP (onglet Debt Sizing, sections 1.02-1.06)
+
+**La dette = NPV du Target Debt Service, actualisé au taux all-in 4.20%.** Formule complète :
+```
+Target Debt Service(t) = CFADS_sizing(t) / DSCR(t)     [DSCR 1.15 an1-20, 1.40 an21-24]
+dette = Σ_t  TargetDebtService(t) × DiscountFactor(t)   [taux 4.20% all-in]
+      = 5 216 873 €  ✓ (= "Discount Target Debt Service" / "NPV" du BP)
+```
+Discount factors BP (taux 4.20%) : an1 ~0.96, an2 0.92, ... décroissants. Le BP les liste
+(ligne "Discount Factor"). Vérif NPV : Σ = 5 216 873 = dette retenue = implied gearing 86.9%.
+
+**CFADS_sizing du BP = PRÉ-IS SAUF l'an24** (dernière année du tenor) :
+- an1-23 : CFADS_sizing = revenu P90 − OPEX P90 (pré-IS pur). Colle à rev−opex au centime.
+- an24 : CFADS_sizing = (rev−opex) − 15 129 = 255 330 − 15 129 = 240 201. Le 15 129 vient de
+  la ligne "Taxes P&L" / "Copy Pasting Macro" (section 1.03). C'est le SEUL IS injecté dans
+  le repayment (les gros IS 56k/61k arrivent an25+, HORS tenor → n'affectent pas le sizing).
+
+**BUG MOTEUR** : il soustrait un IS-P90 dès l'an21 (4k) explosant à ~62k/an an22-24. C'est FAUX :
+le BP ne retranche rien an21-23 et seulement 15 129 à l'an24. FIX : sculpter sur le CFADS P90
+PRÉ-IS pour an1-23, et soustraire uniquement la "Taxes P&L" de l'an24 (15 129 pour Baugé —
+à relier à un calcul d'IS de dernière année, ou input dédié). Retirer le chemin
+cfadsP90AfterTaxKeuro du sizing.
+
+**Mécanisme dette (section 1.04-1.06) — valeurs BP exactes pour validation :**
+```
+Total Target Debt Service = 8 046 831 · NPV (=dette) = 5 216 873 · taux all-in 4.20%
+Total Interest = 2 829 958 · Total Principal = 5 216 873
+Principal repayment an1 169 117 · an2 174 068 ... an23 174 372 · an24 164 657
+Interest an1 219 109 · an2 212 006 ... an24 6 916
+BoP an1 5 216 873 → EoP an24 = 0 (extinction exacte)
+Gearing max cap : 95% × CAPEX = 5 705 676 (non-binding, la dette DSCR 5 216 873 < 5 705 676)
+DSRF : 6 mois, 50%, max DSRF 194 113 (déduit ailleurs).
+```
+Une fois le CFADS_sizing corrigé (pré-IS + 15 129 an24), la dette DOIT tomber sur 5 216 873
+si le moteur actualise le Target Debt Service à 4.20%. À VÉRIFIER : le moteur fait-il bien une
+NPV du service de dette à 4.20%, ou une bissection différente ?
+
+### ✅ FIX SIZING PRÉ-IS — FAIT (engine.ts `resolveCfadsSizingKeuro`, `debtScheduleFromRetainedDebt`,
+`presentValueDebtCapacity`). Le sizing sculpte désormais sur `cfadsP90Keuro` (pré-IS) pour
+an1..tenor-1, et sur `cfadsP90Keuro − taxeFinaleSizingKeuro` (nouvel input, 15.129 k€ pour
+Baugé) à la dernière année du tenor uniquement. `cfadsP90AfterTaxKeuro` (chemin after-tax P90)
+n'est plus utilisé pour la bissection de dette — le champ reste affiché dans l'UI à titre
+informatif. `dscr`/`dscrRealized` suivent la même base pré-IS pour rester cohérents avec ce qui
+est réellement sculpté.
+
+Résultat (Baugé) : **dette sculptée 5218.320 k€ (BP 5216.873, Δ +1.4k, 0.03 %)** · gearing
+86.885 % (BP 86.86 %) · toutes les années 1-24 sont pile au DSCR cible (1.15 puis 1.40) ·
+principal an1 169.090 k€ (BP 169.117) · intérêts an1 219.169 k€ (BP 219.109) · outstanding
+an24 = 0.000 (extinction exacte, BP aussi 0). Sizing bouclé.
+
+Sigoulès reste dans ses tolérances (`taxeFinaleSizingKeuro` absent → 0, pas de retranchement,
+comportement de sizing pré-IS déjà correct pour ce projet — pas de courbe tabulée non plus).
 
 ⚠️ Énigme restante (NON bloquante pour le sizing) : l'OPEX **P50** an21 (BP 238.47) n'est pas
 entièrement reconstruit (avec IFER saut inflaté 68.2 on obtient ≈232.6, reste ~5.7k inexpliqué).
 N'affecte QUE le waterfall P50/TRI. Screenshot C_P50 années 20-22 à demander plus tard.
 NOTE : le P50 semble donc AUSSI appliquer le saut IFER inflaté à an21+ (sinon gap de 28k) —
 mais IFER FLAT années 1-20 en P50 reste prouvé (reconstructions an5/an10).
-
-### ✅ FIX COURBE DE DÉGRADATION TABULÉE — FAIT (engine.ts `resolveDegradationFactor` + input
-`degradationCurve`). Prod P90 calée au MWh près sur toute la plage tabulée (an1 7799≈7798,
-an5 7675≈7674, an10 7518.9≈7518, an21 7172.9≈7174, an24 7079.8≈7081). Revenu merchant P90 an21
-521.611 vs BP 520.954 (Δ+0.657, contre +2.5k avant fix) ; CFADS P90 an21 284.721 vs BP 284.089
-(Δ+0.632). Dette sculptée 5145.750 k€ (BP 5216.873), gearing 85.68 % (BP 86.86 %), sculpting
-toujours borné par la tranche DSCR 1.40 (an22-24, extinction an24, outstanding=0).
-
-⚠️ **Deux incohérences observées, à trancher avec un nouveau screenshot** (non corrigées ici,
-hors périmètre "ne rien casser") :
-1. **P50 an21** : la courbe tabulée donne `8385 × 0.91972 = 7712.8`, PAS 7782 (valeur de
-   référence historique de ce doc, ligne "Production P50 (MWh)"). Le ratio P90/P50=0.93 reste
-   exact (7172.9/7712.8=0.9300), donc soit 7782 était une approximation antérieure (avant la
-   courbe tabulée), soit le P50 a sa PROPRE courbe tabulée distincte de celle du P90 (à vérifier
-   au screenshot C_P50 production).
-2. **CFADS P90 an24, DEUX cibles BP contradictoires dans ce même doc** : la table "⭐ RÉFÉRENCE
-   SIZING" (ligne `24 | 240 201 | 1.40 | 171 572`) donne 240.201, alors que
-   `revenuP90(an24) − opexP90(an24) = 505.007 − 249.677 = 255.330` (cohérent avec les années
-   21-23 où les deux sources concordent au k€ près). Le moteur calcule 255.975 (Δ+0.645 vs
-   255.330, cohérent avec la dérive homogène des années 21-23), mais diverge de 15.8k vs la
-   table sizing (240.201). Un des deux chiffres BP est probablement une erreur de saisie —
-   an24 est la seule année où les deux tables sizing/revenu-opex ne se recoupent pas.
 
 Outputs cibles BP : TRI Investisseur **12.0 %** · VAN brute **1125 k€** · VAN nette **355 k€**
 · Dette **5217 k€** · Gearing **86.86 %** · CCA / Equity **789 k€**

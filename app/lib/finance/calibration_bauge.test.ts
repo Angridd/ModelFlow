@@ -33,6 +33,9 @@ function baugeInput(): FinanceEngineInput {
     debtInterestRate: 4.2,
     debtMaturityYears: 24,
     debtTenorYears: 24,
+    // "Taxes P&L" BP : seul IS injecté dans le repayment, uniquement an24 (dernière année du
+    // tenor). an1-23 sculptent pré-IS. Cf CALIBRATION.md, "MÉCANISME DE SCULPTING COMPLET".
+    taxeFinaleSizingKeuro: 15.129,
     constructionYears: 1,
     commissioningYear: 2029,
     gearingMax: 95,
@@ -578,7 +581,11 @@ describe("calibration Baugé — dégradation tabulée (fix courbe P90/P50)", ()
       .map((r) => r.year);
     console.log(`  années au DSCR cible exact (bornantes) = [${boundYears.join(", ")}]`);
 
-    console.log("\n=== CFADS P90 — TOUTE LA QUEUE 18-24 vs cible sculpting BP (k€) ===");
+    // NOTE : cfadsP90Keuro est le CFADS PRÉ-IS brut (rev-opex) ; l'écart de -15.129k affiché
+    // an24 vs la ligne BP "repayment" est ATTENDU (c'est justement la "Taxes P&L" que le
+    // sizing retranche en interne via taxeFinaleSizingKeuro — vérifiable ci-dessus : dscrRealisé
+    // an24 = 1.4000 pile, et debtSvc sculpté matche le Target Debt Service BP).
+    console.log("\n=== CFADS P90 (pré-IS brut) — TOUTE LA QUEUE 18-24 vs ligne BP 'repayment' ===");
     const BP_CFADS_SCULPT: Record<number, number> = {
       18: 396.034, 19: 392.457, 20: 388.805, 21: 284.089, 22: 263.412, 23: 264.055, 24: 240.201,
     };
@@ -589,8 +596,27 @@ describe("calibration Baugé — dégradation tabulée (fix courbe P90/P50)", ()
         `  an${String(r.year).padStart(2)} : cfadsP90 MF = ${r.cfadsP90Keuro.toFixed(3).padStart(10)} k€   BP = ${bp.toFixed(3).padStart(10)} k€   Δ = ${(r.cfadsP90Keuro - bp).toFixed(3)}`,
       );
     }
+
+    console.log("\n=== VÉRIF SCHEDULE DETTE — principal/intérêts an1 et an24 vs BP ===");
+    let outstandingBefore = sizing?.debtRetenuKeuro ?? 0;
+    for (const y of [1, 2, 23, 24]) {
+      const r = rows.find((x) => x.year === y)!;
+      const debtService = r.debtServiceSculptedKeuro ?? r.debtServiceKeuro;
+      const interest = y === 1
+        ? outstandingBefore * asRateLocal(input.debtInterestRate)
+        : (rows.find((x) => x.year === y - 1)!.debtOutstandingKeuro) * asRateLocal(input.debtInterestRate);
+      const principal = debtService - interest;
+      console.log(
+        `  an${y} : principal = ${principal.toFixed(3)} k€   intérêts = ${interest.toFixed(3)} k€   EoP outstanding = ${r.debtOutstandingKeuro.toFixed(3)} k€`,
+      );
+    }
+    console.log(`  (BP : principal an1 169.117 · intérêts an1 219.109 · EoP an24 = 0)`);
   });
 });
+
+function asRateLocal(percent: number) {
+  return percent / 100;
+}
 
 describe("calibration Baugé — OPEX an1 poste par poste", () => {
   it("affiche le détail OPEX an1 vs BP", () => {
