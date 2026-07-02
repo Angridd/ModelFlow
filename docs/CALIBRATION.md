@@ -228,8 +228,31 @@ Le `GO start year` (21) et le `prix_GO_base` (1 €/MWh) sont des inputs modulab
 >
 > **4 — Écart dette Sigoulès après Fix 1 : 10 505 830 € vs cible 10 323 840 (+1.76%, était +2.56%).**
 > Fix 1 (taxes ↑ → OPEX ↑ → CFADS P90 ↓) a fait BAISSER la dette dans le bon sens (gearing 80.51%
-> → 79.89%). Leviers restants : (a) **queue merchant an21-24** — les courbes Aurora Baugé ne sont
-> PAS transposables à Sigoulès (levier n°1) ; (b) `taxeFinaleSizingKeuro` (mécanisme IS an24, à 0).
+> → 79.89%). ⚠️ L'hypothèse « levier n°1 = queue merchant an21-24 / courbes Aurora non
+> transposables » a été **RÉFUTÉE** (cf FIX 3) : la courbe Aurora Sigoulès est **identique** à
+> Baugé et la queue an21-24 ne pèse que **6.5%** de la dette. Le vrai levier = un poste OPEX
+> manquant. `taxeFinaleSizingKeuro` (IS an24) reste négligeable (levier 266 €/k€, à 0).
+
+> ✅ **RÉSOLU — FIX 3 sizing (OPEX « Autres » Sigoulès — AUCUNE modif moteur).** L'écart dette
+> +1.76% venait d'un **poste OPEX manquant**, pas de la queue merchant.
+> - **Cause (BP feuille C_P90)** : poste « Autres » = compteur 2 500 + télécom 1 500 + inspection
+>   1 500 + autoconso 5 333.33 = **10 833.33 €/an** en an1, indexé 2%. La config Sigoulès avait
+>   `diversOpexKeuro = 0`.
+> - **Diagnostic décisif** (décomposition dette = NPV du Target Debt Service à 4.20%) : la queue
+>   merchant an21-24 = seulement **6.5%** de la dette (687 k€), courbe Aurora **identique** à Baugé.
+>   La mettre à 0 fait CHUTER la dette 505 k€ SOUS la cible → la queue n'est PAS « trop haute ».
+>   Confirmé : pas de haircut merchant, taux 4.20%, **pas d'IS/DSRF/agentFee dans le sizing**
+>   (`resolveCfadsSizingKeuro` = EBITDA P90 pur ; les déductions DSRF/agentFee ne touchent QUE le
+>   flux equity P50 [engine.ts:1790-1792], jamais `cfadsP90Keuro`).
+> - **Résultat** (`diversOpexKeuro: 10.833` ; le moteur route DÉJÀ ce poste dans l'OPEX P90 de
+>   sizing avec indexation 2% [engine.ts:1666] → **aucune modif code**) : CFADS P90 an1 879 737 →
+>   **868 904 €** (BP 868 910, Δ **6 €**) · dette 10 505 830 → **10 338 390 €** (cible 10 323 840,
+>   **+0.14%**, était +1.76%) · gearing 79.89% → **78.61%** (cible 78.50%). **Ferme 92%** de l'écart.
+> - **Résiduel +14.5 k€ (+0.14%)** = micro-diff prix merchant P90 an21-24 (moteur 72.72 vs BP
+>   72.61 €/MWh, +0.15%). Constaté, non corrigé.
+> - ⚠️ `diversOpexKeuro` n'est PAS un fourre-tout : c'est le poste « Autres » du BP. Baugé garde
+>   son propre `diversOpexKeuro = 8.611` (inchangé). Valeur = donnée de config (DB/scénario), pas
+>   un champ moteur à modifier.
 
 **[HISTORIQUE — voir RÉSOLU FIX 1 ci-dessus]** Le calcul du moteur (`calculateTaxesFoncieres`) était faux sur deux points :
 1. Il applique les taux à un % du **CAPEX total**, alors que le BP les applique au **revenu
