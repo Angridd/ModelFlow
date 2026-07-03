@@ -1855,8 +1855,17 @@ function applyWaterfall(
     const residualAfterCca = Math.max(0, cashAfterCcaInterest - ccaRemboursement);
     const dividende = resultatCumule > 0 ? residualAfterCca : 0;
     const cashBloque = dsraSolde + (resultatCumule > 0 ? 0 : residualAfterCca);
+    // Flux actionnaire = FCF after debt service (template BP C_P50!r296, §2.7) :
+    //   EBITDA_P50 − IS − principal − intérêts dette − DSRF − agent fee
+    //   = cfadsAfterTax (EBITDA−IS) − service dette appliqué − DSRF − agent fee.
+    // PRIS AVANT le waterfall SHL/dividendes : la ventilation intérêts SHL / principal SHL /
+    // dividendes est une répartition INTERNE qui ne change pas ce flux. Les intérêts SHL entrent
+    // dans l'EBT (pour l'IS, §2.6) mais NE sont PAS re-déduits ici (pas de double comptage).
+    // Aucun terme DSRA : le BP finance la réserve à l'an0, hors flux equity annuel. C'est CE flux,
+    // pas la cascade, qui porte le TRI investisseur. La cascade (dividende/ccaRemboursement/
+    // cashBloque) reste calculée ci-dessus pour l'affichage comptable du waterfall SHL.
     const fluxActionnaire =
-      dividende + ccaRemboursement + ccaInterets + cashBloque;
+      cfadsAfterTax - debtService - dsrfDeduction - agentFeeDeduction;
 
     return {
       year: pre.year,

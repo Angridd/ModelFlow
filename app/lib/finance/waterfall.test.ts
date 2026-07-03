@@ -154,6 +154,12 @@ describe("waterfall fiscal, DSRA, CCA et double TRI", () => {
         tauxIS: 25,
         devFeesKEuroPerMW: 110,
         tauxISEntreprise: 25,
+        // contractDuration = horizon : ce fixture synthétique n'a pas de courbe merchant, donc
+        // au-delà du PPA le tarif merchant vaut 0 → revenu nul → FCF after debt service (le flux
+        // actionnaire, template BP) NÉGATIF sur les dernières années. Un flux terminal négatif rend
+        // le TRI dégénéré (racine indéfinie). On étend le PPA à tout l'horizon pour garder un flux
+        // positif et tester la propriété visée (les dev fees améliorent le TRI entreprise).
+        contractDuration: 25,
       }),
     );
 
