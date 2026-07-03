@@ -23,6 +23,7 @@ const BACK_OFFICE_KEURO_FALLBACK = 22;
 const DIVERS_OPEX_KEURO_FALLBACK = 35;
 const LOYER_INFLATION_FALLBACK = 0.4;
 const INFLATION_OM_FALLBACK = 2;
+const DSRF_FEE_RATE_FALLBACK = 1.4;
 const INFLATION_MRA_FALLBACK = 2;
 const INFLATION_BACK_OFFICE_FALLBACK = 2;
 const INFLATION_DIVERS_FALLBACK = 2;
@@ -85,11 +86,13 @@ export type FinanceEngineInput = FinancialAssumptions & {
   coefDegressif?: number | null;
   margeDevKeuro?: number | null;
   dsraMonths?: number | null;
-  // BUG B (cf CALIBRATION.md "DEUX BUGS OPPOSÉS") : le BP retire chaque année du flux equity le
-  // DSRF (réserve service dette) et les other fees (agent fee) — "FCF after debt service =
-  // CFADS − principal − intérêts − DSRF − other fees". dsrfAnnuelKeuro déduit pendant le tenor,
-  // agentFeeAnnuelKeuro chaque année d'exploitation. Absent/null → 0 → comportement inchangé.
+  // DSRF (réserve service dette) + agent fee : retirés chaque année du flux equity ET de l'EBT
+  // ("FCF after debt service = CFADS − principal − intérêts − DSRF − agent fee").
+  // DSRF(y) = dsrfFeeRate% × dsraMonths/12 × service dette(y) appliqué, sur la période de dette (§2.1).
+  dsrfFeeRate?: number | null;
+  // Legacy : DSRF annuel flat (montant). Absent → calculé via dsrfFeeRate (template BP).
   dsrfAnnuelKeuro?: number | null;
+  // Agent fee : valeur an1, indexée à l'inflation opex, 0 après la maturité de dette (§2.7).
   agentFeeAnnuelKeuro?: number | null;
   devFeesKEuroPerMW?: number | null;
   tauxISEntreprise?: number | null;
@@ -1753,9 +1756,10 @@ function applyWaterfall(
     | "tauxIS"
     | "dsraMonths"
     | "taxeFinaleSizingKeuro"
+    | "dsrfFeeRate"
     | "dsrfAnnuelKeuro"
     | "agentFeeAnnuelKeuro"
-    | "constructionYears"
+    | "inflationOM"
   >,
   discountRate: number,
   effectiveSchedule: DscrTranche[] | null,
@@ -1764,16 +1768,12 @@ function applyWaterfall(
   ccaRemunRate: number = 0,
 ): Array<AnnualCashFlow & { cfadsP90AfterTaxKeuro: number }> {
   let ccaOutstanding = Math.max(0, ccaPrincipalKeuro);
-  // Seed du report déficitaire (§2.6/§2.7 : le cumul démarre à l'an0 construction). Les intérêts
-  // SHL capitalisés pendant la construction (payables non payés, cash = 0) sont un EBT négatif an0
-  // qui amorce le cumEBT. Capitalisés = principal capitalisé − drawdown = principal × (1 − 1/(1+r)^N).
-  const constructionYears = resolveConstructionYears(input);
-  const ccaCapitalizedConstructionInterest =
-    ccaRemunRate > 0 && constructionYears > 0
-      ? Math.max(0, ccaPrincipalKeuro) * (1 - 1 / (1 + ccaRemunRate) ** constructionYears)
-      : 0;
-  let cumEbtP50 = -ccaCapitalizedConstructionInterest;
-  let cumEbtP90 = -ccaCapitalizedConstructionInterest;
+  // Report déficitaire : le cumEBT démarre à 0. Le BP ne seede PAS l'intérêt SHL capitalisé an0
+  // dans son cumul — vérifié G6 : IS an24 = 25% × cumEBT 532 022 colle au no-seed (Σ EBT an1-24
+  // = 539,6), pas au with-seed (398,2). L'intérêt de construction est déjà porté par le principal
+  // SHL capitalisé (ccaPrincipalKeuro), donc les intérêts SHL an1+ en tiennent compte. Cf CALIBRATION.md.
+  let cumEbtP50 = 0;
+  let cumEbtP90 = 0;
   let resultatCumule = 0;
   let dsraSolde = 0;
   const taxeFinaleSizingKeuro = input.taxeFinaleSizingKeuro ?? 0;
@@ -1792,8 +1792,22 @@ function applyWaterfall(
     const ccaInterets = ccaOutstanding * ccaRemunRate;
     const interets = debtInterest + ccaInterets;
     // DSRF + agent fee : charges déductibles (dans l'EBT, §2.6) ET cash (retirées du flux equity plus bas).
-    const dsrfDeduction = pre.year <= effectiveTenor ? (input.dsrfAnnuelKeuro ?? 0) : 0;
-    const agentFeeDeduction = input.agentFeeAnnuelKeuro ?? 0;
+    // DSRF(y) = dsrfFeeRate% × dsraMonths/12 × service dette(y) appliqué, 0 hors dette (§2.1) ;
+    // dsrfAnnuelKeuro (legacy) override le calcul. Agent = valeur an1 × (1+inflOpex)^(y−1), an1..tenor (§2.7).
+    const debtServiceForFees = sculptedService ?? pre.debtServiceKeuro;
+    const dsrfDeduction =
+      pre.year > effectiveTenor
+        ? 0
+        : input.dsrfAnnuelKeuro != null
+          ? input.dsrfAnnuelKeuro
+          : asRate(input.dsrfFeeRate ?? DSRF_FEE_RATE_FALLBACK) *
+            ((input.dsraMonths ?? 0) / 12) *
+            Math.max(0, debtServiceForFees);
+    const agentFeeDeduction =
+      pre.year <= effectiveTenor
+        ? (input.agentFeeAnnuelKeuro ?? 0) *
+          (1 + asRate(input.inflationOM ?? INFLATION_OM_FALLBACK)) ** (pre.year - 1)
+        : 0;
     const ebit = pre.cashFlowKeuro - pre.amort;
     // EBT = EBITDA_P50 − D&A − intérêts (dette + SHL) − DSRF − agent fees (template BP C_P50!r245).
     const ebt = ebit - interets - dsrfDeduction - agentFeeDeduction;
