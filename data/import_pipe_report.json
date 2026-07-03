@@ -1,0 +1,422 @@
+[
+  {
+    "name": "Aérodrome Perreux/Charny",
+    "technology": "Fixed",
+    "capacityMw": 7.63,
+    "commissioningYear": 2029,
+    "metrics": {
+      "irr": 6.1,
+      "npv": -556.07,
+      "dscr": 1.15,
+      "lcoe": 87.69,
+      "debtKeuro": 5315.92,
+      "binding": "dscr"
+    },
+    "flags": [
+      "loyer à vérifier (mode inconnu: \"annuel\")",
+      "G7 démantèlement non modélisé (76300 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: loyer à vérifier (mode inconnu: \"annuel\") ; G7 démantèlement non modélisé (76300 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Avermes - sol",
+    "technology": "Fixed",
+    "capacityMw": 8.12,
+    "commissioningYear": 2030,
+    "metrics": {
+      "irr": 4.15,
+      "npv": -1223.62,
+      "dscr": 1.15,
+      "lcoe": 97.9,
+      "debtKeuro": 5563.39,
+      "binding": "dscr"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (81200 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (81200 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Digoin",
+    "technology": "Fixed",
+    "capacityMw": 4.69,
+    "commissioningYear": 2029,
+    "metrics": {
+      "irr": 4.54,
+      "npv": -534.81,
+      "dscr": 1.15,
+      "lcoe": 92.98,
+      "debtKeuro": 3151.38,
+      "binding": "dscr"
+    },
+    "flags": [
+      "loyer à compléter (valeur vide)",
+      "MRA converti (21200 € total → 4.5203 €/kWc), à vérifier",
+      "G7 démantèlement non modélisé (46900 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: loyer à compléter (valeur vide) ; MRA converti (21200 € total → 4.5203 €/kWc), à vérifier ; G7 démantèlement non modélisé (46900 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Langon",
+    "technology": "Fixed",
+    "capacityMw": 13.89,
+    "commissioningYear": 2033,
+    "metrics": {
+      "irr": 8.84,
+      "npv": -305.34,
+      "dscr": 1.15,
+      "lcoe": 80.26,
+      "debtKeuro": 10773.69,
+      "binding": "dscr"
+    },
+    "flags": [
+      "loyer à vérifier (mode inconnu: \"% of revenues\")",
+      "G7 démantèlement non modélisé (138900 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: loyer à vérifier (mode inconnu: \"% of revenues\") ; G7 démantèlement non modélisé (138900 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Marcillé-Robert",
+    "technology": "Fixed",
+    "capacityMw": 8.27,
+    "commissioningYear": 2029,
+    "metrics": {
+      "irr": 5.76,
+      "npv": -703.66,
+      "dscr": 1.15,
+      "lcoe": 86.23,
+      "debtKeuro": 5722.15,
+      "binding": "dscr"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (82700 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (82700 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Montcuq 1 & 2",
+    "technology": "Fixed",
+    "capacityMw": 21.33504,
+    "commissioningYear": 2029,
+    "metrics": {
+      "irr": 6.17,
+      "npv": -2147.16,
+      "dscr": 1.15,
+      "lcoe": 78.33,
+      "debtKeuro": 16352.37,
+      "binding": "dscr"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (213350 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (213350 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Montcuq 3",
+    "technology": "Fixed",
+    "capacityMw": 22.07232,
+    "commissioningYear": 2031,
+    "metrics": {
+      "irr": 8.42,
+      "npv": -888.86,
+      "dscr": 1.15,
+      "lcoe": 78.22,
+      "debtKeuro": 18261.3,
+      "binding": "dscr"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (220723 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (220723 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Mur-de-Sologne",
+    "technology": "Tracker",
+    "capacityMw": 15.38,
+    "commissioningYear": 2029,
+    "metrics": {
+      "irr": 4.94,
+      "npv": -2609.45,
+      "dscr": 1.15,
+      "lcoe": 88.48,
+      "debtKeuro": 12174.15,
+      "binding": "dscr"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (153800 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (153800 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Orval",
+    "technology": "Tracker",
+    "capacityMw": 7.64,
+    "commissioningYear": 2033,
+    "metrics": {
+      "irr": 5.03,
+      "npv": -1125.46,
+      "dscr": 1.15,
+      "lcoe": 92.29,
+      "debtKeuro": 5779.85,
+      "binding": "dscr"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (76400 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (76400 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Panzoult CRE 1",
+    "technology": "Tracker",
+    "capacityMw": 8.7,
+    "commissioningYear": 2028,
+    "metrics": {
+      "irr": 4.89,
+      "npv": -1283.75,
+      "dscr": 1.15,
+      "lcoe": 81.97,
+      "debtKeuro": 6214.37,
+      "binding": "dscr"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (87000 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (87000 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Panzoult CRE 2",
+    "technology": "Tracker",
+    "capacityMw": 20,
+    "commissioningYear": 2028,
+    "metrics": {
+      "irr": 6.39,
+      "npv": -1926.07,
+      "dscr": 1.15,
+      "lcoe": 79.53,
+      "debtKeuro": 15802.83,
+      "binding": "dscr"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (200000 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (200000 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Panzoult CRE 3",
+    "technology": "Fixed",
+    "capacityMw": 5.42,
+    "commissioningYear": 2028,
+    "metrics": {
+      "irr": 2.75,
+      "npv": -1420.49,
+      "dscr": 1.15,
+      "lcoe": 92.35,
+      "debtKeuro": 3217.97,
+      "binding": "dscr"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (54200 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (54200 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Perpignan",
+    "technology": "Fixed",
+    "capacityMw": 9.06,
+    "commissioningYear": 2028,
+    "metrics": {
+      "irr": 8.53,
+      "npv": -99.99,
+      "dscr": 1.15,
+      "lcoe": 73.87,
+      "debtKeuro": 6233.79,
+      "binding": "dscr"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (90600 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (90600 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Peyrilhac 1",
+    "technology": "Tracker",
+    "capacityMw": 17.26,
+    "commissioningYear": 2028,
+    "metrics": {
+      "irr": 7.04,
+      "npv": -1358.96,
+      "dscr": 1.15,
+      "lcoe": 78.81,
+      "debtKeuro": 14142.22,
+      "binding": "dscr"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (172600 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (172600 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Salbris (GIAT) 1",
+    "technology": "Fixed",
+    "capacityMw": 20.93,
+    "commissioningYear": 2030,
+    "metrics": {
+      "irr": 8.75,
+      "npv": -731.51,
+      "dscr": 1.15,
+      "lcoe": 90.08,
+      "debtKeuro": 17160.95,
+      "binding": "dscr"
+    },
+    "flags": [
+      "loyer à compléter (valeur vide)",
+      "G7 démantèlement non modélisé (209300 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: loyer à compléter (valeur vide) ; G7 démantèlement non modélisé (209300 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Sauvigny-les-Bois 79",
+    "technology": "Tracker",
+    "capacityMw": 11.5,
+    "commissioningYear": 2027,
+    "metrics": {
+      "irr": 5.31,
+      "npv": -1340.53,
+      "dscr": 1.15,
+      "lcoe": 77.97,
+      "debtKeuro": 7932.85,
+      "binding": "dscr"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (115000 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (115000 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Sauvigny-les-Bois 76",
+    "technology": "Fixed",
+    "capacityMw": 11.59,
+    "commissioningYear": 2027,
+    "metrics": {
+      "irr": 6.8,
+      "npv": -488.33,
+      "dscr": 1.15,
+      "lcoe": 72.69,
+      "debtKeuro": 7338.21,
+      "binding": "dscr"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (115900 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (115900 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Selles-sur-Cher 1",
+    "technology": "Fixed",
+    "capacityMw": 4.99,
+    "commissioningYear": 2033,
+    "metrics": {
+      "irr": 9.32,
+      "npv": 12.42,
+      "dscr": 1.15,
+      "lcoe": 88.38,
+      "debtKeuro": 3719.64,
+      "binding": "gearing"
+    },
+    "flags": [
+      "loyer à compléter (valeur vide)",
+      "G7 démantèlement non modélisé (49900 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: loyer à compléter (valeur vide) ; G7 démantèlement non modélisé (49900 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Villeherviers-Fontenils",
+    "technology": "Tracker",
+    "capacityMw": 18.24024,
+    "commissioningYear": 2033,
+    "metrics": {
+      "irr": 7.05,
+      "npv": -1134.59,
+      "dscr": 1.15,
+      "lcoe": 79.28,
+      "debtKeuro": 13610.86,
+      "binding": "dscr"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (182402 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (182402 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Villeherviers-La Griffonnerie",
+    "technology": "Fixed",
+    "capacityMw": 8.93376,
+    "commissioningYear": 2033,
+    "metrics": {
+      "irr": 4.38,
+      "npv": -1480.76,
+      "dscr": 1.15,
+      "lcoe": 88.3,
+      "debtKeuro": 5844.94,
+      "binding": "dscr"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (89338 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (89338 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Villeherviers-Les Bruyères",
+    "technology": "Tracker",
+    "capacityMw": 4.98,
+    "commissioningYear": 2033,
+    "metrics": {
+      "irr": 3.79,
+      "npv": -1027.32,
+      "dscr": 1.15,
+      "lcoe": 97.08,
+      "debtKeuro": 3452.42,
+      "binding": "dscr"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (49800 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (49800 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Villognon",
+    "technology": "Tracker",
+    "capacityMw": 19.53,
+    "commissioningYear": 2030,
+    "metrics": {
+      "irr": 9.28,
+      "npv": -231.93,
+      "dscr": 1.15,
+      "lcoe": 74.18,
+      "debtKeuro": 16834.16,
+      "binding": "gearing"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (195300 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (195300 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  },
+  {
+    "name": "Ychoux 2 +",
+    "technology": "Fixed",
+    "capacityMw": 13.17,
+    "commissioningYear": 2028,
+    "metrics": {
+      "irr": 9.88,
+      "npv": 337.75,
+      "dscr": 1.15,
+      "lcoe": 70.61,
+      "debtKeuro": 9496.97,
+      "binding": "gearing"
+    },
+    "flags": [
+      "G7 démantèlement non modélisé (131700 € an25-29, flux surestimés)"
+    ],
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (131700 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+  }
+]
