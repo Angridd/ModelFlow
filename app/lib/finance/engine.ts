@@ -1735,8 +1735,14 @@ function buildPreRows(
   return preRows;
 }
 
-function taxAmount(ebt: number, tauxIS: number | null | undefined) {
-  return tauxIS != null ? Math.max(0, ebt * asRate(tauxIS)) : 0;
+// IS = tauxIS × MIN(EBT, cumEBT) ; 0 si EBT < 0 OU cumEBT < 0 — report déficitaire intégral
+// (template BP §2.6 / C_P50!r245). Le MIN encode le report : la 1re année où le cumul devient
+// positif taxe le cumul, ensuite l'EBT courant.
+function computeIS(ebt: number, cumEbt: number, tauxIS: number | null | undefined) {
+  if (tauxIS == null || ebt <= 0 || cumEbt <= 0) {
+    return 0;
+  }
+  return Math.min(ebt, cumEbt) * asRate(tauxIS);
 }
 
 function applyWaterfall(
@@ -1753,8 +1759,8 @@ function applyWaterfall(
   ccaRemunRate: number = 0,
 ): Array<AnnualCashFlow & { cfadsP90AfterTaxKeuro: number }> {
   let ccaOutstanding = Math.max(0, ccaPrincipalKeuro);
-  let deficitCumule = 0;
-  let deficitCumuleP90 = 0;
+  let cumEbtP50 = 0;
+  let cumEbtP90 = 0;
   let resultatCumule = 0;
   let dsraSolde = 0;
   const taxeFinaleSizingKeuro = input.taxeFinaleSizingKeuro ?? 0;
@@ -1772,23 +1778,21 @@ function applyWaterfall(
     const ccaBop = ccaOutstanding;
     const ccaInterets = ccaOutstanding * ccaRemunRate;
     const interets = debtInterest + ccaInterets;
+    // DSRF + agent fee : charges déductibles (dans l'EBT, §2.6) ET cash (retirées du flux equity plus bas).
+    const dsrfDeduction = pre.year <= effectiveTenor ? (input.dsrfAnnuelKeuro ?? 0) : 0;
+    const agentFeeDeduction = input.agentFeeAnnuelKeuro ?? 0;
     const ebit = pre.cashFlowKeuro - pre.amort;
-    const ebt = ebit - interets;
-    const baseImposable = ebt - deficitCumule;
-    const is = taxAmount(baseImposable, input.tauxIS);
-    deficitCumule =
-      ebt < 0 ? deficitCumule + Math.abs(ebt) : Math.max(0, deficitCumule - ebt);
+    // EBT = EBITDA_P50 − D&A − intérêts (dette + SHL) − DSRF − agent fees (template BP C_P50!r245).
+    const ebt = ebit - interets - dsrfDeduction - agentFeeDeduction;
+    cumEbtP50 += ebt;
+    const is = computeIS(ebt, cumEbtP50, input.tauxIS);
     const resultatNet = ebt - is;
     resultatCumule += resultatNet;
     const cfadsAfterTax = pre.cashFlowKeuro - is;
     const ebitP90 = pre.cfadsP90Keuro - pre.amort;
-    const ebtP90 = ebitP90 - interets;
-    const baseImposableP90 = ebtP90 - deficitCumuleP90;
-    const isP90 = taxAmount(baseImposableP90, input.tauxIS);
-    deficitCumuleP90 =
-      ebtP90 < 0
-        ? deficitCumuleP90 + Math.abs(ebtP90)
-        : Math.max(0, deficitCumuleP90 - ebtP90);
+    const ebtP90 = ebitP90 - interets - dsrfDeduction - agentFeeDeduction;
+    cumEbtP90 += ebtP90;
+    const isP90 = computeIS(ebtP90, cumEbtP90, input.tauxIS);
     const debtService = sculptedService ?? pre.debtServiceKeuro;
     const nextDebtService =
       nextSculptedService ??
@@ -1814,11 +1818,8 @@ function applyWaterfall(
     dsraSolde += dsraDepot;
     cashAvailable -= dsraDepot;
 
-    // BUG B : DSRF + agent fee sortent du flux equity avant la cascade SHL/dividendes, comme le
-    // BP ("FCF after debt service = CFADS − principal − intérêts − DSRF − other fees"). DSRF
-    // pendant le tenor de la dette ; agent fee chaque année d'exploitation. Cf CALIBRATION.md BUG B.
-    const dsrfDeduction = pre.year <= effectiveTenor ? (input.dsrfAnnuelKeuro ?? 0) : 0;
-    const agentFeeDeduction = input.agentFeeAnnuelKeuro ?? 0;
+    // BUG B : DSRF + agent fee sortent aussi du flux equity avant la cascade SHL/dividendes
+    // (mêmes montants déjà déduits de l'EBT ci-dessus pour l'IS). Cf CALIBRATION.md BUG B.
     cashAvailable = Math.max(0, cashAvailable - dsrfDeduction - agentFeeDeduction);
 
     const cashAfterCcaInterest = Math.max(0, cashAvailable - ccaInterets);
@@ -1861,7 +1862,7 @@ function applyWaterfall(
       ccaDrawdownKeuro: 0,
       ccaCapitalizedInterestKeuro: 0,
       ccaEoPKeuro: ccaOutstanding,
-      deficitCumuleKeuro: deficitCumule,
+      deficitCumuleKeuro: Math.max(0, -cumEbtP50),
       resultatCumuleKeuro: resultatCumule,
       dsraSoldeKeuro: dsraSolde,
       dsraDepotKeuro: dsraDepot,
