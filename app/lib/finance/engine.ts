@@ -169,6 +169,11 @@ export type FinanceEngineInput = FinancialAssumptions & {
   iferRate2?: number | null;
   iferRpn?: number | null;
   inflationAurora?: number | null;
+  // Index d'inflation des COURBES (merchant Aurora + certificat capacité) à l'an1 — série IMF
+  // stockée du BP (base calendaire absolue), PAS un 1,02^n pur. Si fourni : index(y) =
+  // curveIndexAn1 × (1+inflationAurora)^(year−1). Absent → comportement historique
+  // (1+inflationAurora)^(calendarYear−2024). MES 2029 → curveIndexAn1 = 1,10245 (index 2029).
+  curveIndexAn1?: number | null;
   aleasOpexRate?: number | null;
   ccaApportKeuro?: number | null;
   ccaRemunRate?: number | null;
@@ -559,9 +564,12 @@ function resolveMerchantPrices(
   const auroraCurve = auroraCurveByYear.get(calendarYear);
   const inflationRate = asRate(input.inflationAurora ?? INFLATION_AURORA_FALLBACK);
   const contractDuration = input.contractDuration ?? CONTRACT_DURATION_FALLBACK;
-  const inflFactor = hasCalendarYears
-    ? (1 + inflationRate) ** (calendarYear - 2024)
-    : (1 + inflationRate) ** Math.max(0, projectYear - contractDuration);
+  const inflFactor =
+    input.curveIndexAn1 != null
+      ? input.curveIndexAn1 * (1 + inflationRate) ** (projectYear - 1)
+      : hasCalendarYears
+        ? (1 + inflationRate) ** (calendarYear - 2024)
+        : (1 + inflationRate) ** Math.max(0, projectYear - contractDuration);
 
   if (!auroraCurve) {
     if (auroraCurveByYear.size === 0) {
@@ -1610,7 +1618,9 @@ function buildPreRows(
             ? capacityPriceCurve[capacityPriceCurve.length - 1]
             : 0);
     const capacityInflation =
-      (1 + asRate(input.inflationAurora ?? 2)) ** (calendarYear - 2024);
+      input.curveIndexAn1 != null
+        ? input.curveIndexAn1 * (1 + asRate(input.inflationAurora ?? 2)) ** (year - 1)
+        : (1 + asRate(input.inflationAurora ?? 2)) ** (calendarYear - 2024);
     const capacityKw = (input.capacityCertificateMw ?? 0) * 1000;
     const revenueCapacityKeuro =
       (capacityPriceBrut * capacityInflation * capacityKw) / 1000;

@@ -102,6 +102,7 @@ function baugeInput(): FinanceEngineInput {
     agentFeeAnnuelKeuro: 1.0,
     // Aurora (year, central, low)
     inflationAurora: 2,
+    curveIndexAn1: 1.10245, // index IMF des courbes à l'an1 (MES 2029), série stockée du BP (G8a)
     capacityCertificateMw: 0.2,
     goStartYear: 21,
     goPriceBase: 1,
