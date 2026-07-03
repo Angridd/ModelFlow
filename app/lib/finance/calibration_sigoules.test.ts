@@ -1,17 +1,31 @@
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   calculateAnnualCashFlows,
   calculateCapexDetails,
   calculateScenarioMetrics,
+  calculateTaxesFoncieres,
 } from "@/app/lib/finance/engine";
 import type { FinanceEngineInput } from "@/app/lib/finance/engine";
 
 // ---------------------------------------------------------------------------
-// BANC D'ESSAI — calibration Sigoulès ligne par ligne contre le BP Excel.
-// Ce fichier N'A PAS vocation à "passer" : il AFFICHE le flux actionnaire (= FCF after
-// debt service, template BP C_P50!r296) année par année vs le banc §3.1 du SPEC, et le
-// TRI investisseur (cible 7,42%). Cf docs/SPEC_BP_SIGOULES.md §2.7-2.8 + §3.1.
+// CALIBRATION SIGOULÈS — test permanent (verrouille l'état moteur calé au BP).
+// Source de vérité : docs/SPEC_BP_SIGOULES.md (formules exactes + bancs §3.1-3.2).
+// Le 1er `it` ASSERTE (CAPEX/taxes/dette/D&A/IS/flux/TRI à tolérances serrées) ; le 2nd
+// AFFICHE le flux actionnaire (= FCF after debt service, C_P50!r296) an1-35 vs banc §3.1.
+//
+// ⚠️ Les valeurs an24-29 portent des RÉSIDUELS DOCUMENTÉS, non forcés (cf CALIBRATION.md
+// "CHANTIER TRI CLOS") : IS an24 +1,9 k€ (index merchant P50 / D&A) et démantèlement
+// an25-29 (G7, 24 k€/an) NON implémenté. L'assertion IS an24 fige donc l'ÉTAT MF actuel
+// (134 900 €), pas la cible BP (133 006 €) — le résiduel est intentionnel.
 // ---------------------------------------------------------------------------
+
+// |MF − attendu| ≤ tol ; messages parlants en cas de dérive.
+function expectClose(actual: number, expected: number, tol: number, label: string) {
+  expect(
+    Math.abs(actual - expected),
+    `${label} : MF=${actual} attendu=${expected} (±${tol}) Δ=${(actual - expected).toFixed(3)}`,
+  ).toBeLessThanOrEqual(tol);
+}
 
 function sigoulesInput(): FinanceEngineInput {
   return {
@@ -157,6 +171,66 @@ const BP_FLUX: number[] = [
 ];
 const BP_FLUX_SUM = 8828276;
 const BP_MISE = 2827258;
+
+describe("calibration Sigoulès — assertions permanentes (CAPEX/dette/taxes/TRI)", () => {
+  it("CAPEX, taxes, dette, D&A, IS, flux et TRI à l'euro (état MF calé BP)", () => {
+    const input = sigoulesInput();
+    const capex = calculateCapexDetails(input);
+    const metrics = calculateScenarioMetrics(input);
+    const rows = calculateAnnualCashFlows(input);
+    const ops = rows.filter((r) => r.year >= 1).sort((a, b) => a.year - b.year);
+    const at = (y: number) => {
+      const r = ops.find((x) => x.year === y);
+      if (!r) throw new Error(`ligne an${y} absente`);
+      return r;
+    };
+    const eur = (keuro: number) => keuro * 1000;
+
+    // CAPEX total (§1.3) — 13 151 098 €
+    expectClose(eur(capex.capexTotalKeuro), 13_151_098, 1, "CAPEX total");
+
+    // Taxes foncières an1 (Règle 6, Appréciation Directe) — TF 4 582 € · CFE 3 264 €.
+    // Valeur non arrondie (metrics.tfAnnuelleKeuro est arrondi à 2 déc. de k€ → perd les unités €).
+    const taxes = calculateTaxesFoncieres(input, capex.capexTotalKeuro, 1);
+    expectClose(eur(taxes.tfAnnuelleKeuro), 4_582, 1, "TF an1");
+    expectClose(eur(taxes.cfeAnnuelleKeuro), 3_264, 1, "CFE an1");
+
+    // CFADS P90 sizing an1 (§3.3) — 868 903,7 €
+    expectClose(eur(at(1).cfadsP90Keuro), 868_903.7, 1, "CFADS P90 an1");
+
+    // Dette sculptée & gearing (§2.1) — 10 323 840 € · 78,50 % (binding = DSCR < gearing 95 %)
+    const dette = metrics.sizing?.debtRetenuKeuro ?? 0;
+    const gearing = (metrics.sizing?.gearingActuel ?? 0) * 100;
+    expectClose(eur(dette), 10_323_840, 100, "dette sculptée");
+    expectClose(gearing, 78.5, 0.02, "gearing %");
+
+    // DSRF an1 = 1,4 % × (6/12 × service dette an1) (§2.1) — 5 289 €
+    const debtServiceAn1 = at(1).debtServiceSculptedKeuro ?? at(1).debtServiceKeuro;
+    const dsrfAn1 = 0.014 * (6 / 12) * eur(debtServiceAn1);
+    expectClose(dsrfAn1, 5_289, 1, "DSRF an1");
+
+    // Agent fee an20 = 1 000 × 1,02^(20-1) (§2.7) — 1 456,8 €
+    const agentAn20 = (input.agentFeeAnnuelKeuro ?? 0) * 1000 * 1.02 ** (20 - 1);
+    expectClose(agentAn20, 1_456.8, 1, "agent an20");
+
+    // Dotation D&A an1 (§2.5, dégressif Type1 coef 2,25 + linéaire Type2) — 1 009 565 €
+    expectClose(eur(at(1).amort), 1_009_565, 1, "D&A an1");
+
+    // Report déficitaire intégral (§2.6) : premier IS = an24 ; IS an24 = 134 900 € (état MF,
+    // résiduel +1,9 k€ vs BP 133 006 documenté — l'assertion fige MF, pas la cible BP).
+    const firstIsYear = ops.find((r) => r.is > 0)?.year ?? -1;
+    expect(firstIsYear, "premier IS doit tomber an24").toBe(24);
+    expectClose(eur(at(24).is), 134_900, 100, "IS an24");
+
+    // Flux actionnaire = FCF after debt service (banc §3.1) — an1/an21/an35
+    expectClose(eur(at(1).fluxActionnaire), 197_340, 5, "flux an1");
+    expectClose(eur(at(21).fluxActionnaire), 367_899, 10, "flux an21");
+    expectClose(eur(at(35).fluxActionnaire), 634_532, 10, "flux an35");
+
+    // TRI investisseur (§2.8) — 7,45 % (cible BP 7,42 %, Δ 0,03pp)
+    expectClose(metrics.investorIrr, 7.45, 0.05, "investorIrr");
+  });
+});
 
 describe("calibration Sigoulès — flux actionnaire = FCF after debt service (banc §3.1)", () => {
   it("affiche flux actionnaire MF vs BP an1-35 + Σ + TRI investisseur", () => {
