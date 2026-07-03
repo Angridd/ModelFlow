@@ -1750,7 +1750,12 @@ function applyWaterfall(
   scheduleByYear: Map<number, RetainedDebtScheduleItem>,
   input: Pick<
     FinanceEngineInput,
-    "tauxIS" | "dsraMonths" | "taxeFinaleSizingKeuro" | "dsrfAnnuelKeuro" | "agentFeeAnnuelKeuro"
+    | "tauxIS"
+    | "dsraMonths"
+    | "taxeFinaleSizingKeuro"
+    | "dsrfAnnuelKeuro"
+    | "agentFeeAnnuelKeuro"
+    | "constructionYears"
   >,
   discountRate: number,
   effectiveSchedule: DscrTranche[] | null,
@@ -1759,8 +1764,16 @@ function applyWaterfall(
   ccaRemunRate: number = 0,
 ): Array<AnnualCashFlow & { cfadsP90AfterTaxKeuro: number }> {
   let ccaOutstanding = Math.max(0, ccaPrincipalKeuro);
-  let cumEbtP50 = 0;
-  let cumEbtP90 = 0;
+  // Seed du report déficitaire (§2.6/§2.7 : le cumul démarre à l'an0 construction). Les intérêts
+  // SHL capitalisés pendant la construction (payables non payés, cash = 0) sont un EBT négatif an0
+  // qui amorce le cumEBT. Capitalisés = principal capitalisé − drawdown = principal × (1 − 1/(1+r)^N).
+  const constructionYears = resolveConstructionYears(input);
+  const ccaCapitalizedConstructionInterest =
+    ccaRemunRate > 0 && constructionYears > 0
+      ? Math.max(0, ccaPrincipalKeuro) * (1 - 1 / (1 + ccaRemunRate) ** constructionYears)
+      : 0;
+  let cumEbtP50 = -ccaCapitalizedConstructionInterest;
+  let cumEbtP90 = -ccaCapitalizedConstructionInterest;
   let resultatCumule = 0;
   let dsraSolde = 0;
   const taxeFinaleSizingKeuro = input.taxeFinaleSizingKeuro ?? 0;
