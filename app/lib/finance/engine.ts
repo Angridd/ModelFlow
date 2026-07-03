@@ -511,9 +511,10 @@ function resolveGearingMaxPct(input: FinanceEngineInput) {
   return input.gearingMaxPct ?? input.gearingMax ?? null;
 }
 
-// Dégradation an N : courbe tabulée si fournie (garantie fabricant, non-exponentielle),
-// sinon exponentiel (1-degradationRate)^(year-1). Au-delà de la courbe tabulée, l'exponentiel
-// prend le relais depuis le dernier coefficient connu.
+// Dégradation an N : courbe tabulée si fournie (garantie fabricant), sinon LINÉAIRE
+// max(0, 1 − degradationRate × (year−1)) — conforme au template BP (production = initiale ×
+// (1 − r×(y−1)), vérifié à l'euro : Sigoulès an21 = 16 156,8 × 0,92 = 14 864,26). Au-delà d'une
+// courbe tabulée, extrapolation exponentielle depuis le dernier coefficient connu (inchangé).
 function resolveDegradationFactor(
   degradationCurve: number[] | null | undefined,
   degradationRate: number,
@@ -526,7 +527,7 @@ function resolveDegradationFactor(
     const lastCoef = degradationCurve[degradationCurve.length - 1];
     return lastCoef * (1 - degradationRate) ** (year - degradationCurve.length);
   }
-  return (1 - degradationRate) ** (year - 1);
+  return Math.max(0, 1 - degradationRate * (year - 1));
 }
 
 function resolveConstructionYears(input: Pick<FinanceEngineInput, "constructionYears">) {
