@@ -7,6 +7,7 @@ import {
   calculateOpexDetails,
   calculateScenarioMetrics,
 } from "@/app/lib/finance/engine";
+import { merchantCurveForTechnology } from "@/app/lib/finance/merchantCurves";
 import { DEFAULT_FINANCIAL_ASSUMPTIONS } from "@/app/lib/finance/types";
 import type { DscrTranche } from "@/app/lib/finance/types";
 import { prisma } from "@/app/lib/prisma";
@@ -478,27 +479,27 @@ export async function deleteProject(projectId: string) {
 }
 
 export async function createScenario(projectId: string, formData: FormData) {
-  const [project, auroraCurves] = await Promise.all([
-    prisma.project.findUnique({
-      where: {
-        id: projectId,
-      },
-      select: {
-        capacityMw: true,
-        commissioningYear: true,
-        debtSizingCentralW: true,
-        debtSizingLowW: true,
-        investorCurveW: true,
-      },
-    }),
-    prisma.auroraCurve.findMany({
-      orderBy: { year: "asc" },
-    }),
-  ]);
+  const project = await prisma.project.findUnique({
+    where: {
+      id: projectId,
+    },
+    select: {
+      capacityMw: true,
+      commissioningYear: true,
+      technology: true,
+      debtSizingCentralW: true,
+      debtSizingLowW: true,
+      investorCurveW: true,
+    },
+  });
 
   if (!project) {
     redirect("/projects");
   }
+
+  // Courbe merchant PAR TECHNO (même source que l'import et la page détail) — remplace la table
+  // AuroraCurve globale pour que le KPI stocké == recompute détail, y compris après édition UI.
+  const auroraCurves = merchantCurveForTechnology(project.technology);
 
   const assumptions = withCalculatedCapexAndOpex(
     readScenarioAssumptions(formData),
@@ -555,27 +556,27 @@ export async function updateScenario(
   scenarioId: string,
   formData: FormData,
 ) {
-  const [project, auroraCurves] = await Promise.all([
-    prisma.project.findUnique({
-      where: {
-        id: projectId,
-      },
-      select: {
-        capacityMw: true,
-        commissioningYear: true,
-        debtSizingCentralW: true,
-        debtSizingLowW: true,
-        investorCurveW: true,
-      },
-    }),
-    prisma.auroraCurve.findMany({
-      orderBy: { year: "asc" },
-    }),
-  ]);
+  const project = await prisma.project.findUnique({
+    where: {
+      id: projectId,
+    },
+    select: {
+      capacityMw: true,
+      commissioningYear: true,
+      technology: true,
+      debtSizingCentralW: true,
+      debtSizingLowW: true,
+      investorCurveW: true,
+    },
+  });
 
   if (!project) {
     redirect("/projects");
   }
+
+  // Courbe merchant PAR TECHNO (même source que l'import et la page détail) — remplace la table
+  // AuroraCurve globale pour que le KPI stocké == recompute détail, y compris après édition UI.
+  const auroraCurves = merchantCurveForTechnology(project.technology);
 
   const assumptions = withCalculatedCapexAndOpex(
     readScenarioAssumptions(formData),

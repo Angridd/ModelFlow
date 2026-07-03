@@ -15,7 +15,7 @@ import {
 } from "@/app/lib/finance/engine";
 import { AnimatedKpiCards } from "@/app/components/AnimatedKpiCards";
 import { ProjectFinancialCharts } from "@/app/components/ProjectFinancialCharts";
-import { CAPACITY_PRICE_CURVE } from "@/app/lib/finance/merchantCurves";
+import { CAPACITY_PRICE_CURVE, merchantCurveForTechnology } from "@/app/lib/finance/merchantCurves";
 import type { DscrTranche } from "@/app/lib/finance/types";
 import { generateSensitivityRows } from "@/app/lib/sensitivity";
 import { prisma } from "@/app/lib/prisma";
@@ -86,29 +86,28 @@ export default async function ProjectDetailPage({
 
   const { id } = await params;
   const { scenarioId } = await searchParams;
-  const [project, auroraCurves] = await Promise.all([
-    prisma.project.findUnique({
-      where: { id },
-      include: {
-        scenarios: {
-          orderBy: { name: "asc" },
-        },
+  const project = await prisma.project.findUnique({
+    where: { id },
+    include: {
+      scenarios: {
+        orderBy: { name: "asc" },
       },
-    }),
-    prisma.auroraCurve.findMany({
-      orderBy: { year: "asc" },
-    }),
-  ]);
+    },
+  });
 
   if (!project) {
     notFound();
   }
 
   const scenarios = project.scenarios;
+  // Courbe merchant résolue PAR TECHNO (Fixed → FIXED_CURVE_2026Q2, Tracker → TRACKER_CURVE_2026Q2),
+  // exactement comme l'import (source de vérité versionnée). Remplace l'ancienne lecture de la table
+  // AuroraCurve globale (year @unique → une seule techno) → détail == liste à l'euro, Fixed ET Tracker.
+  const merchantCurves = merchantCurveForTechnology(project.technology);
   const buildFinanceInput = (scenario: (typeof scenarios)[number]) => ({
     capacityMw: project.capacityMw,
     commissioningYear: project.commissioningYear,
-    auroraCurves,
+    auroraCurves: merchantCurves,
     debtSizingCentralW: project.debtSizingCentralW,
     debtSizingLowW: project.debtSizingLowW,
     investorCurveW: project.investorCurveW,
