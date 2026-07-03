@@ -16,7 +16,7 @@
       "loyer à vérifier (mode inconnu: \"annuel\")",
       "G7 démantèlement non modélisé (76300 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: loyer à vérifier (mode inconnu: \"annuel\") ; G7 démantèlement non modélisé (76300 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: loyer à vérifier (mode inconnu: \"annuel\") ; G7 démantèlement non modélisé (76300 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Avermes - sol",
@@ -34,7 +34,7 @@
     "flags": [
       "G7 démantèlement non modélisé (81200 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (81200 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (81200 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Digoin",
@@ -54,7 +54,7 @@
       "MRA converti (21200 € total → 4.5203 €/kWc), à vérifier",
       "G7 démantèlement non modélisé (46900 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: loyer à compléter (valeur vide) ; MRA converti (21200 € total → 4.5203 €/kWc), à vérifier ; G7 démantèlement non modélisé (46900 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: loyer à compléter (valeur vide) ; MRA converti (21200 € total → 4.5203 €/kWc), à vérifier ; G7 démantèlement non modélisé (46900 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Langon",
@@ -73,7 +73,7 @@
       "loyer à vérifier (mode inconnu: \"% of revenues\")",
       "G7 démantèlement non modélisé (138900 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: loyer à vérifier (mode inconnu: \"% of revenues\") ; G7 démantèlement non modélisé (138900 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: loyer à vérifier (mode inconnu: \"% of revenues\") ; G7 démantèlement non modélisé (138900 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Marcillé-Robert",
@@ -91,7 +91,7 @@
     "flags": [
       "G7 démantèlement non modélisé (82700 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (82700 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (82700 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Montcuq 1 & 2",
@@ -109,7 +109,7 @@
     "flags": [
       "G7 démantèlement non modélisé (213350 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (213350 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (213350 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Montcuq 3",
@@ -127,7 +127,7 @@
     "flags": [
       "G7 démantèlement non modélisé (220723 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (220723 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (220723 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Mur-de-Sologne",
@@ -145,7 +145,7 @@
     "flags": [
       "G7 démantèlement non modélisé (153800 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (153800 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (153800 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Orval",
@@ -163,7 +163,7 @@
     "flags": [
       "G7 démantèlement non modélisé (76400 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (76400 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (76400 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Panzoult CRE 1",
@@ -181,7 +181,7 @@
     "flags": [
       "G7 démantèlement non modélisé (87000 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (87000 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (87000 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Panzoult CRE 2",
@@ -199,7 +199,7 @@
     "flags": [
       "G7 démantèlement non modélisé (200000 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (200000 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (200000 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Panzoult CRE 3",
@@ -217,7 +217,7 @@
     "flags": [
       "G7 démantèlement non modélisé (54200 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (54200 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (54200 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Perpignan",
@@ -235,7 +235,7 @@
     "flags": [
       "G7 démantèlement non modélisé (90600 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (90600 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (90600 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Peyrilhac 1",
@@ -253,7 +253,7 @@
     "flags": [
       "G7 démantèlement non modélisé (172600 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (172600 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (172600 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Salbris (GIAT) 1",
@@ -272,7 +272,7 @@
       "loyer à compléter (valeur vide)",
       "G7 démantèlement non modélisé (209300 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: loyer à compléter (valeur vide) ; G7 démantèlement non modélisé (209300 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: loyer à compléter (valeur vide) ; G7 démantèlement non modélisé (209300 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Sauvigny-les-Bois 79",
@@ -290,7 +290,7 @@
     "flags": [
       "G7 démantèlement non modélisé (115000 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (115000 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (115000 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Sauvigny-les-Bois 76",
@@ -308,7 +308,7 @@
     "flags": [
       "G7 démantèlement non modélisé (115900 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (115900 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (115900 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Selles-sur-Cher 1",
@@ -327,7 +327,7 @@
       "loyer à compléter (valeur vide)",
       "G7 démantèlement non modélisé (49900 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: loyer à compléter (valeur vide) ; G7 démantèlement non modélisé (49900 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: loyer à compléter (valeur vide) ; G7 démantèlement non modélisé (49900 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Villeherviers-Fontenils",
@@ -345,7 +345,7 @@
     "flags": [
       "G7 démantèlement non modélisé (182402 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (182402 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (182402 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Villeherviers-La Griffonnerie",
@@ -363,7 +363,7 @@
     "flags": [
       "G7 démantèlement non modélisé (89338 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (89338 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (89338 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Villeherviers-Les Bruyères",
@@ -381,7 +381,7 @@
     "flags": [
       "G7 démantèlement non modélisé (49800 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (49800 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (49800 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Villognon",
@@ -399,7 +399,7 @@
     "flags": [
       "G7 démantèlement non modélisé (195300 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (195300 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (195300 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   },
   {
     "name": "Ychoux 2 +",
@@ -417,6 +417,6 @@
     "flags": [
       "G7 démantèlement non modélisé (131700 € an25-29, flux surestimés)"
     ],
-    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (131700 € an25-29, flux surestimés) — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)"
+    "note": "draft_bizdev — import BizDev 03/07/2026 — flags: G7 démantèlement non modélisé (131700 € an25-29, flux surestimés) — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste"
   }
 ]

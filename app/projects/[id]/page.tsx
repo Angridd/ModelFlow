@@ -15,6 +15,7 @@ import {
 } from "@/app/lib/finance/engine";
 import { AnimatedKpiCards } from "@/app/components/AnimatedKpiCards";
 import { ProjectFinancialCharts } from "@/app/components/ProjectFinancialCharts";
+import { CAPACITY_PRICE_CURVE } from "@/app/lib/finance/merchantCurves";
 import type { DscrTranche } from "@/app/lib/finance/types";
 import { generateSensitivityRows } from "@/app/lib/sensitivity";
 import { prisma } from "@/app/lib/prisma";
@@ -185,6 +186,29 @@ export default async function ProjectDetailPage({
     bankFeesPLTKEuroPerMW: scenario.bankFeesPLTKEuroPerMW,
     interimFinancingRate: scenario.interimFinancingRate,
     commitmentFeesRate: scenario.commitmentFeesRate,
+    // Inputs moteur désormais persistés (migration scenario_full_engine_inputs) — fallback ?? null
+    // => scénario legacy (colonnes null) recompute à l'identique via les défauts du moteur.
+    ccaRemunRate: scenario.ccaRemunRate,
+    unavailability: scenario.unavailability,
+    indemnitesImmoKeuro: scenario.indemnitesImmoKeuro,
+    aleasOpexRate: scenario.aleasOpexRate,
+    tauxTSECfe: scenario.tauxTSECfe,
+    tauxGEMAPICfe: scenario.tauxGEMAPICfe,
+    coefDegressif: scenario.coefDegressif,
+    taxeFinaleSizingKeuro: scenario.taxeFinaleSizingKeuro,
+    agentFeeAnnuelKeuro: scenario.agentFeeAnnuelKeuro,
+    dsrfFeeRate: scenario.dsrfFeeRate,
+    capacityCertificateMw: scenario.capacityCertificateMw ?? undefined,
+    goStartYear: scenario.goStartYear ?? undefined,
+    goPriceBase: scenario.goPriceBase ?? undefined,
+    curveIndexAn1: scenario.curveIndexAn1,
+    fonciereBienEuroWc: scenario.fonciereBienEuroWc,
+    batimentsFonciersKeuro: scenario.batimentsFonciersKeuro,
+    modRetraitementKeuro: scenario.modRetraitementKeuro,
+    valeurTerrainKeuro: scenario.valeurTerrainKeuro,
+    // Donnée de marché partagée (comme auroraCurves), pas une colonne : sans effet si
+    // capacityCertificateMw est null (revenu capacité = 0), donc rétrocompatible pour le legacy.
+    capacityPriceCurve: CAPACITY_PRICE_CURVE,
   });
   const projectReferenceScenario = scenarios.find((scenario) => scenario.isReference);
   const selectedScenarioId =

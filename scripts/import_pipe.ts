@@ -192,11 +192,11 @@ function buildProject(cell: (r: number, c: number) => unknown, col: number): Bui
     commitmentFeesRate: 0.1,
   };
 
-  // Champs présents dans le moteur mais ABSENTS du schéma Scenario (utilisés au calcul,
-  // NON persistés — le recalcul de la page projet est dégradé, cf rapport de session).
-  const engineOnly = {
-    capacityMw,
-    commissioningYear: mes,
+  // Inputs moteur désormais PERSISTÉS en base (migration scenario_full_engine_inputs) — un seul
+  // point de vérité, épandu dans l'input moteur ET dans le scénario stocké → la page détail
+  // recompute = les KPI de la liste. taxeFinaleSizingKeuro : toujours 0 (fallback moteur 0,
+  // jamais un montant recopié).
+  const persistedEngineInputs = {
     unavailability: num(cell(78, col)) ?? 0,
     indemnitesImmoKeuro: (num(cell(175, col)) ?? 0) / 1000,
     aleasOpexRate: (num(cell(260, col)) ?? 0) * 100, // 0.005 → 0.5
@@ -210,16 +210,24 @@ function buildProject(cell: (r: number, c: number) => unknown, col: number): Bui
     goStartYear: Math.trunc(num(cell(452, col)) ?? 21),
     goPriceBase: 1,
     curveIndexAn1,
-    investorCurveW: 1,
-    debtSizingCentralW: 0.7,
-    debtSizingLowW: 0.3,
-    auroraCurves: curve,
-    capacityPriceCurve: CAPACITY_PRICE_CURVE,
     // Base foncière template €/Wc (ÉTAPE 3) : BOS divers 0,014 + terrassement 0,003 = 0,017.
     fonciereBienEuroWc: 0.017,
     batimentsFonciersKeuro: 0,
     modRetraitementKeuro: devFeesKeuroTotal,
     valeurTerrainKeuro: 5 * surfaceHa, // 5 000 €/ha × ha / 1000
+  };
+
+  // NON persistés dans Scenario : portés par Project (capacité / MES / pondérations dette) ou
+  // données de marché partagées (courbes Aurora + certificat capacité). Injectés en mémoire seul.
+  const engineOnly = {
+    capacityMw,
+    commissioningYear: mes,
+    investorCurveW: 1,
+    debtSizingCentralW: 0.7,
+    debtSizingLowW: 0.3,
+    auroraCurves: curve,
+    capacityPriceCurve: CAPACITY_PRICE_CURVE,
+    ...persistedEngineInputs,
   };
 
   const input: FinanceEngineInput = {
@@ -241,6 +249,7 @@ function buildProject(cell: (r: number, c: number) => unknown, col: number): Bui
     surfaceHa,
     yieldP90Mwh: null,
     ...shared,
+    ...persistedEngineInputs,
     dscrSchedule: JSON.stringify(dscrSchedule),
     isReference: true,
   };
@@ -272,7 +281,7 @@ async function main() {
     const note =
       `${IMPORT_TAG}` +
       (b.flags.length ? ` — flags: ${b.flags.join(" ; ")}` : " — aucun flag") +
-      " — courbe/curveIndexAn1/DSRF/agent/aléas/capacité/GO/base foncière NON persistés (schéma Scenario partiel)";
+      " — inputs moteur complets persistés (migration scenario_full_engine_inputs) : détail = liste";
 
     b.scenario.dscr = metrics.dscr ?? 0;
     b.scenario.npv = metrics.npv;

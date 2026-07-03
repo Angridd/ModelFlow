@@ -122,6 +122,23 @@ model Scenario {
   bankFeesPLTKEuroPerMW    Float?   @map("bankFeesPLTK€PerMW")
   interimFinancingRate     Float?
   commitmentFeesRate       Float?
+  unavailability           Float?
+  indemnitesImmoKeuro      Float?
+  aleasOpexRate            Float?
+  tauxTSECfe               Float?
+  tauxGEMAPICfe            Float?
+  coefDegressif            Float?
+  taxeFinaleSizingKeuro    Float?
+  agentFeeAnnuelKeuro      Float?
+  dsrfFeeRate              Float?
+  capacityCertificateMw    Float?
+  goStartYear              Int?
+  goPriceBase              Float?
+  curveIndexAn1            Float?
+  fonciereBienEuroWc       Float?
+  batimentsFonciersKeuro   Float?
+  modRetraitementKeuro     Float?
+  valeurTerrainKeuro       Float?
   dscr                     Float
   npv                      Float
   irr                      Float
