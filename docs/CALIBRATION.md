@@ -287,6 +287,42 @@ Le `GO start year` (21) et le `prix_GO_base` (1 €/MWh) sont des inputs modulab
 >    SHL capitalisés an0 → **G2** flux actionnaire = FCF after debt service (mise 2 827 258, dès an1).
 > - Source de vérité : [`docs/SPEC_BP_SIGOULES.md`](SPEC_BP_SIGOULES.md) (formules exactes + bancs).
 
+> ✅ **CHANTIER TRI CLOS — Sigoulès investisseur 7,45 % vs BP 7,42 % (Δ 0,03pp).**
+> Banc de validation permanent : [`app/lib/finance/calibration_sigoules.test.ts`](../app/lib/finance/calibration_sigoules.test.ts).
+>
+> **1 — Trajet ④.** TRI investisseur **17,58 % → 7,45 %** (cible BP **7,42 %**, Δ 0,03pp).
+> Définition calée : `IRR(an0 : −2 827 258 ; an1-35 : FCF after debt service)` avec
+> `FCF after debt service = EBITDA_P50 − IS − principal − intérêts − DSRF − agent`.
+> Le waterfall SHL/dividendes reste calculé pour l'affichage comptable ; **l'IRR n'en dépend plus**
+> (la ventilation intérêts SHL / principal SHL / dividendes est une répartition interne). Les
+> intérêts SHL entrent dans l'EBT (pour l'IS) mais ne sont PAS re-déduits du flux (pas de double
+> comptage). Aucun terme DSRA : l'ancien flux sommait le **solde** DSRA (un stock), ce qui gonflait
+> le flux Sigoulès (dsraMonths=6).
+>
+> **2 — Mécanismes template implémentés (commits).**
+> - **G4** — D&A dégressif coef 2,25 + mapping 3 classes (Type 1 dégressif / Type 2 linéaire / No D&A).
+> - **G3** — `IS = 25 % × MIN(EBT, cumEBT)`, report déficitaire intégral (§2.6).
+> - **G5** — intérêts SHL capitalisés pendant la construction, **SANS seed du cumEBT an0** : le seed
+>   initial (intérêt de construction dans le cumul) est **prouvé faux par le banc** (IS an24 =
+>   25 % × cumEBT 532 022 colle au no-seed, pas au with-seed) → retiré.
+> - **G6** — DSRF dynamique `1,4 % × (6/12 × service dette)` + agent fee `1 000 × 1,02^(y−1)` an1-24,
+>   retirés du flux equity ET de l'EBT — **clôt l'audit #7**.
+> - **G2** — flux actionnaire = FCF after debt service (commit `6d8b061`).
+>
+> **3 — Baugé : ancre préservée.** `investorIrr` **12,06 % vs BP 12,03 %**, inchangé (0,00pp) — sa
+> calibration reposait déjà sur cette définition (DSRA=0 → waterfall = FCF after debt service).
+> ⚠️ Baugé est un **millésime template antérieur** : DSRF/agent restent en **overrides flat legacy**
+> (`dsrfAnnuelKeuro`/`agentFeeAnnuelKeuro`) — **ne pas** les passer en calculé (`dsrfFeeRate`).
+>
+> **4 — Résiduels connus, tracés, non forcés.**
+> - **IS an24 +1,9 k€** (index merchant P50 / D&A) → flux an24 −1 898 € en miroir.
+> - **an25-29 +16-18 k€/an** = **G7 démantèlement** (24 k€/an) non implémenté = **seul gap TRI restant**.
+> - **±3 € d'arrondi** an21+ (index merchant P50). Flux an1-23 et an30-35 à l'euro.
+>
+> **5 — État global Sigoulès.** CAPEX **0,00 %** · dette **0,00 %** (10 323 850 vs 10 323 840) ·
+> TF/CFE **à l'euro** · TRI **0,03pp**. Le moteur est figé (aucune modif) ; le banc verrouille l'état.
+> **Prochain jalon** : fiche **Digoin** (Annexe A de la spec) = premier test « saisie pure ».
+
 **[HISTORIQUE — voir RÉSOLU FIX 1 ci-dessus]** Le calcul du moteur (`calculateTaxesFoncieres`) était faux sur deux points :
 1. Il applique les taux à un % du **CAPEX total**, alors que le BP les applique au **revenu
    cadastral** (≈ 7.5–10 k€), pas au CAPEX.
