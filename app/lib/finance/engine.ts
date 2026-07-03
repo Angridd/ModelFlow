@@ -80,6 +80,9 @@ export type FinanceEngineInput = FinancialAssumptions & {
   amortDuree?: number | null;
   capexType1Keuro?: number | null;
   capexType2Keuro?: number | null;
+  // Coef d'amortissement dégressif Type 1. Absent → barème fiscal FR par durée
+  // (1,25 / 1,75 / 2,25 selon la durée ; 2,25 pour > 6 ans). Template BP Sigoulès/Baugé : 2,25.
+  coefDegressif?: number | null;
   margeDevKeuro?: number | null;
   dsraMonths?: number | null;
   // BUG B (cf CALIBRATION.md "DEUX BUGS OPPOSÉS") : le BP retire chaque année du flux equity le
@@ -1474,6 +1477,7 @@ function buildAmortizationSchedule(
   projectLifeYears: number,
   capexType1Keuro?: number | null,
   capexType2Keuro?: number | null,
+  coefDegressif?: number | null,
 ): AmortizationScheduleItem[] {
   const schedule: AmortizationScheduleItem[] = [];
   const hasTypedCapex = capexType1Keuro != null || capexType2Keuro != null;
@@ -1498,7 +1502,8 @@ function buildAmortizationSchedule(
   }
 
   const linearRate = 1 / amortDuree;
-  const degressiveRate = linearRate * degressiveAmortizationCoefficient(amortDuree);
+  const degressiveRate =
+    linearRate * (coefDegressif ?? degressiveAmortizationCoefficient(amortDuree));
   const type2AnnualAmortKeuro = type2OutstandingKeuro / amortDuree;
 
   for (let year = 1; year <= projectLifeYears; year += 1) {
@@ -1535,8 +1540,9 @@ function buildPreRows(
   input: FinanceEngineInput,
   investmentOverrideKeuro?: number,
 ): PreRow[] {
+  const capexDetails = calculateCapexDetails(input);
   const initialInvestment =
-    investmentOverrideKeuro ?? calculateCapexDetails(input).capexTotalKeuro;
+    investmentOverrideKeuro ?? capexDetails.capexTotalKeuro;
   const initialDebt = initialInvestment * (input.debtRate / 100);
   const degradationRate = asRate(input.degradationRate);
   const debtInterestRate = asRate(input.debtInterestRate);
@@ -1552,12 +1558,25 @@ function buildPreRows(
     debtInterestRate,
     input.debtMaturityYears,
   );
+  // D&A — split Type 1 (dégressif) / Type 2 (linéaire) MAPPÉ depuis capexDetails si non saisi
+  // (template BP §2.5) : Type 1 = modules + BoS + contingency ; Type 2 = raccordement + apport
+  // affaire + dev fees (MOD). Non amortis (exclus) = financing fees + taxes foncières + indemnités.
+  // capexType1/2 saisis → override (Baugé) ; capex legacy sans détail → bloc unique (inchangé).
+  let capexType1Keuro = input.capexType1Keuro;
+  let capexType2Keuro = input.capexType2Keuro;
+  if (capexType1Keuro == null && capexType2Keuro == null && capexDetails.hasDetailedCapex) {
+    capexType1Keuro =
+      capexDetails.modulesKeuro + capexDetails.boSKeuro + capexDetails.contingencyKeuro;
+    capexType2Keuro =
+      capexDetails.raccordementKeuro + capexDetails.apportAffaireKeuro + capexDetails.devFeesKeuro;
+  }
   const amortizationSchedule = buildAmortizationSchedule(
     initialInvestment,
     input.amortDuree ?? input.projectLifeYears,
     input.projectLifeYears,
-    input.capexType1Keuro,
-    input.capexType2Keuro,
+    capexType1Keuro,
+    capexType2Keuro,
+    input.coefDegressif,
   );
   const contractDuration = input.contractDuration ?? CONTRACT_DURATION_FALLBACK;
   const auroraCurveByYear = buildAuroraCurveByYear(input);
