@@ -139,6 +139,12 @@ model Scenario {
   batimentsFonciersKeuro   Float?
   modRetraitementKeuro     Float?
   valeurTerrainKeuro       Float?
+  // Inputs moteur de calibration BP (seed-driven, pas de champ formulaire). Nullable → rétrocompat
+  // stricte : scénario legacy (colonnes null) recompute à l'identique. opexEngagementsKeuroByYear =
+  // tableau k€ an-par-an encodé JSON (comme dscrSchedule) ; margeFactFigeeKeuro = k€ (null = boucle
+  // endogène, 0 = figée). Cf scripts/read_bp_matrix.ts (engineOnly) et app/lib/finance/engine.ts.
+  opexEngagementsKeuroByYear String?
+  margeFactFigeeKeuro        Float?
   dscr                     Float
   npv                      Float
   irr                      Float

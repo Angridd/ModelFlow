@@ -68,6 +68,25 @@ function parseDscrSchedule(json: string | null): DscrTranche[] | null {
   }
 }
 
+// Engagements OPEX an-par-an (k€) persistés en JSON (migration persist_engagements_marge).
+// Vide/invalide → undefined (rétrocompat stricte : comportement moteur inchangé, comme calibrate_all).
+function parseEngagements(json: string | null): number[] | undefined {
+  if (!json) return undefined;
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    if (
+      Array.isArray(parsed) &&
+      parsed.length > 0 &&
+      parsed.every((n) => typeof n === "number" && Number.isFinite(n))
+    ) {
+      return parsed as number[];
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function getStatusBadgeClass(status: string): string {
   const s = status.toLowerCase();
   if (s === "approved" || s === "rtb") return "badge badge-green";
@@ -105,6 +124,10 @@ export default async function ProjectDetailPage({
   // AuroraCurve globale (year @unique → une seule techno) → détail == liste à l'euro, Fixed ET Tracker.
   const merchantCurves = merchantCurveForTechnology(project.technology);
   const buildFinanceInput = (scenario: (typeof scenarios)[number]) => ({
+    // Inputs moteur de calibration BP persistés (migration persist_engagements_marge) : réinjectés
+    // ici pour que « détail = liste » (mêmes dette/TRI que calibrate_all). null → moteur inchangé.
+    opexEngagementsKeuroByYear: parseEngagements(scenario.opexEngagementsKeuroByYear),
+    margeFactFigeeKeuro: scenario.margeFactFigeeKeuro,
     capacityMw: project.capacityMw,
     commissioningYear: project.commissioningYear,
     auroraCurves: merchantCurves,

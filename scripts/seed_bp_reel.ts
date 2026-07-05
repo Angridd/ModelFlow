@@ -43,8 +43,16 @@ async function main() {
       continue;
     }
 
+    // Inputs moteur de calibration persistés (migration persist_engagements_marge) : le tableau
+    // engagements est encodé JSON (comme dscrSchedule), la marge figée telle quelle (null/0). Ainsi
+    // la page projet (buildFinanceInput lit la DB) reproduit la dette/TRI de calibrate_all.
+    const engagements = b.engineOnly.opexEngagementsKeuroByYear as number[] | undefined;
+    const margeFactFigeeKeuro = b.engineOnly.margeFactFigeeKeuro as number | null | undefined;
     const scenario: Record<string, unknown> = {
       ...b.scenario,
+      opexEngagementsKeuroByYear:
+        engagements && engagements.length > 0 ? JSON.stringify(engagements) : null,
+      margeFactFigeeKeuro: margeFactFigeeKeuro ?? null,
       dscr: metrics.dscr ?? 0,
       npv: metrics.npv,
       irr: metrics.irr,
