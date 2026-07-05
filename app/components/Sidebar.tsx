@@ -26,6 +26,19 @@ const navItems: NavItem[] = [
     ),
   },
   {
+    href: "/analyse",
+    label: "Analyse",
+    // Section stratégique : pipeline MES, anomalies de coût, leviers chiffrés, benchmark, sensibilité.
+    isActive: (pathname) => pathname === "/analyse" || pathname.startsWith("/analyse/"),
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden>
+        <path d="M1 13.5V1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        <path d="M1 13.5H14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        <path d="M3.5 10L6.5 6.5L9 8.5L13 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity="0.85" />
+      </svg>
+    ),
+  },
+  {
     href: "/projects",
     label: "Projets",
     // Vue liste : accès rapide fiche par fiche (le formulaire "nouveau" a son propre onglet).
