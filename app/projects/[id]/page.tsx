@@ -318,6 +318,13 @@ export default async function ProjectDetailPage({
               Export CSV
             </Link>
             <Link
+              href={`/projects/${project.id}/bp`}
+              className="btn-secondary"
+              style={{ background: "rgba(255,255,255,0.12)", borderColor: "rgba(255,255,255,0.2)", color: "white" }}
+            >
+              Voir le modèle BP
+            </Link>
+            <Link
               href={`/projects/${project.id}/scenarios/new`}
               className="btn-primary"
               style={{ background: "white", color: "var(--ps-blue-dark)" }}
