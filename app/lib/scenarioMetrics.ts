@@ -200,7 +200,15 @@ export function computeProjectFinance(
   project: ProjectFinanceFields,
   scenario: Scenario,
 ): ProjectFinance {
-  const input = buildFinanceInput(project, scenario);
+  return computeFinanceFromInput(buildFinanceInput(project, scenario));
+}
+
+/**
+ * Variante « input direct » : calcule les métriques + structure de financement à partir d'un
+ * FinanceEngineInput DÉJÀ construit (utilisée par le stress test portefeuille, qui perturbe l'input
+ * avant recalcul). Logique STRICTEMENT identique à computeProjectFinance (source unique).
+ */
+export function computeFinanceFromInput(input: FinanceEngineInput): ProjectFinance {
   const metrics = calculateScenarioMetrics(input);
   const capexTotalKeuro = calculateCapexDetails(input).capexTotalKeuro;
   const capexCalibKeuro = capexTotalKeuro + metrics.financingFeesKeuro;

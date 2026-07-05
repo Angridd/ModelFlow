@@ -494,6 +494,145 @@ export type TornadoRow = {
   highNpv: number;
 };
 
+// ── Stress test PORTEFEUILLE — choc UNIFORME sur les inputs (types + perturbation pure) ──────
+/**
+ * Drivers exposés dans l'onglet stress test. Chaque delta est un ÉCART ABSOLU (défaut 0) appliqué
+ * À L'IDENTIQUE sur les 25 projets. La perturbation se fait AU NIVEAU DES INPUTS (moteur inchangé).
+ */
+export type StressDriverKey = "tariff" | "debtRate" | "capex" | "yield" | "merchant" | "opex";
+
+export type StressDeltas = Record<StressDriverKey, number>;
+
+export const ZERO_STRESS_DELTAS: StressDeltas = {
+  tariff: 0,
+  debtRate: 0,
+  capex: 0,
+  yield: 0,
+  merchant: 0,
+  opex: 0,
+};
+
+export type StressDriverDef = {
+  key: StressDriverKey;
+  label: string;
+  unit: string;
+  /** Pas suggéré pour le champ (incrément UI). */
+  step: number;
+  /** Note affichée sous le champ (mapping input / proxy). */
+  hint: string;
+};
+
+export const STRESS_DRIVERS: readonly StressDriverDef[] = [
+  { key: "tariff", label: "Tarif PPA", unit: "€/MWh", step: 1, hint: "additif sur input « tariff »" },
+  { key: "debtRate", label: "Taux de dette (all-in)", unit: "bips", step: 10, hint: "+bips/100 sur « debtInterestRate » (points de %)" },
+  { key: "capex", label: "CAPEX", unit: "ct/Wc", step: 1, hint: "proxy via « boSCtWc » : s'ajoute au CAPEX, D&A et base des frais de financing" },
+  { key: "yield", label: "Productible", unit: "%", step: 1, hint: "×(1+δ) sur « yieldMwh » / « yieldP90Mwh »" },
+  { key: "merchant", label: "Prix merchant", unit: "€/MWh", step: 1, hint: "décale les courbes Aurora (investor + debt sizing)" },
+  { key: "opex", label: "OPEX O&M", unit: "€/kWc", step: 0.1, hint: "additif sur « omFixedEuroKwc »" },
+] as const;
+
+/**
+ * Applique le choc UNIFORME aux inputs d'UN projet (pure, ZÉRO `any`, moteur non touché).
+ * Chaque driver est indépendant ; un delta nul ⇒ champ inchangé (baseline == stressé si tout à 0).
+ *   - tariff    : + €/MWh sur `tariff`
+ *   - debtRate  : + bips → + bips/100 points de % sur `debtInterestRate`
+ *   - capex     : + ct/Wc via `boSCtWc` (proxy fidèle : le BOS s'ajoute linéairement au CAPEX et
+ *                 alimente D&A + base des frais de financing comme du vrai capex)
+ *   - yield     : ×(1 + δ/100) sur `yieldMwh` et `yieldP90Mwh`
+ *   - merchant  : + €/MWh sur chaque point des courbes Aurora (high/central/low)
+ *   - opex      : + €/kWc sur `omFixedEuroKwc`
+ */
+export function applyStressDeltas(
+  input: FinanceEngineInput,
+  deltas: StressDeltas,
+): FinanceEngineInput {
+  let out: FinanceEngineInput = input;
+
+  if (deltas.tariff !== 0 && typeof out.tariff === "number" && Number.isFinite(out.tariff)) {
+    out = { ...out, tariff: out.tariff + deltas.tariff };
+  }
+
+  if (
+    deltas.debtRate !== 0 &&
+    typeof out.debtInterestRate === "number" &&
+    Number.isFinite(out.debtInterestRate)
+  ) {
+    out = { ...out, debtInterestRate: out.debtInterestRate + deltas.debtRate / 100 };
+  }
+
+  if (deltas.capex !== 0) {
+    out = { ...out, boSCtWc: (out.boSCtWc ?? 0) + deltas.capex };
+  }
+
+  if (deltas.yield !== 0) {
+    const factor = 1 + deltas.yield / 100;
+    const next: Partial<FinanceEngineInput> = {};
+    if (typeof out.yieldMwh === "number" && Number.isFinite(out.yieldMwh)) {
+      next.yieldMwh = out.yieldMwh * factor;
+    }
+    if (typeof out.yieldP90Mwh === "number" && Number.isFinite(out.yieldP90Mwh)) {
+      next.yieldP90Mwh = out.yieldP90Mwh * factor;
+    }
+    out = { ...out, ...next };
+  }
+
+  if (deltas.merchant !== 0 && out.auroraCurves) {
+    out = {
+      ...out,
+      auroraCurves: out.auroraCurves.map((c) => ({
+        year: c.year,
+        high: c.high + deltas.merchant,
+        central: c.central + deltas.merchant,
+        low: c.low + deltas.merchant,
+      })),
+    };
+  }
+
+  if (
+    deltas.opex !== 0 &&
+    typeof out.omFixedEuroKwc === "number" &&
+    Number.isFinite(out.omFixedEuroKwc)
+  ) {
+    out = { ...out, omFixedEuroKwc: out.omFixedEuroKwc + deltas.opex };
+  }
+
+  return out;
+}
+
+// ── Stress test — types résultat partagés client ⇆ server action ─────────────────────────
+export type PortfolioStressProjectRow = {
+  id: string;
+  name: string;
+  capacityMw: number;
+  baseIrr: number;
+  stressIrr: number;
+  baseNpv: number;
+  stressNpv: number;
+  baseHealth: Health;
+  stressHealth: Health;
+};
+
+export type PortfolioStressAggregate = {
+  projectCount: number;
+  baseNpvTotal: number;
+  stressNpvTotal: number;
+  baseIrrMedian: number | null;
+  stressIrrMedian: number | null;
+  baseDebtTotal: number;
+  stressDebtTotal: number;
+  baseEquityTotal: number;
+  stressEquityTotal: number;
+  /** Nb de projets avec TRI investisseur ≥ IRR_CRITICAL_PCT (7,5 %). */
+  baseAboveThreshold: number;
+  stressAboveThreshold: number;
+};
+
+export type PortfolioStressResult = {
+  deltas: StressDeltas;
+  rows: PortfolioStressProjectRow[];
+  aggregate: PortfolioStressAggregate;
+};
+
 export function benchmarkValue(m: ProjectMetrics, key: BenchmarkColumnKey): number | null {
   switch (key) {
     case "capexPerMwc":

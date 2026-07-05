@@ -6,6 +6,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Legend,
   ReferenceLine,
   ResponsiveContainer,
@@ -24,14 +25,20 @@ import {
   ALL_POSTES,
   CAPEX_POSTES,
   OPEX_POSTES,
+  IRR_CRITICAL_PCT,
+  STRESS_DRIVERS,
+  ZERO_STRESS_DELTAS,
   type Anomaly,
   type BenchmarkColumnKey,
   type Health,
   type LeverResult,
+  type PortfolioStressResult,
   type ProjectAnalysis,
+  type StressDeltas,
+  type StressDriverKey,
   type TornadoRow,
 } from "@/app/lib/analysis";
-import { computeTornado } from "@/app/analyse/actions";
+import { computePortfolioStress, computeTornado } from "@/app/analyse/actions";
 
 // Palette réutilisée du Dashboard (déjà validée CVD-safe en prod).
 const COLORS = {
@@ -135,13 +142,14 @@ function HealthBadge({ health }: { health: Health }) {
 }
 
 // ── Onglets ─────────────────────────────────────────────────────────────────────────────
-type TabKey = "pipeline" | "costs" | "levers" | "benchmark" | "sensitivity";
+type TabKey = "pipeline" | "costs" | "levers" | "benchmark" | "sensitivity" | "stress";
 const TABS: { key: TabKey; label: string }[] = [
   { key: "pipeline", label: "📅 Pipeline MES" },
   { key: "costs", label: "🔍 Coûts & anomalies" },
   { key: "levers", label: "💡 Leviers chiffrés" },
   { key: "benchmark", label: "📊 Benchmark" },
   { key: "sensitivity", label: "🎚️ Sensibilité" },
+  { key: "stress", label: "🌍 Stress test" },
 ];
 
 export function AnalyseView({
@@ -191,6 +199,7 @@ export function AnalyseView({
       {tab === "levers" && <LeversTab levers={levers} />}
       {tab === "benchmark" && <BenchmarkTab projects={projects} />}
       {tab === "sensitivity" && <SensitivityTab projects={projects} />}
+      {tab === "stress" && <StressTab />}
     </div>
   );
 }
@@ -700,6 +709,251 @@ function SensitivityTab({ projects }: { projects: ProjectAnalysis[] }) {
             </ResponsiveContainer>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// 6. STRESS TEST PORTEFEUILLE (choc uniforme sur les 25 projets)
+// ══════════════════════════════════════════════════════════════════════════════════════
+/** Bloc « avant → après » d'un KPI agrégé. */
+function StressKpi({
+  label,
+  before,
+  after,
+  delta,
+  emphasize,
+}: {
+  label: string;
+  before: string;
+  after: string;
+  delta?: { text: string; positive: boolean } | null;
+  emphasize?: boolean;
+}) {
+  return (
+    <div className="card" style={{ padding: "0.9rem 1.1rem" }}>
+      <p className="meta-label" style={{ marginBottom: "0.4rem" }}>{label}</p>
+      <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap" }}>
+        <span style={{ color: "#6b7280", fontSize: "0.95rem" }}>{before}</span>
+        <span aria-hidden style={{ color: "#9ca3af" }}>→</span>
+        <span style={{ fontSize: emphasize ? "1.35rem" : "1.15rem", fontWeight: 700, color: "#0d1117" }}>{after}</span>
+      </div>
+      {delta ? (
+        <p style={{ marginTop: "0.3rem", fontSize: "0.82rem", fontWeight: 600, color: delta.positive ? COLORS.positive : COLORS.negative }}>
+          {delta.text}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function StressTab() {
+  const [deltas, setDeltas] = useState<StressDeltas>({ ...ZERO_STRESS_DELTAS });
+  const [result, setResult] = useState<PortfolioStressResult | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const setDriver = (key: StressDriverKey, raw: string) => {
+    const v = raw.trim() === "" || raw.trim() === "-" ? 0 : Number(raw);
+    setDeltas((d) => ({ ...d, [key]: Number.isFinite(v) ? v : 0 }));
+  };
+
+  const apply = () => {
+    startTransition(async () => {
+      const r = await computePortfolioStress(deltas);
+      setResult(r);
+    });
+  };
+
+  const reset = () => {
+    setDeltas({ ...ZERO_STRESS_DELTAS });
+    setResult(null);
+  };
+
+  const chartData = useMemo(() => {
+    if (!result) return [];
+    return [...result.rows]
+      .map((r) => ({ label: r.name, van: r.stressNpv - r.baseNpv }))
+      .sort((a, b) => a.van - b.van)
+      .slice(0, 15);
+  }, [result]);
+
+  const inputStyle: React.CSSProperties = {
+    height: "2.4rem",
+    width: "6.5rem",
+    borderRadius: 8,
+    border: "1px solid #d1d5db",
+    padding: "0 0.6rem",
+    fontSize: "0.9rem",
+    background: "white",
+    color: "#0d1117",
+    fontVariantNumeric: "tabular-nums",
+  };
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="card">
+        <h2 className="section-title">Stress test portefeuille — choc uniforme</h2>
+        <p className="section-subtitle">
+          Applique le MÊME écart absolu sur les {result?.aggregate.projectCount ?? 25} projets BP réel à la fois, puis
+          recalcule le moteur (perturbation des inputs uniquement). Le driver « CAPEX ±ct/Wc » est un proxy fidèle via le
+          BOS (s'ajoute au CAPEX, à l'amortissement et à la base des frais de financement).
+        </p>
+
+        <div style={{ display: "grid", gap: "0.9rem", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", marginTop: "1.1rem" }}>
+          {STRESS_DRIVERS.map((d) => (
+            <div key={d.key}>
+              <label style={{ display: "block", fontWeight: 600, fontSize: "0.85rem", color: "#0d1117", marginBottom: "0.3rem" }}>
+                {d.label} <span style={{ color: "#6b7280", fontWeight: 400 }}>(± {d.unit})</span>
+              </label>
+              <input
+                type="number"
+                step={d.step}
+                value={deltas[d.key]}
+                onChange={(e) => setDriver(d.key, e.target.value)}
+                style={inputStyle}
+                aria-label={`${d.label} en ${d.unit}`}
+              />
+              <p style={{ fontSize: "0.68rem", color: "#9ca3af", marginTop: "0.25rem", lineHeight: 1.25 }}>{d.hint}</p>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", gap: "0.6rem", marginTop: "1.15rem", flexWrap: "wrap" }}>
+          <button className="btn-primary" onClick={apply} disabled={pending}>
+            {pending ? "Calcul…" : "Appliquer le choc"}
+          </button>
+          <button className="btn-secondary" onClick={reset} disabled={pending}>Réinitialiser</button>
+        </div>
+      </div>
+
+      {result === null ? (
+        <p style={{ color: "#6b7280" }}>
+          Saisir un ou plusieurs deltas puis « Appliquer le choc » (≈ {25} recalculs, à la demande).
+        </p>
+      ) : (
+        (() => {
+          const agg = result.aggregate;
+          const deltaVanTotal = agg.stressNpvTotal - agg.baseNpvTotal;
+          return (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <StressKpi
+              label="VAN nette portefeuille"
+              before={fmtKeuro(agg.baseNpvTotal)}
+              after={fmtKeuro(agg.stressNpvTotal)}
+              delta={{ text: `${fmtSigned(deltaVanTotal, 0, " k€")} (ΔVAN totale)`, positive: deltaVanTotal >= 0 }}
+              emphasize
+            />
+            <StressKpi
+              label="TRI investisseur médian"
+              before={fmtPct(agg.baseIrrMedian)}
+              after={fmtPct(agg.stressIrrMedian)}
+              delta={
+                agg.baseIrrMedian !== null && agg.stressIrrMedian !== null
+                  ? { text: `${fmtSigned(agg.stressIrrMedian - agg.baseIrrMedian, 2)} pp`, positive: agg.stressIrrMedian - agg.baseIrrMedian >= 0 }
+                  : null
+              }
+            />
+            <StressKpi
+              label={`Projets ≥ ${IRR_CRITICAL_PCT} %`}
+              before={`${agg.baseAboveThreshold}/${agg.projectCount}`}
+              after={`${agg.stressAboveThreshold}/${agg.projectCount}`}
+              delta={{ text: `${fmtSigned(agg.stressAboveThreshold - agg.baseAboveThreshold, 0)} projet(s)`, positive: agg.stressAboveThreshold - agg.baseAboveThreshold >= 0 }}
+              emphasize
+            />
+            <StressKpi
+              label="Dette totale"
+              before={fmtKeuro(agg.baseDebtTotal)}
+              after={fmtKeuro(agg.stressDebtTotal)}
+              delta={{ text: fmtSigned(agg.stressDebtTotal - agg.baseDebtTotal, 0, " k€"), positive: agg.stressDebtTotal - agg.baseDebtTotal >= 0 }}
+            />
+            <StressKpi
+              label="Equity totale (CCA)"
+              before={fmtKeuro(agg.baseEquityTotal)}
+              after={fmtKeuro(agg.stressEquityTotal)}
+              delta={{ text: fmtSigned(agg.stressEquityTotal - agg.baseEquityTotal, 0, " k€"), positive: agg.stressEquityTotal - agg.baseEquityTotal <= 0 }}
+            />
+          </div>
+
+          <div className="card">
+            <h2 className="section-title">ΔVAN par projet (top 15 mouvements)</h2>
+            <p className="section-subtitle">VAN stressée − VAN de base, k€. Rouge = dégradation, vert = amélioration.</p>
+            {chartData.length === 0 ? (
+              <p style={{ marginTop: "1rem", color: "#6b7280" }}>Aucun mouvement.</p>
+            ) : (
+              <div style={{ width: "100%", height: Math.max(240, chartData.length * 28 + 40), marginTop: "1rem" }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 24, left: 8, bottom: 4 }}>
+                    <CartesianGrid stroke={COLORS.grid} horizontal={false} />
+                    <XAxis type="number" stroke={COLORS.axis} fontSize={11} tickFormatter={(v: number) => fmtSigned(v, 0)} />
+                    <YAxis type="category" dataKey="label" stroke={COLORS.axis} fontSize={11} width={150} />
+                    <Tooltip cursor={{ fill: "rgba(0,79,159,0.05)" }} content={(p) => <ChartTooltip {...p} title="ΔVAN" format={(v) => fmtSigned(v, 0, " k€")} />} />
+                    <ReferenceLine x={0} stroke="#6b7280" />
+                    <Bar dataKey="van" name="ΔVAN" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+                      {chartData.map((d) => (
+                        <Cell key={d.label} fill={d.van >= 0 ? COLORS.positive : COLORS.negative} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          <div className="overflow-x-auto" style={{ borderRadius: "var(--radius-card)", boxShadow: "var(--shadow-card)", background: "white" }}>
+            <table className="ps-table" style={{ minWidth: "900px" }}>
+              <thead>
+                <tr>
+                  <th className="col-left">Projet</th>
+                  <th>MW</th>
+                  <th>TRI inv. (av. → ap.)</th>
+                  <th>ΔTRI</th>
+                  <th>VAN (av. → ap.)</th>
+                  <th>ΔVAN</th>
+                  <th>Santé (av. → ap.)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.rows.map((r) => {
+                  const dIrr = r.stressIrr - r.baseIrr;
+                  const dVan = r.stressNpv - r.baseNpv;
+                  return (
+                    <tr key={r.id}>
+                      <td className="col-left">
+                        <Link href={`/projects/${r.id}`} style={{ color: "var(--ps-blue-dark)", fontWeight: 600 }}>{r.name}</Link>
+                      </td>
+                      <td>{fmtNum(r.capacityMw, 1)}</td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <span style={{ color: "#6b7280" }}>{fmtPct(r.baseIrr)}</span>
+                        {" → "}
+                        <strong className={r.stressIrr < IRR_CRITICAL_PCT ? "val-neg" : "val-pos"}>{fmtPct(r.stressIrr)}</strong>
+                      </td>
+                      <td className={dIrr >= 0 ? "val-pos" : "val-neg"}>{fmtSigned(dIrr, 2)} pp</td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <span style={{ color: "#6b7280" }}>{fmtKeuro(r.baseNpv)}</span>
+                        {" → "}
+                        <strong className={r.stressNpv >= 0 ? "val-pos" : "val-neg"}>{fmtKeuro(r.stressNpv)}</strong>
+                      </td>
+                      <td className={dVan >= 0 ? "val-pos" : "val-neg"}>{fmtSigned(dVan, 0, " k€")}</td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <HealthBadge health={r.baseHealth} />
+                        {r.baseHealth !== r.stressHealth ? (
+                          <>
+                            <span aria-hidden style={{ margin: "0 0.3rem", color: "#9ca3af" }}>→</span>
+                            <HealthBadge health={r.stressHealth} />
+                          </>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+          );
+        })()
       )}
     </div>
   );

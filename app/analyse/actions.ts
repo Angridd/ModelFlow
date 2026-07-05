@@ -5,12 +5,26 @@
  * Chaque variable est perturbée de ±10 % sur le FinanceEngineInput reconstruit, puis le moteur
  * (non modifié) est ré-exécuté pour lire TRI investisseur + VAN nette.
  */
-import type { TornadoRow, TornadoVariable } from "@/app/lib/analysis";
+import {
+  applyStressDeltas,
+  classifyHealth,
+  IRR_CRITICAL_PCT,
+  median,
+  type PortfolioStressProjectRow,
+  type PortfolioStressResult,
+  type StressDeltas,
+  type TornadoRow,
+  type TornadoVariable,
+} from "@/app/lib/analysis";
 import {
   calculateScenarioMetrics,
   type FinanceEngineInput,
 } from "@/app/lib/finance/engine";
-import { buildFinanceInput } from "@/app/lib/scenarioMetrics";
+import {
+  buildFinanceInput,
+  computeFinanceFromInput,
+  pickReferenceScenario,
+} from "@/app/lib/scenarioMetrics";
 import { prisma } from "@/app/lib/prisma";
 
 const DELTA = 0.1;
@@ -116,4 +130,97 @@ export async function computeTornado(projectId: string): Promise<TornadoRow[]> {
       Math.abs(b.highIrr - b.lowIrr) - Math.abs(a.highIrr - a.lowIrr),
   );
   return rows;
+}
+
+/**
+ * STRESS TEST PORTEFEUILLE — applique un choc UNIFORME (deltas) sur les 25 projets « bp_reel » à la
+ * fois et renvoie l'impact agrégé + par projet. Recompute À LA DEMANDE (~25 recalculs par clic) :
+ * pour chaque projet on reconstruit le FinanceEngineInput (même chemin que le reste), on perturbe
+ * les inputs (applyStressDeltas — moteur non modifié) puis on relit métriques + financement.
+ */
+export async function computePortfolioStress(
+  deltas: StressDeltas,
+): Promise<PortfolioStressResult> {
+  const projects = await prisma.project.findMany({
+    where: { status: "bp_reel" },
+    include: { scenarios: true },
+  });
+
+  const rows: PortfolioStressProjectRow[] = [];
+  const baseIrrs: number[] = [];
+  const stressIrrs: number[] = [];
+  let baseNpvTotal = 0;
+  let stressNpvTotal = 0;
+  let baseDebtTotal = 0;
+  let stressDebtTotal = 0;
+  let baseEquityTotal = 0;
+  let stressEquityTotal = 0;
+  let baseAboveThreshold = 0;
+  let stressAboveThreshold = 0;
+
+  for (const project of projects) {
+    const scenario = pickReferenceScenario(project.scenarios);
+    if (!scenario) continue;
+
+    const input = buildFinanceInput(project, scenario);
+    const base = computeFinanceFromInput(input);
+    const stress = computeFinanceFromInput(applyStressDeltas(input, deltas));
+
+    const baseHealth = classifyHealth({
+      npv: base.metrics.npv,
+      investorIrr: base.metrics.investorIrr,
+      gearingPct: base.gearingPct,
+      dscr: base.metrics.dscr,
+    });
+    const stressHealth = classifyHealth({
+      npv: stress.metrics.npv,
+      investorIrr: stress.metrics.investorIrr,
+      gearingPct: stress.gearingPct,
+      dscr: stress.metrics.dscr,
+    });
+
+    rows.push({
+      id: project.id,
+      name: project.name,
+      capacityMw: project.capacityMw,
+      baseIrr: base.metrics.investorIrr,
+      stressIrr: stress.metrics.investorIrr,
+      baseNpv: base.metrics.npv,
+      stressNpv: stress.metrics.npv,
+      baseHealth,
+      stressHealth,
+    });
+
+    baseIrrs.push(base.metrics.investorIrr);
+    stressIrrs.push(stress.metrics.investorIrr);
+    baseNpvTotal += base.metrics.npv;
+    stressNpvTotal += stress.metrics.npv;
+    baseDebtTotal += base.debtRetenuKeuro;
+    stressDebtTotal += stress.debtRetenuKeuro;
+    baseEquityTotal += base.ccaKeuro;
+    stressEquityTotal += stress.ccaKeuro;
+    if (base.metrics.investorIrr >= IRR_CRITICAL_PCT) baseAboveThreshold += 1;
+    if (stress.metrics.investorIrr >= IRR_CRITICAL_PCT) stressAboveThreshold += 1;
+  }
+
+  // Tri par ΔVAN croissante : les plus dégradés (Δ le plus négatif) en tête.
+  rows.sort((a, b) => (a.stressNpv - a.baseNpv) - (b.stressNpv - b.baseNpv));
+
+  return {
+    deltas,
+    rows,
+    aggregate: {
+      projectCount: rows.length,
+      baseNpvTotal,
+      stressNpvTotal,
+      baseIrrMedian: median(baseIrrs),
+      stressIrrMedian: median(stressIrrs),
+      baseDebtTotal,
+      stressDebtTotal,
+      baseEquityTotal,
+      stressEquityTotal,
+      baseAboveThreshold,
+      stressAboveThreshold,
+    },
+  };
 }

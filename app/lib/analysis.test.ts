@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { FinanceEngineInput } from "@/app/lib/finance/engine";
 import {
   ANOMALY_RATIO,
+  applyStressDeltas,
   benchmarkValue,
   buildLeverPlan,
   classifyHealth,
@@ -11,6 +12,7 @@ import {
   perMwc,
   quantile,
   quartileRank,
+  ZERO_STRESS_DELTAS,
   type ProjectAnalysis,
   type ProjectMetrics,
   type ProjectPostes,
@@ -153,6 +155,60 @@ describe("mapping poste → levier", () => {
   it("input nul → indicatif (rétrocompat, pas de plantage)", () => {
     const plan = buildLeverPlan("bos", input, 2000, 1000);
     expect(plan.kind).toBe("indicative");
+  });
+});
+
+describe("stress test — perturbation d'input", () => {
+  const base = {
+    tariff: 80,
+    debtInterestRate: 4,
+    boSCtWc: 20,
+    yieldMwh: 1200,
+    yieldP90Mwh: 1116,
+    omFixedEuroKwc: 5,
+    auroraCurves: [
+      { year: 2030, high: 70, central: 60, low: 50 },
+      { year: 2031, high: 72, central: 62, low: 52 },
+    ],
+  } as unknown as FinanceEngineInput;
+
+  it("deltas nuls → input identique (baseline == stressé)", () => {
+    const out = applyStressDeltas(base, { ...ZERO_STRESS_DELTAS });
+    expect(out).toEqual(base);
+  });
+
+  it("tarif additif €/MWh, taux +bips/100 pts %, CAPEX via BOS, OPEX additif", () => {
+    const out = applyStressDeltas(base, {
+      ...ZERO_STRESS_DELTAS,
+      tariff: 1,
+      debtRate: 10,
+      capex: 1,
+      opex: 0.5,
+    });
+    expect(out.tariff).toBeCloseTo(81, 6); // +1 €/MWh
+    expect(out.debtInterestRate).toBeCloseTo(4.1, 6); // +10 bips = +0,10 pt de %
+    expect(out.boSCtWc).toBeCloseTo(21, 6); // +1 ct/Wc (proxy CAPEX)
+    expect(out.omFixedEuroKwc).toBeCloseTo(5.5, 6); // +0,5 €/kWc
+  });
+
+  it("productible multiplicatif ×(1+δ/100) sur P50 et P90", () => {
+    const out = applyStressDeltas(base, { ...ZERO_STRESS_DELTAS, yield: 10 });
+    expect(out.yieldMwh).toBeCloseTo(1320, 6);
+    expect(out.yieldP90Mwh).toBeCloseTo(1227.6, 6);
+  });
+
+  it("prix merchant décale chaque point de courbe Aurora de +€/MWh", () => {
+    const out = applyStressDeltas(base, { ...ZERO_STRESS_DELTAS, merchant: 5 });
+    expect(out.auroraCurves?.[0]).toEqual({ year: 2030, high: 75, central: 65, low: 55 });
+    expect(out.auroraCurves?.[1].central).toBeCloseTo(67, 6);
+    // non mutant : la base est intacte
+    expect(base.auroraCurves?.[0].central).toBe(60);
+  });
+
+  it("BOS nul + delta CAPEX → part du 0 (proxy forcé)", () => {
+    const noBos = { ...base, boSCtWc: null } as unknown as FinanceEngineInput;
+    const out = applyStressDeltas(noBos, { ...ZERO_STRESS_DELTAS, capex: 2 });
+    expect(out.boSCtWc).toBeCloseTo(2, 6);
   });
 });
 
