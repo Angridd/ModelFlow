@@ -449,29 +449,29 @@ export default async function ProjectDetailPage({
       <AnimatedKpiCards
         cards={[
           {
-            label: projectReferenceScenario ? "VAN rÃ©fÃ©rence" : "Meilleure VAN",
+            label: projectReferenceScenario ? "VAN référence" : "Meilleure VAN",
             value: kpiNpv,
-            suffix: " Mâ‚¬",
+            suffix: " M€",
             scale: 1000,
             decimals: 2,
             tone: kpiNpv !== null && kpiNpv < 0 ? "negative" : "positive",
           },
           {
-            label: projectReferenceScenario ? "TRI rÃ©fÃ©rence" : "Meilleur TRI",
+            label: projectReferenceScenario ? "TRI référence" : "Meilleur TRI",
             value: kpiIrr,
             suffix: " %",
             decimals: 2,
             tone: "positive",
           },
           {
-            label: projectReferenceScenario ? "DSCR rÃ©fÃ©rence" : "DSCR minimum",
+            label: projectReferenceScenario ? "DSCR référence" : "DSCR minimum",
             value: kpiDscr,
             decimals: 2,
           },
           {
-            label: projectReferenceScenario ? "LCOE rÃ©fÃ©rence" : "LCOE minimum",
+            label: projectReferenceScenario ? "LCOE référence" : "LCOE minimum",
             value: kpiLcoe,
-            suffix: " â‚¬/MWh",
+            suffix: " €/MWh",
             decimals: 2,
           },
         ]}
