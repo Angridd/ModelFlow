@@ -339,8 +339,9 @@ export function buildProject(
     valeurTerrainKeuro: 5 * surfaceHa,
   };
 
-  // OPEX « engagements » an-par-an (k€, an1..anN) — moteur uniquement (pas de colonne Scenario ;
-  // routé ADDITIVEMENT SANS ré-indexation dans engine.buildPreRows). Absent → [] → inchangé.
+  // OPEX « engagements » an-par-an (k€, an1..anN) — routé ADDITIVEMENT SANS ré-indexation dans
+  // engine.buildPreRows. Persisté via la colonne Scenario.opexEngagementsKeuroByYear (String? JSON)
+  // et saisissable au formulaire (grille an-par-an). Absent → [] → inchangé.
   const opexEngagementsKeuroByYear = engagementsBySlug?.get(slugify(name)) ?? [];
   if (opexEngagementsKeuroByYear.length === 0) {
     flags.push("Aucun engagement Inp_Opération trouvé (série vide → OPEX inchangé)");
@@ -349,7 +350,8 @@ export function buildProject(
   // Marge facturable figée par le BP (r32 « Dont Marge facturable » € → k€). Les k€ sont déjà
   // inclus dans le CAPEX via indemnitesImmoKeuro → on impose 0 pour ne pas les compter deux fois
   // et désactiver la boucle endogène. r32 ≠ 0 uniquement sur Ychoux → null partout ailleurs
-  // (rétrocompat stricte). ENGINE-ONLY : pas de colonne Prisma.
+  // (rétrocompat stricte). Persisté via la colonne Scenario.margeFactFigeeKeuro (Float?),
+  // saisissable au formulaire (section template).
   const margeFactFigeeKeuro = margeFacturableEuro > 0 ? 0 : null;
 
   const engineOnly = {

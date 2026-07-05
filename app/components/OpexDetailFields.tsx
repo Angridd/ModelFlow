@@ -32,6 +32,8 @@ type OpexDetailInitialValue = {
   tauxTEOM?: number | null;
   tauxCFECommune?: number | null;
   tauxCFEEPCI?: number | null;
+  tauxTSECfe?: number | null;
+  tauxGEMAPICfe?: number | null;
   tauxCCI?: number | null;
   prixTerrainHa?: number | null;
   abattTerrain?: number | null;
@@ -156,6 +158,10 @@ export function OpexDetailFields({
     initialNumber(initialValue.tauxCFECommune, "0.22"),
   );
   const [tauxCFEEPCI, setTauxCFEEPCI] = useState(initialNumber(initialValue.tauxCFEEPCI, "0.08"));
+  const [tauxTSECfe, setTauxTSECfe] = useState(initialNumber(initialValue.tauxTSECfe));
+  const [tauxGEMAPICfe, setTauxGEMAPICfe] = useState(
+    initialNumber(initialValue.tauxGEMAPICfe),
+  );
   const [tauxCCI, setTauxCCI] = useState(initialNumber(initialValue.tauxCCI, "0.005"));
   const [prixTerrainHa, setPrixTerrainHa] = useState(
     initialNumber(initialValue.prixTerrainHa, "5000"),
@@ -164,7 +170,7 @@ export function OpexDetailFields({
     initialNumber(initialValue.abattTerrain, "0"),
   );
   const [inflationTaxes, setInflationTaxes] = useState(
-    initialNumber(initialValue.inflationTaxes, "0.4"),
+    initialNumber(initialValue.inflationTaxes, "2"),
   );
   const [iferRate1, setIferRate1] = useState(initialNumber(initialValue.iferRate1, "3.5"));
   const [iferRate2, setIferRate2] = useState(initialNumber(initialValue.iferRate2, "8.5"));
@@ -214,6 +220,8 @@ export function OpexDetailFields({
     tauxTEOM,
     tauxCFECommune,
     tauxCFEEPCI,
+    tauxTSECfe,
+    tauxGEMAPICfe,
     tauxCCI,
   ].some((value) => parseNumber(value) !== null);
 
@@ -258,6 +266,8 @@ export function OpexDetailFields({
           tauxTEOM: parseNumber(tauxTEOM),
           tauxCFECommune: parseNumber(tauxCFECommune),
           tauxCFEEPCI: parseNumber(tauxCFEEPCI),
+          tauxTSECfe: parseNumber(tauxTSECfe),
+          tauxGEMAPICfe: parseNumber(tauxGEMAPICfe),
           tauxCCI: parseNumber(tauxCCI),
           prixTerrainHa: parseNumber(prixTerrainHa),
           abattTerrain: parseNumber(abattTerrain),
@@ -302,6 +312,8 @@ export function OpexDetailFields({
       tariffInflationRate,
       tauxCFECommune,
       tauxCFEEPCI,
+      tauxTSECfe,
+      tauxGEMAPICfe,
       tauxCCI,
       tauxGEMAPI,
       tauxTEOM,
@@ -527,6 +539,14 @@ export function OpexDetailFields({
               <input name="tauxCFEEPCI" type="number" min="0" step="0.01" value={tauxCFEEPCI} onChange={(event) => setTauxCFEEPCI(event.target.value)} placeholder="ex. 0.08" className={defaultInputClass(tauxCFEEPCI, "0.08")} />
             </label>
             <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              TSE (CFE)
+              <input name="tauxTSECfe" type="number" min="0" step="0.001" value={tauxTSECfe} onChange={(event) => setTauxTSECfe(event.target.value)} placeholder="ex. 0.05" title="Taux TSE appliqué à la base CFE (cotisation additionnelle)" className={numberInputClass} />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              GEMAPI (CFE)
+              <input name="tauxGEMAPICfe" type="number" min="0" step="0.001" value={tauxGEMAPICfe} onChange={(event) => setTauxGEMAPICfe(event.target.value)} placeholder="ex. 0.005" title="Taux GEMAPI appliqué à la base CFE (cotisation additionnelle)" className={numberInputClass} />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
               CCI
               <input name="tauxCCI" type="number" min="0" step="0.01" value={tauxCCI} onChange={(event) => setTauxCCI(event.target.value)} placeholder="ex. 0.005" className={defaultInputClass(tauxCCI, "0.005")} />
             </label>
@@ -545,7 +565,7 @@ export function OpexDetailFields({
             </label>
             <label className="grid gap-2 text-sm font-medium text-zinc-700">
               <span>Inflation taxes (%/an) <span className="badge-default">Défaut</span></span>
-              <input name="inflationTaxes" type="number" min="0" step="0.01" value={inflationTaxes} onChange={(event) => setInflationTaxes(event.target.value)} placeholder="ex. 0.4" className={defaultInputClass(inflationTaxes, "0.4")} />
+              <input name="inflationTaxes" type="number" min="0" step="0.01" value={inflationTaxes} onChange={(event) => setInflationTaxes(event.target.value)} placeholder="ex. 2" className={defaultInputClass(inflationTaxes, "2")} />
             </label>
           </div>
         </div>

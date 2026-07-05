@@ -117,9 +117,9 @@ export type FinanceEngineInput = FinancialAssumptions & {
     low: number;
   }> | null;
   capacityPriceCurve?: number[];
-  capacityCertificateMw?: number;
-  goStartYear?: number;
-  goPriceBase?: number;
+  capacityCertificateMw?: number | null;
+  goStartYear?: number | null;
+  goPriceBase?: number | null;
   debtSizingCentralW?: number | null;
   debtSizingLowW?: number | null;
   investorCurveW?: number | null;
@@ -149,7 +149,8 @@ export type FinanceEngineInput = FinancialAssumptions & {
   // en k€. Non-null → désactive la boucle endogène `ajusteMargeFacturable` et impose cette valeur
   // (les k€ correspondants sont déjà inclus dans le CAPEX via `indemnitesImmoKeuro`, d'où 0 pour
   // ne pas les compter deux fois). Le cap gearing reste actif. null → boucle endogène inchangée
-  // (rétrocompat stricte). ENGINE-ONLY : non persisté en base, comme opexEngagementsKeuroByYear.
+  // (rétrocompat stricte). Persisté en base : colonne Scenario.margeFactFigeeKeuro (Float?),
+  // saisissable au formulaire (section template) — comme opexEngagementsKeuroByYear (String? JSON).
   margeFactFigeeKeuro?: number | null;
   loyerMode?: string | null;
   loyerValeur?: number | null;

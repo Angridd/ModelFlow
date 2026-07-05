@@ -9,11 +9,141 @@ import { DefaultNumberInput } from "@/app/components/DefaultNumberInput";
 import { DscrSchedule } from "@/app/components/DscrSchedule";
 import { FinancingFeesFields } from "@/app/components/FinancingFeesFields";
 import { OpexDetailFields } from "@/app/components/OpexDetailFields";
+import { OpexEngagementsFields } from "@/app/components/OpexEngagementsFields";
 import {
   DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS,
   type DscrTranche,
 } from "@/app/lib/finance/types";
 import { prisma } from "@/app/lib/prisma";
+
+const projectParamFields = [
+  {
+    name: "debtTenorYears" as const,
+    label: "Durée dette sculptée / tenor (ans)",
+    step: "1",
+    placeholder: "ex. 18",
+    title: "Nombre d'années de dette sculptée (DSCR). Vide → durée de la dette.",
+  },
+  {
+    name: "ccaRemunRate" as const,
+    label: "Taux rémunération CCA (%/an)",
+    step: "0.01",
+    placeholder: "ex. 2",
+    title: "Taux de rémunération du compte courant d'associé (CCA).",
+  },
+  {
+    name: "dsrfFeeRate" as const,
+    label: "Taux DSRF (%)",
+    step: "0.01",
+    placeholder: "ex. 1.4",
+    title: "Taux de dotation à la réserve de service de la dette (DSRF).",
+  },
+  {
+    name: "agentFeeAnnuelKeuro" as const,
+    label: "Agent fee annuel (k€)",
+    step: "0.01",
+    placeholder: "ex. 5",
+    title: "Commission d'agent bancaire annuelle (k€), indexée inflation OPEX.",
+  },
+  {
+    name: "indemnitesImmoKeuro" as const,
+    label: "Indemnités immobilisées (k€)",
+    step: "0.01",
+    placeholder: "ex. 0",
+    title: "Indemnités immobilisées ajoutées au CAPEX.",
+  },
+  {
+    name: "capacityCertificateMw" as const,
+    label: "Puissance certificat capacité (MW)",
+    step: "0.01",
+    placeholder: "ex. 5",
+    title: "Puissance ouvrant droit au revenu de capacité.",
+  },
+  {
+    name: "goStartYear" as const,
+    label: "Année début GO",
+    step: "1",
+    placeholder: "ex. 21",
+    title: "Première année de revenu Garanties d'Origine.",
+  },
+  {
+    name: "unavailability" as const,
+    label: "Indisponibilité (fraction)",
+    step: "0.001",
+    placeholder: "ex. 0.01",
+    title: "Fraction d'indisponibilité (0,01 = 1 %). Production = yield × (1 − indispo).",
+  },
+  {
+    name: "aleasOpexRate" as const,
+    label: "Aléas OPEX (% du CA)",
+    step: "0.01",
+    placeholder: "ex. 0.5",
+    title: "Provision aléas OPEX en % du chiffre d'affaires.",
+  },
+] as const;
+
+const templateParamFields = [
+  {
+    name: "coefDegressif" as const,
+    label: "Coef. amortissement dégressif",
+    step: "0.01",
+    placeholder: "ex. 2.25",
+    title: "Coefficient d'amortissement dégressif Type 1 (barème fiscal FR).",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.coefDegressif,
+  },
+  {
+    name: "goPriceBase" as const,
+    label: "Prix GO base (€/MWh)",
+    step: "0.01",
+    placeholder: "ex. 1",
+    title: "Prix de base des Garanties d'Origine, indexé Aurora.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.goPriceBase,
+  },
+  {
+    name: "taxeFinaleSizingKeuro" as const,
+    label: "Taxe finale sizing (k€)",
+    step: "0.01",
+    placeholder: "ex. 0",
+    title: "IS soustrait du CFADS de sizing à la dernière année du tenor.",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.taxeFinaleSizingKeuro,
+  },
+  {
+    name: "fonciereBienEuroWc" as const,
+    label: "Foncière bien (€/Wc)",
+    step: "0.001",
+    placeholder: "ex. 0.017",
+    title: "Base foncière des biens en €/Wc (BOS divers + terrassement).",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.fonciereBienEuroWc,
+  },
+  {
+    name: "batimentsFonciersKeuro" as const,
+    label: "Bâtiments fonciers (k€)",
+    step: "0.01",
+    placeholder: "ex. 0",
+    title: "Bâtiments soumis à la taxe foncière (k€).",
+    defaultValue: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.batimentsFonciersKeuro,
+  },
+] as const;
+
+function parseEngagements(json: string | null): number[] | null {
+  if (!json) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(json) as unknown;
+    if (
+      Array.isArray(parsed) &&
+      parsed.every((value): value is number => typeof value === "number" && Number.isFinite(value))
+    ) {
+      return parsed;
+    }
+  } catch {
+    // fall through
+  }
+
+  return null;
+}
 
 const primaryFields = [
   {
@@ -570,6 +700,8 @@ export default async function EditScenarioPage({
             tauxTEOM: scenario.tauxTEOM,
             tauxCFECommune: scenario.tauxCFECommune,
             tauxCFEEPCI: scenario.tauxCFEEPCI,
+            tauxTSECfe: scenario.tauxTSECfe,
+            tauxGEMAPICfe: scenario.tauxGEMAPICfe,
             tauxCCI: scenario.tauxCCI,
             prixTerrainHa:
               scenario.prixTerrainHa ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.prixTerrainHa,
@@ -687,6 +819,37 @@ export default async function EditScenarioPage({
           </div>
         </section>
 
+        <span className="form-section-title">Paramètres projet</span>
+        <p className="text-xs text-zinc-500" style={{ marginTop: "-0.75rem" }}>
+          Variables propres au projet — à saisir. Laisser vide conserve le comportement par défaut.
+        </p>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          {projectParamFields.map((field) => (
+            <label key={field.name} className="grid gap-1.5 text-sm font-medium text-zinc-700">
+              {field.label}
+              <input
+                name={field.name}
+                type="number"
+                min="0"
+                step={field.step}
+                defaultValue={scenario[field.name] ?? ""}
+                placeholder={field.placeholder}
+                title={field.title}
+                className="h-10 px-3"
+              />
+            </label>
+          ))}
+        </div>
+
+        <section className="form-section">
+          <p className="form-section-head">Engagements OPEX an-par-an (k€)</p>
+          <OpexEngagementsFields
+            years={scenario.projectLifeYears}
+            initialValue={parseEngagements(scenario.opexEngagementsKeuroByYear)}
+          />
+        </section>
+
         <div className="grid gap-2">
           <p className="text-sm font-medium" style={{ color: "var(--ps-blue-dark)" }}>
             Profil DSCR cible
@@ -697,6 +860,56 @@ export default async function EditScenarioPage({
             }
           />
         </div>
+
+        <details className="form-section">
+          <summary className="form-section-head" style={{ cursor: "pointer" }}>
+            Paramètres template (pré-remplis, modulables)
+          </summary>
+          <p className="text-xs text-zinc-500" style={{ margin: "0.5rem 0 1rem" }}>
+            Constantes du template BP — pré-remplies avec leur valeur par défaut, modifiables si besoin.
+          </p>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {templateParamFields.map((field) => (
+              <label key={field.name} className="grid gap-1.5 text-sm font-medium text-zinc-700">
+                <span>{field.label} <span className="badge-default">Défaut</span></span>
+                <DefaultNumberInput
+                  name={field.name}
+                  type="number"
+                  min="0"
+                  step={field.step}
+                  defaultValue={scenario[field.name] ?? field.defaultValue}
+                  placeholder={field.placeholder}
+                  title={field.title}
+                  className="h-10 px-3"
+                />
+              </label>
+            ))}
+            <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+              <span>Marge facturable figée (k€)</span>
+              <input
+                name="margeFactFigeeKeuro"
+                type="number"
+                step="0.01"
+                defaultValue={scenario.margeFactFigeeKeuro ?? ""}
+                placeholder="vide = calcul endogène"
+                title="Marge facturable imposée par le BP (k€). Vide → boucle endogène (comportement par défaut)."
+                className="h-10 px-3"
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+              <span>Index courbe an1 (override)</span>
+              <input
+                name="curveIndexAn1"
+                type="number"
+                step="0.00001"
+                defaultValue={scenario.curveIndexAn1 ?? ""}
+                placeholder="calculé par défaut"
+                title="Index d'inflation des courbes à l'an1. Vide → calculé depuis l'année de mise en service."
+                className="h-10 px-3"
+              />
+            </label>
+          </div>
+        </details>
 
         <div className="flex justify-end gap-3 pt-2">
           <Link href={`/projects/${scenario.project.id}`} className="btn-secondary">

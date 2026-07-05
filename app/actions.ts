@@ -328,7 +328,57 @@ function readScenarioAssumptions(formData: FormData) {
     bankFeesPLTKEuroPerMW: readOptionalNumber(formData, "bankFeesPLTK€PerMW"),
     interimFinancingRate: readOptionalNumber(formData, "interimFinancingRate"),
     commitmentFeesRate: readOptionalNumber(formData, "commitmentFeesRate"),
+    // Paramètres projet (dette/DSCR, revenus, technique) — colonnes Scenario existantes.
+    ccaRemunRate: readOptionalNumber(formData, "ccaRemunRate"),
+    dsrfFeeRate: readOptionalNumber(formData, "dsrfFeeRate"),
+    agentFeeAnnuelKeuro: readOptionalNumber(formData, "agentFeeAnnuelKeuro"),
+    taxeFinaleSizingKeuro: readOptionalNumber(formData, "taxeFinaleSizingKeuro"),
+    indemnitesImmoKeuro: readOptionalNumber(formData, "indemnitesImmoKeuro"),
+    coefDegressif: readOptionalNumber(formData, "coefDegressif"),
+    margeFactFigeeKeuro: readOptionalNumber(formData, "margeFactFigeeKeuro"),
+    fonciereBienEuroWc: readOptionalNumber(formData, "fonciereBienEuroWc"),
+    batimentsFonciersKeuro: readOptionalNumber(formData, "batimentsFonciersKeuro"),
+    capacityCertificateMw: readOptionalNumber(formData, "capacityCertificateMw"),
+    goStartYear: readOptionalInteger(formData, "goStartYear"),
+    goPriceBase: readOptionalNumber(formData, "goPriceBase"),
+    curveIndexAn1: readOptionalNumber(formData, "curveIndexAn1"),
+    unavailability: readOptionalNumber(formData, "unavailability"),
+    tauxTSECfe: readOptionalNumber(formData, "tauxTSECfe"),
+    tauxGEMAPICfe: readOptionalNumber(formData, "tauxGEMAPICfe"),
+    aleasOpexRate: readOptionalNumber(formData, "aleasOpexRate"),
+    opexEngagementsKeuroByYear: readOpexEngagements(formData),
   };
+}
+
+function readOpexEngagements(formData: FormData): number[] | null {
+  const value = formData.get("opexEngagementsKeuroByYear");
+
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("Format des engagements OPEX invalide.");
+  }
+
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    return null;
+  }
+
+  const engagements: number[] = [];
+
+  for (const item of parsed) {
+    if (typeof item !== "number" || !Number.isFinite(item)) {
+      throw new Error("Format des engagements OPEX invalide.");
+    }
+
+    engagements.push(item);
+  }
+
+  return engagements;
 }
 
 function readAuroraWeights(formData: FormData) {
@@ -510,7 +560,8 @@ export async function createScenario(projectId: string, formData: FormData) {
   const effectiveDebtSizingCentralW =
     auroraWeights.debtSizingCentralW ?? project.debtSizingCentralW;
   const effectiveDebtSizingLowW = auroraWeights.debtSizingLowW ?? project.debtSizingLowW;
-  const { dscrSchedule, ...assumptionsWithoutSchedule } = assumptions;
+  const { dscrSchedule, opexEngagementsKeuroByYear, ...assumptionsWithoutSchedule } =
+    assumptions;
   const calculatedMetrics = calculateScenarioMetrics({
     capacityMw: project.capacityMw,
     commissioningYear: project.commissioningYear,
@@ -520,6 +571,7 @@ export async function createScenario(projectId: string, formData: FormData) {
     investorCurveW: effectiveInvestorCurveW,
     ...assumptionsWithoutSchedule,
     dscrSchedule,
+    opexEngagementsKeuroByYear,
   });
 
   if (
@@ -538,6 +590,9 @@ export async function createScenario(projectId: string, formData: FormData) {
       name: readText(formData, "name"),
       ...assumptionsWithoutSchedule,
       dscrSchedule: dscrSchedule ? JSON.stringify(dscrSchedule) : null,
+      opexEngagementsKeuroByYear: opexEngagementsKeuroByYear
+        ? JSON.stringify(opexEngagementsKeuroByYear)
+        : null,
       dscr: calculatedMetrics.dscr ?? 0,
       npv: calculatedMetrics.npv,
       irr: calculatedMetrics.irr,
@@ -587,7 +642,8 @@ export async function updateScenario(
   const effectiveDebtSizingCentralW =
     auroraWeights.debtSizingCentralW ?? project.debtSizingCentralW;
   const effectiveDebtSizingLowW = auroraWeights.debtSizingLowW ?? project.debtSizingLowW;
-  const { dscrSchedule, ...assumptionsWithoutSchedule } = assumptions;
+  const { dscrSchedule, opexEngagementsKeuroByYear, ...assumptionsWithoutSchedule } =
+    assumptions;
   const calculatedMetrics = calculateScenarioMetrics({
     capacityMw: project.capacityMw,
     commissioningYear: project.commissioningYear,
@@ -597,6 +653,7 @@ export async function updateScenario(
     investorCurveW: effectiveInvestorCurveW,
     ...assumptionsWithoutSchedule,
     dscrSchedule,
+    opexEngagementsKeuroByYear,
   });
 
   if (
@@ -619,6 +676,9 @@ export async function updateScenario(
       name: readText(formData, "name"),
       ...assumptionsWithoutSchedule,
       dscrSchedule: dscrSchedule ? JSON.stringify(dscrSchedule) : null,
+      opexEngagementsKeuroByYear: opexEngagementsKeuroByYear
+        ? JSON.stringify(opexEngagementsKeuroByYear)
+        : null,
       dscr: calculatedMetrics.dscr ?? 0,
       npv: calculatedMetrics.npv,
       irr: calculatedMetrics.irr,
@@ -720,6 +780,26 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
       bankFeesPLTKEuroPerMW: scenario.bankFeesPLTKEuroPerMW,
       interimFinancingRate: scenario.interimFinancingRate,
       commitmentFeesRate: scenario.commitmentFeesRate,
+      unavailability: scenario.unavailability,
+      indemnitesImmoKeuro: scenario.indemnitesImmoKeuro,
+      aleasOpexRate: scenario.aleasOpexRate,
+      tauxTSECfe: scenario.tauxTSECfe,
+      tauxGEMAPICfe: scenario.tauxGEMAPICfe,
+      coefDegressif: scenario.coefDegressif,
+      taxeFinaleSizingKeuro: scenario.taxeFinaleSizingKeuro,
+      agentFeeAnnuelKeuro: scenario.agentFeeAnnuelKeuro,
+      dsrfFeeRate: scenario.dsrfFeeRate,
+      ccaRemunRate: scenario.ccaRemunRate,
+      capacityCertificateMw: scenario.capacityCertificateMw,
+      goStartYear: scenario.goStartYear,
+      goPriceBase: scenario.goPriceBase,
+      curveIndexAn1: scenario.curveIndexAn1,
+      fonciereBienEuroWc: scenario.fonciereBienEuroWc,
+      batimentsFonciersKeuro: scenario.batimentsFonciersKeuro,
+      modRetraitementKeuro: scenario.modRetraitementKeuro,
+      valeurTerrainKeuro: scenario.valeurTerrainKeuro,
+      opexEngagementsKeuroByYear: scenario.opexEngagementsKeuroByYear,
+      margeFactFigeeKeuro: scenario.margeFactFigeeKeuro,
       dscr: scenario.dscr,
       npv: scenario.npv,
       irr: scenario.irr,
