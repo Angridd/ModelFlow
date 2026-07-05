@@ -12,7 +12,7 @@
     "surfaceHa": 34.5,
     "yieldP90Mwh": null,
     "yieldMwh": 1212,
-    "tariff": 77,
+    "tariff": 80.92777385769999,
     "projectLifeYears": 35,
     "degradationRate": 0.4,
     "discountRate": 7.5,
@@ -29,8 +29,8 @@
     "mraEuroKwc": 1.0931259323380917,
     "backOfficeKeuro": 22.5,
     "diversOpexKeuro": 11.673333333333332,
-    "loyerMode": null,
-    "loyerValeur": 0.065,
+    "loyerMode": "pctCA",
+    "loyerValeur": 6.5,
     "loyerInflation": 0.4,
     "inflationOM": 2,
     "inflationMRA": 2,
@@ -180,6 +180,7 @@
     "equityRequiredKeuro": 2032.5755244412162
   },
   "flags": [
-    "Démantèlement 138900 € an25-30 non modélisé (flux surestimés)"
+    "Démantèlement 138900 € an25-30 non modélisé (flux surestimés)",
+    "Tarif PPA an1 indexé BP 80.93 €/MWh (portefeuille 77.00)"
   ]
 }

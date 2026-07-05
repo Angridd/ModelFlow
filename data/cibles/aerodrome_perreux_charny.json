@@ -29,7 +29,7 @@
     "mraEuroKwc": 1.0931259323380917,
     "backOfficeKeuro": 22.5,
     "diversOpexKeuro": 8.89111111111111,
-    "loyerMode": null,
+    "loyerMode": "fixe",
     "loyerValeur": 0,
     "loyerInflation": 0.4,
     "inflationOM": 2,

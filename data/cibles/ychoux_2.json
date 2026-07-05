@@ -72,7 +72,7 @@
     "interimFinancingRate": 2.5,
     "commitmentFeesRate": 0.1,
     "unavailability": 0.01,
-    "indemnitesImmoKeuro": 184.236328125,
+    "indemnitesImmoKeuro": 200.135986328125,
     "aleasOpexRate": 0.5,
     "tauxTSECfe": 0.00212,
     "tauxGEMAPICfe": 0.00916,
@@ -98,7 +98,7 @@
     "debtSizingCentralW": 0.7,
     "debtSizingLowW": 0.3,
     "unavailability": 0.01,
-    "indemnitesImmoKeuro": 184.236328125,
+    "indemnitesImmoKeuro": 200.135986328125,
     "aleasOpexRate": 0.5,
     "tauxTSECfe": 0.00212,
     "tauxGEMAPICfe": 0.00916,
@@ -166,18 +166,18 @@
     }
   ],
   "targets": {
-    "capexTotalKeuro": 10202.092977834562,
-    "detteKeuro": 9691.988328942833,
-    "equityCcaKeuro": 510.10464889172835,
-    "gearingPct": 95,
-    "maxDebtDscrKeuro": 9691.988769642516,
-    "vanBruteKeuro": 3258.690838180468,
+    "capexTotalKeuro": 10203.866064416592,
+    "detteKeuro": 9693.672761195761,
+    "equityCcaKeuro": 510.19330322083084,
+    "gearingPct": 94.99999999999999,
+    "maxDebtDscrKeuro": 9693.673085624989,
+    "vanBruteKeuro": 3271.005958675585,
     "trIBrutPct": null,
-    "vanNetteKeuro": 2172.1658381804677,
-    "investorIrrPct": 29.504308104515086,
-    "trIProjetBrutPct": 8.873205482959749,
-    "trIProjetNetPct": 7.242108285427094,
-    "equityRequiredKeuro": 510.10464889172835
+    "vanNetteKeuro": 2184.480958675584,
+    "investorIrrPct": 29.503769278526313,
+    "trIProjetBrutPct": 8.854309618473053,
+    "trIProjetNetPct": 7.227827012538911,
+    "equityRequiredKeuro": 510.19330322083084
   },
   "flags": [
     "Démantèlement 131700 € an25-30 non modélisé (flux surestimés)"
