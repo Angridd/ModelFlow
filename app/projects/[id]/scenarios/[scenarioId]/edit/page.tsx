@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { headers } from "next/headers";
 import { updateScenario } from "@/app/actions";
+import { Breadcrumbs } from "@/app/components/Breadcrumbs";
 import { CapexDetailFields } from "@/app/components/CapexDetailFields";
 import { DefaultNumberInput } from "@/app/components/DefaultNumberInput";
 import { DscrSchedule } from "@/app/components/DscrSchedule";
@@ -371,9 +372,14 @@ export default async function EditScenarioPage({
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-10">
       <div>
-        <Link href={`/projects/${scenario.project.id}`} className="page-breadcrumb">
-          ← {scenario.project.name}
-        </Link>
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/" },
+            { label: "Projets", href: "/projects" },
+            { label: scenario.project.name, href: `/projects/${scenario.project.id}` },
+            { label: `Scénario · ${scenario.name}` },
+          ]}
+        />
         <h1 className="page-title" style={{ marginTop: "0.25rem" }}>Modifier le scénario</h1>
       </div>
 

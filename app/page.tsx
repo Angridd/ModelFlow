@@ -58,11 +58,15 @@ export default async function Home() {
           <p className="page-breadcrumb">Cockpit portefeuille</p>
           <h1 className="page-title">Dashboard</h1>
           <p style={{ fontSize: "0.875rem", color: "#6b7280", marginTop: "0.25rem" }}>
-            {rows.length} projet{rows.length !== 1 ? "s" : ""} · TRI investisseur (equity BP) recalculé en direct
+            Analyse consolidée du portefeuille calibré : {rows.length} projet{rows.length !== 1 ? "s" : ""} BP réel ·
+            TRI investisseur (equity BP) recalculé en direct.{" "}
+            <Link href="/projects" style={{ color: "var(--ps-blue-mid)", fontWeight: 600 }}>
+              Accès fiche par fiche →
+            </Link>
           </p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-          <Link href="/projects" className="btn-secondary">Projets</Link>
+          <Link href="/projects" className="btn-secondary">Liste des projets</Link>
           <Link href="/projects/new" className="btn-primary">+ Nouveau projet</Link>
         </div>
       </div>

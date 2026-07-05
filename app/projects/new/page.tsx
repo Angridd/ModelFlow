@@ -1,13 +1,18 @@
 import Link from "next/link";
+import { Breadcrumbs } from "@/app/components/Breadcrumbs";
 import { createProject } from "@/app/actions";
 
 export default function NewProjectPage() {
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-10">
       <div>
-        <Link href="/projects" className="page-breadcrumb">
-          ← Projets
-        </Link>
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/" },
+            { label: "Projets", href: "/projects" },
+            { label: "Nouveau projet" },
+          ]}
+        />
         <h1 className="page-title" style={{ marginTop: "0.25rem" }}>
           Nouveau projet
         </h1>

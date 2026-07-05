@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { headers } from "next/headers";
 import { createScenario } from "@/app/actions";
+import { Breadcrumbs } from "@/app/components/Breadcrumbs";
 import { CapexDetailFields } from "@/app/components/CapexDetailFields";
 import { DefaultNumberInput } from "@/app/components/DefaultNumberInput";
 import { DscrSchedule } from "@/app/components/DscrSchedule";
@@ -342,9 +343,14 @@ export default async function NewScenarioPage({
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-10">
       <div>
-        <Link href={`/projects/${project.id}`} className="page-breadcrumb">
-          ← {project.name}
-        </Link>
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/" },
+            { label: "Projets", href: "/projects" },
+            { label: project.name, href: `/projects/${project.id}` },
+            { label: "Nouveau scénario" },
+          ]}
+        />
         <h1 className="page-title" style={{ marginTop: "0.25rem" }}>Nouveau scénario</h1>
       </div>
 

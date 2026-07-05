@@ -14,6 +14,7 @@ import {
   calculateScenarioMetrics,
 } from "@/app/lib/finance/engine";
 import { AnimatedKpiCards } from "@/app/components/AnimatedKpiCards";
+import { Breadcrumbs } from "@/app/components/Breadcrumbs";
 import { ProjectFinancialCharts } from "@/app/components/ProjectFinancialCharts";
 import { buildFinanceInput as buildScenarioInput, parseDscrSchedule } from "@/app/lib/scenarioMetrics";
 import { generateSensitivityRows } from "@/app/lib/sensitivity";
@@ -265,9 +266,14 @@ export default async function ProjectDetailPage({
         <div className="project-hero-particles" aria-hidden="true" />
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
           <div>
-            <Link href="/projects" className="page-breadcrumb" style={{ color: "rgba(255,255,255,0.55)" }}>
-              ← Projets
-            </Link>
+            <Breadcrumbs
+              tone="light"
+              items={[
+                { label: "Dashboard", href: "/" },
+                { label: "Projets", href: "/projects" },
+                { label: project.name },
+              ]}
+            />
             <h1 className="project-hero-title">{project.name}</h1>
             <div className="project-hero-badges">
               {projectReferenceScenario ? (

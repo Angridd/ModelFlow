@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { AuroraImport } from "@/app/components/AuroraImport";
+import { Breadcrumbs } from "@/app/components/Breadcrumbs";
 import { DeleteProjectButton } from "@/app/projects/delete-project-button";
 import { computeProjectFinance } from "@/app/lib/scenarioMetrics";
 import { prisma } from "@/app/lib/prisma";
@@ -64,14 +65,23 @@ export default async function ProjectsPage() {
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-10">
       <div className="page-header">
         <div>
+          <Breadcrumbs items={[{ label: "Dashboard", href: "/" }, { label: "Projets" }]} />
           <h1 className="page-title">Projets</h1>
           <p style={{ fontSize: "0.875rem", color: "#6b7280", marginTop: "0.25rem" }}>
-            {projects.length} projet{projects.length !== 1 ? "s" : ""} dans le portefeuille
+            Accès rapide fiche par fiche : {projects.length} projet{projects.length !== 1 ? "s" : ""} (tous statuts).{" "}
+            <Link href="/" style={{ color: "var(--ps-blue-mid)", fontWeight: 600 }}>
+              Analyse portefeuille →
+            </Link>
           </p>
         </div>
-        <Link href="/projects/new" className="btn-primary">
-          + Nouveau projet
-        </Link>
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          <Link href="/" className="btn-secondary">
+            Dashboard
+          </Link>
+          <Link href="/projects/new" className="btn-primary">
+            + Nouveau projet
+          </Link>
+        </div>
       </div>
 
       {/* Aurora section */}
@@ -129,7 +139,13 @@ export default async function ProjectsPage() {
               <div key={project.id} className={`project-card fade-up ${delayClass}`}>
                 <div className={`project-card-stripe ${getStatusStripe(project.status)}`} />
                 <div className="project-card-body">
-                  <div className="project-card-name">{project.name}</div>
+                  <Link
+                    href={`/projects/${project.id}`}
+                    className="project-card-name"
+                    style={{ display: "inline-block" }}
+                  >
+                    {project.name}
+                  </Link>
                   <div className="project-card-mw">
                     {project.capacityMw}{" "}
                     <span

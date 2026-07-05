@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
+import { Breadcrumbs } from "@/app/components/Breadcrumbs";
 import { updateProject } from "@/app/actions";
 import { prisma } from "@/app/lib/prisma";
 
@@ -25,10 +26,15 @@ export default async function EditProjectPage({
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-10">
       <div>
-        <Link href="/projects" className="text-sm font-medium text-zinc-500 hover:text-zinc-900">
-          Projets
-        </Link>
-        <h1 className="mt-2 text-3xl font-semibold tracking-normal text-zinc-950">
+        <Breadcrumbs
+          items={[
+            { label: "Dashboard", href: "/" },
+            { label: "Projets", href: "/projects" },
+            { label: project.name, href: `/projects/${project.id}` },
+            { label: "Éditer" },
+          ]}
+        />
+        <h1 className="page-title" style={{ marginTop: "0.25rem" }}>
           Modifier le projet
         </h1>
       </div>
