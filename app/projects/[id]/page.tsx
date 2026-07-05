@@ -15,8 +15,7 @@ import {
 } from "@/app/lib/finance/engine";
 import { AnimatedKpiCards } from "@/app/components/AnimatedKpiCards";
 import { ProjectFinancialCharts } from "@/app/components/ProjectFinancialCharts";
-import { CAPACITY_PRICE_CURVE, merchantCurveForTechnology } from "@/app/lib/finance/merchantCurves";
-import type { DscrTranche } from "@/app/lib/finance/types";
+import { buildFinanceInput as buildScenarioInput, parseDscrSchedule } from "@/app/lib/scenarioMetrics";
 import { generateSensitivityRows } from "@/app/lib/sensitivity";
 import { prisma } from "@/app/lib/prisma";
 
@@ -58,35 +57,6 @@ function formatPercent(value: number) {
   })} %`;
 }
 
-function parseDscrSchedule(json: string | null): DscrTranche[] | null {
-  if (!json) return null;
-  try {
-    const parsed = JSON.parse(json) as DscrTranche[];
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-// Engagements OPEX an-par-an (k€) persistés en JSON (migration persist_engagements_marge).
-// Vide/invalide → undefined (rétrocompat stricte : comportement moteur inchangé, comme calibrate_all).
-function parseEngagements(json: string | null): number[] | undefined {
-  if (!json) return undefined;
-  try {
-    const parsed = JSON.parse(json) as unknown;
-    if (
-      Array.isArray(parsed) &&
-      parsed.length > 0 &&
-      parsed.every((n) => typeof n === "number" && Number.isFinite(n))
-    ) {
-      return parsed as number[];
-    }
-    return undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 function getStatusBadgeClass(status: string): string {
   const s = status.toLowerCase();
   if (s === "approved" || s === "rtb") return "badge badge-green";
@@ -119,119 +89,12 @@ export default async function ProjectDetailPage({
   }
 
   const scenarios = project.scenarios;
-  // Courbe merchant résolue PAR TECHNO (Fixed → FIXED_CURVE_2026Q2, Tracker → TRACKER_CURVE_2026Q2),
-  // exactement comme l'import (source de vérité versionnée). Remplace l'ancienne lecture de la table
-  // AuroraCurve globale (year @unique → une seule techno) → détail == liste à l'euro, Fixed ET Tracker.
-  const merchantCurves = merchantCurveForTechnology(project.technology);
-  const buildFinanceInput = (scenario: (typeof scenarios)[number]) => ({
-    // Inputs moteur de calibration BP persistés (migration persist_engagements_marge) : réinjectés
-    // ici pour que « détail = liste » (mêmes dette/TRI que calibrate_all). null → moteur inchangé.
-    opexEngagementsKeuroByYear: parseEngagements(scenario.opexEngagementsKeuroByYear),
-    margeFactFigeeKeuro: scenario.margeFactFigeeKeuro,
-    capacityMw: project.capacityMw,
-    commissioningYear: project.commissioningYear,
-    auroraCurves: merchantCurves,
-    debtSizingCentralW: project.debtSizingCentralW,
-    debtSizingLowW: project.debtSizingLowW,
-    investorCurveW: project.investorCurveW,
-    capex: scenario.capex,
-    surfaceHa: scenario.surfaceHa,
-    prixModuleUSDWc: scenario.prixModuleUSDWc,
-    tauxEURUSD: scenario.tauxEURUSD,
-    boSCtWc: scenario.boSCtWc,
-    raccordementOuvrageKEuro: scenario.raccordementOuvrageKEuro,
-    tarifQPKEuroPerMW: scenario.tarifQPKEuroPerMW,
-    apportAffaireMode: scenario.apportAffaireMode,
-    apportAffaireValeur: scenario.apportAffaireValeur,
-    opex: scenario.opex,
-    omFixedEuroKwc: scenario.omFixedEuroKwc,
-    mraEuroKwc: scenario.mraEuroKwc,
-    backOfficeKeuro: scenario.backOfficeKeuro,
-    diversOpexKeuro: scenario.diversOpexKeuro,
-    loyerMode: scenario.loyerMode,
-    loyerValeur: scenario.loyerValeur,
-    loyerInflation: scenario.loyerInflation,
-    inflationOM: scenario.inflationOM,
-    inflationMRA: scenario.inflationMRA,
-    inflationBackOffice: scenario.inflationBackOffice,
-    inflationDivers: scenario.inflationDivers,
-    methodeTaxes: scenario.methodeTaxes,
-    tauxTFCommune: scenario.tauxTFCommune,
-    tauxTFEPCI: scenario.tauxTFEPCI,
-    tauxTSE: scenario.tauxTSE,
-    tauxGEMAPI: scenario.tauxGEMAPI,
-    tauxTEOM: scenario.tauxTEOM,
-    tauxCFECommune: scenario.tauxCFECommune,
-    tauxCFEEPCI: scenario.tauxCFEEPCI,
-    tauxCCI: scenario.tauxCCI,
-    prixTerrainHa: scenario.prixTerrainHa,
-    abattTerrain: scenario.abattTerrain,
-    inflationTaxes: scenario.inflationTaxes,
-    iferRate1: scenario.iferRate1,
-    iferRate2: scenario.iferRate2,
-    iferRpn: scenario.iferRpn,
-    inflationAurora: scenario.inflationAurora,
-    yieldMwh: scenario.yieldMwh,
-    yieldP90Mwh: scenario.yieldP90Mwh,
-    tariff: scenario.tariff,
-    debtRate: scenario.debtRate,
-    projectLifeYears: scenario.projectLifeYears,
-    degradationRate: scenario.degradationRate,
-    discountRate: scenario.discountRate,
-    debtInterestRate: scenario.debtInterestRate,
-    debtMaturityYears: scenario.debtMaturityYears,
-    tariffInflationRate: scenario.tariffInflationRate,
-    opexInflationRate: scenario.opexInflationRate,
-    contractDuration: scenario.contractDuration,
-    constructionYears: scenario.constructionYears,
-    assuranceRate: scenario.assuranceRate,
-    inflationAssurance: scenario.inflationAssurance,
-    balancingCost: scenario.balancingCost,
-    dscrTarget: scenario.dscrTarget,
-    debtTenorYears: scenario.debtTenorYears,
-    dscrSchedule: parseDscrSchedule(scenario.dscrSchedule),
-    gearingMaxPct: scenario.gearingMaxPct,
-    tauxIS: scenario.tauxIS,
-    amortDuree: scenario.amortDuree,
-    dsraMonths: scenario.dsraMonths,
-    devFeesKEuroPerMW: scenario.devFeesKEuroPerMW,
-    tauxISEntreprise: scenario.tauxISEntreprise,
-    contingencyRate: scenario.contingencyRate,
-    longueurModule: scenario.longueurModule,
-    largeurModule: scenario.largeurModule,
-    txAmenagementRate: scenario.txAmenagementRate,
-    coefArcheo: scenario.coefArcheo,
-    legalFeesKEuro: scenario.legalFeesKEuro,
-    technicalDDKEuro: scenario.technicalDDKEuro,
-    arrangerFeesRate: scenario.arrangerFeesRate,
-    participantFeesRate: scenario.participantFeesRate,
-    bankFeesPLTKEuroPerMW: scenario.bankFeesPLTKEuroPerMW,
-    interimFinancingRate: scenario.interimFinancingRate,
-    commitmentFeesRate: scenario.commitmentFeesRate,
-    // Inputs moteur désormais persistés (migration scenario_full_engine_inputs) — fallback ?? null
-    // => scénario legacy (colonnes null) recompute à l'identique via les défauts du moteur.
-    ccaRemunRate: scenario.ccaRemunRate,
-    unavailability: scenario.unavailability,
-    indemnitesImmoKeuro: scenario.indemnitesImmoKeuro,
-    aleasOpexRate: scenario.aleasOpexRate,
-    tauxTSECfe: scenario.tauxTSECfe,
-    tauxGEMAPICfe: scenario.tauxGEMAPICfe,
-    coefDegressif: scenario.coefDegressif,
-    taxeFinaleSizingKeuro: scenario.taxeFinaleSizingKeuro,
-    agentFeeAnnuelKeuro: scenario.agentFeeAnnuelKeuro,
-    dsrfFeeRate: scenario.dsrfFeeRate,
-    capacityCertificateMw: scenario.capacityCertificateMw ?? undefined,
-    goStartYear: scenario.goStartYear ?? undefined,
-    goPriceBase: scenario.goPriceBase ?? undefined,
-    curveIndexAn1: scenario.curveIndexAn1,
-    fonciereBienEuroWc: scenario.fonciereBienEuroWc,
-    batimentsFonciersKeuro: scenario.batimentsFonciersKeuro,
-    modRetraitementKeuro: scenario.modRetraitementKeuro,
-    valeurTerrainKeuro: scenario.valeurTerrainKeuro,
-    // Donnée de marché partagée (comme auroraCurves), pas une colonne : sans effet si
-    // capacityCertificateMw est null (revenu capacité = 0), donc rétrocompatible pour le legacy.
-    capacityPriceCurve: CAPACITY_PRICE_CURVE,
-  });
+  // Chemin de calcul UNIFIÉ (app/lib/scenarioMetrics.ts) : même reconstruction d'input que la liste
+  // et le dashboard → « détail = liste = dashboard » par construction. La courbe merchant est
+  // résolue par techno dans le helper (Fixed / Tracker), les engagements + marge figée sont réinjectés
+  // depuis les colonnes persistées du scénario.
+  const buildFinanceInput = (scenario: (typeof scenarios)[number]) =>
+    buildScenarioInput(project, scenario);
   const projectReferenceScenario = scenarios.find((scenario) => scenario.isReference);
   const selectedScenarioId =
     typeof scenarioId === "string"
@@ -255,13 +118,23 @@ export default async function ProjectDetailPage({
     : null;
   const kpiNpv =
     referenceMetrics?.npv ?? maxValue(scenarios.map((scenario) => scenario.npv));
+  // TRI principal = TRI INVESTISSEUR (equity BP, = investorIrr), la métrique calée sur bp_projet_pipe.
+  // Fallback legacy (pas de scénario de référence) : max des TRI projet persistés.
   const kpiIrr =
-    referenceMetrics?.irr ?? maxValue(scenarios.map((scenario) => scenario.irr));
+    referenceMetrics?.investorIrr ?? maxValue(scenarios.map((scenario) => scenario.irr));
   const kpiDscr = projectReferenceScenario
     ? (referenceMetrics?.dscr ?? null)
     : minValue(scenarios.map((scenario) => scenario.dscr).filter((dscr) => dscr > 0));
   const kpiLcoe =
     referenceMetrics?.lcoe ?? minValue(scenarios.map((scenario) => scenario.lcoe));
+  // Métriques recalculées par scénario (chemin unifié) → la table de comparaison affiche le TRI
+  // investisseur et la VAN nette recalculés, pas les valeurs persistées potentiellement périmées.
+  const metricsByScenarioId = new Map(
+    scenarios.map((scenario) => [
+      scenario.id,
+      calculateScenarioMetrics(buildFinanceInput(scenario)),
+    ] as const),
+  );
   const importScenariosForProject = importScenarios.bind(null, project.id);
   const cashFlowScenario = projectReferenceScenario ?? analysisScenario;
   const annualCashFlows = cashFlowScenario
@@ -310,9 +183,13 @@ export default async function ProjectDetailPage({
     analysisScenario !== undefined
       ? (analysisScenario.devFeesKEuroPerMW ?? 0) * project.capacityMw
       : null;
-  const analysisNpvNetKeuro =
-    analysisScenario !== undefined && analysisDevFeesKeuro !== null
-      ? (analysisMetrics?.npv ?? analysisScenario.npv) - analysisDevFeesKeuro
+  // VAN nette = m.npv : les dev fees sont DÉJÀ déduits (comptés dans le CAPEX effectif). C'est la
+  // convention « VANn » de calibrate_all. VAN brute = VAN nette + dev fees (avant nettage de la marge
+  // de développement). L'ancien code déduisait les dev fees une seconde fois (double comptage).
+  const analysisVanNetteKeuro = analysisMetrics?.npv ?? analysisScenario?.npv ?? null;
+  const analysisVanBruteKeuro =
+    analysisVanNetteKeuro !== null && analysisDevFeesKeuro !== null
+      ? analysisVanNetteKeuro + analysisDevFeesKeuro
       : null;
   const financingChartData =
     sizing !== null && ccaKeuro !== null
@@ -449,7 +326,7 @@ export default async function ProjectDetailPage({
       <AnimatedKpiCards
         cards={[
           {
-            label: projectReferenceScenario ? "VAN référence" : "Meilleure VAN",
+            label: projectReferenceScenario ? "VAN nette référence" : "Meilleure VAN",
             value: kpiNpv,
             suffix: " M€",
             scale: 1000,
@@ -457,7 +334,7 @@ export default async function ProjectDetailPage({
             tone: kpiNpv !== null && kpiNpv < 0 ? "negative" : "positive",
           },
           {
-            label: projectReferenceScenario ? "TRI référence" : "Meilleur TRI",
+            label: projectReferenceScenario ? "TRI investisseur" : "Meilleur TRI",
             value: kpiIrr,
             suffix: " %",
             decimals: 2,
@@ -820,15 +697,15 @@ export default async function ProjectDetailPage({
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
-            <p className="meta-label">VAN Brute</p>
-            <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--ps-blue-dark)", marginTop: "0.2rem" }}>
-              {formatMillionEuros(analysisMetrics?.npv ?? analysisScenario?.npv ?? null)}
+            <p className="meta-label">VAN nette</p>
+            <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--ps-green)", marginTop: "0.2rem" }}>
+              {formatMillionEuros(analysisVanNetteKeuro)}
             </p>
           </div>
           <div>
-            <p className="meta-label">VAN Nette</p>
-            <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--ps-green)", marginTop: "0.2rem" }}>
-              {formatMillionEuros(analysisNpvNetKeuro)}
+            <p className="meta-label">VAN brute</p>
+            <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--ps-blue-dark)", marginTop: "0.2rem" }}>
+              {formatMillionEuros(analysisVanBruteKeuro)}
             </p>
           </div>
           <div>
@@ -840,25 +717,45 @@ export default async function ProjectDetailPage({
         </div>
       </section>
 
-      {cashFlowMetrics?.doubleIRR !== null && cashFlowMetrics?.doubleIRR !== undefined ? (
+      {cashFlowMetrics ? (
         <section className="card">
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
-            <h2 className="section-title">Double TRI</h2>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "0.25rem", flexWrap: "wrap", gap: "0.5rem" }}>
+            <h2 className="section-title">TRI — investisseur &amp; projet</h2>
             <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>{cashFlowScenario?.name ?? "-"}</span>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <p className="section-subtitle" style={{ marginBottom: "1rem" }}>
+            Le <strong>TRI investisseur</strong> (equity BP, mise SHL) est la métrique calée sur le BP.
+            Le <strong>TRI projet</strong> mesure la rentabilité intrinsèque, avant structure de financement.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
-              <p className="meta-label">TRI Invest</p>
-              <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--ps-green)", marginTop: "0.2rem" }}>
-                {formatNumber(cashFlowMetrics.doubleIRR.irrInvest, " %")}
+              <p className="meta-label">TRI investisseur</p>
+              <p style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--ps-green)", marginTop: "0.2rem" }}>
+                {formatNumber(cashFlowMetrics.investorIrr, " %")}
               </p>
             </div>
             <div>
-              <p className="meta-label">TRI Entreprise</p>
-              <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--ps-blue-dark)", marginTop: "0.2rem" }}>
-                {formatNumber(cashFlowMetrics.doubleIRR.irrEntreprise, " %")}
+              <p className="meta-label">TRI projet</p>
+              <p style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--ps-blue-dark)", marginTop: "0.2rem" }}>
+                {formatNumber(cashFlowMetrics.irr, " %")}
               </p>
             </div>
+            {cashFlowMetrics.doubleIRR ? (
+              <>
+                <div>
+                  <p className="meta-label">TRI invest. (double)</p>
+                  <p style={{ fontSize: "1.25rem", fontWeight: 600, color: "var(--ps-blue-mid)", marginTop: "0.2rem" }}>
+                    {formatNumber(cashFlowMetrics.doubleIRR.irrInvest, " %")}
+                  </p>
+                </div>
+                <div>
+                  <p className="meta-label">TRI entreprise (double)</p>
+                  <p style={{ fontSize: "1.25rem", fontWeight: 600, color: "var(--ps-blue-mid)", marginTop: "0.2rem" }}>
+                    {formatNumber(cashFlowMetrics.doubleIRR.irrEntreprise, " %")}
+                  </p>
+                </div>
+              </>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -1019,8 +916,8 @@ export default async function ProjectDetailPage({
                 <th>Tarif</th>
                 <th>Dette</th>
                 <th>DSCR</th>
-                <th>VAN</th>
-                <th>TRI</th>
+                <th>VAN nette</th>
+                <th>TRI inv.</th>
                 <th>LCOE</th>
                 <th className="col-left">Actions</th>
               </tr>
@@ -1042,9 +939,13 @@ export default async function ProjectDetailPage({
                   <td>{formatNumber(scenario.tariff, " €/MWh")}</td>
                   <td>{formatNumber(scenario.debtRate, " %")}</td>
                   <td>{formatNumber(scenario.dscr > 0 ? scenario.dscr : null)}</td>
-                  <td className="val-pos">{formatMillionEuros(scenario.npv)}</td>
-                  <td className="val-pos">{formatNumber(scenario.irr, " %")}</td>
-                  <td>{formatNumber(scenario.lcoe, " €/MWh")}</td>
+                  <td className="val-pos">
+                    {formatMillionEuros(metricsByScenarioId.get(scenario.id)?.npv ?? scenario.npv)}
+                  </td>
+                  <td className="val-pos">
+                    {formatNumber(metricsByScenarioId.get(scenario.id)?.investorIrr ?? scenario.irr, " %")}
+                  </td>
+                  <td>{formatNumber(metricsByScenarioId.get(scenario.id)?.lcoe ?? scenario.lcoe, " €/MWh")}</td>
                   <td className="col-left">
                     <div style={{ display: "flex", gap: "0.375rem", flexWrap: "wrap" }}>
                       <Link

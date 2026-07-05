@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { AuroraImport } from "@/app/components/AuroraImport";
 import { DeleteProjectButton } from "@/app/projects/delete-project-button";
+import { computeProjectFinance } from "@/app/lib/scenarioMetrics";
 import { prisma } from "@/app/lib/prisma";
 
 function formatAuroraQuarter(value: Date) {
@@ -121,6 +122,8 @@ export default async function ProjectsPage() {
         <div className="projects-grid">
           {projects.map((project, i) => {
             const refScenario = project.scenarios[0];
+            // Chemin unifié : TRI investisseur / VAN nette / LCOE recalculés (== détail == dashboard).
+            const finance = refScenario ? computeProjectFinance(project, refScenario) : null;
             const delayClass = `delay-${Math.min(i + 1, 6) as 1 | 2 | 3 | 4 | 5 | 6}`;
             return (
               <div key={project.id} className={`project-card fade-up ${delayClass}`}>
@@ -152,24 +155,24 @@ export default async function ProjectsPage() {
                       <span className="badge badge-gray">{project.ao}</span>
                     ) : null}
                   </div>
-                  {refScenario ? (
+                  {refScenario && finance ? (
                     <div className="project-card-kpis">
                       <div className="project-card-kpi">
-                        <span className="project-card-kpi-label">TRI</span>
+                        <span className="project-card-kpi-label">TRI inv.</span>
                         <span className="project-card-kpi-value">
-                          {fmtIrr(refScenario.irr)}
+                          {fmtIrr(finance.metrics.investorIrr)}
                         </span>
                       </div>
                       <div className="project-card-kpi">
-                        <span className="project-card-kpi-label">VAN</span>
+                        <span className="project-card-kpi-label">VAN nette</span>
                         <span className="project-card-kpi-value">
-                          {fmtNpv(refScenario.npv)}
+                          {fmtNpv(finance.metrics.npv)}
                         </span>
                       </div>
                       <div className="project-card-kpi">
                         <span className="project-card-kpi-label">LCOE</span>
                         <span className="project-card-kpi-value">
-                          {fmtLcoe(refScenario.lcoe)}
+                          {fmtLcoe(finance.metrics.lcoe)}
                         </span>
                       </div>
                     </div>

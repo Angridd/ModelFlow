@@ -23,8 +23,8 @@ function formatAnimatedNumber(value: number, decimals: number) {
 }
 
 function displayLabel(label: string) {
-  if (label.startsWith("VAN")) return label.includes("Meilleure") ? "Meilleure VAN" : "VAN reference";
-  if (label.startsWith("TRI")) return label.includes("Meilleur") ? "Meilleur TRI" : "TRI reference";
+  if (label.startsWith("VAN")) return label.includes("Meilleure") ? "Meilleure VAN" : "VAN nette reference";
+  if (label.startsWith("TRI")) return label.includes("Meilleur ") ? "Meilleur TRI" : "TRI investisseur";
   if (label.startsWith("DSCR")) return label.includes("minimum") ? "DSCR minimum" : "DSCR reference";
   if (label.startsWith("LCOE")) return label.includes("minimum") ? "LCOE minimum" : "LCOE reference";
 
