@@ -140,6 +140,11 @@ export type FinanceEngineInput = FinancialAssumptions & {
   mraEuroKwc?: number | null;
   backOfficeKeuro?: number | null;
   diversOpexKeuro?: number | null;
+  // OPEX discrétionnaires « engagements » du BP (feuille Inp_Opération, ligne « Total
+  // Engagements »), en k€ par ANNÉE PROJET (index 0 = an1). Montants RÉELS déjà datés par le BP :
+  // lumpy et front-loadés → routés ADDITIVEMENT dans opexP50 ET opexP90 SANS ré-indexation
+  // (contrairement à diversOpexKeuro). Absent/[] → aucun changement (rétrocompat stricte).
+  opexEngagementsKeuroByYear?: number[] | null;
   loyerMode?: string | null;
   loyerValeur?: number | null;
   loyerInflation?: number | null;
@@ -1668,7 +1673,12 @@ function buildPreRows(
       revenueP50,
       opexP90Basket?.aleasKeuro,
     );
-    const annualOpex = opexDetailsP50.opexTotalKeuro;
+    // OPEX « engagements » du BP (Inp_Opération / « Total Engagements ») : montants réels
+    // datés à l'année projet, NON ré-indexés (déjà en euros courants du BP). Additifs, en P50
+    // ET en P90 (le BP les intègre dans « Total operational expenses PV » C_P90 r196-204).
+    // Absent → 0 → comportement inchangé (rétrocompat stricte).
+    const engagementsKeuro = input.opexEngagementsKeuroByYear?.[year - 1] ?? 0;
+    const annualOpex = opexDetailsP50.opexTotalKeuro + engagementsKeuro;
 
     // Equity cash-flow (P50) kEUR = revenue P50 - OPEX (project NPV/IRR base).
     const cfadsP50 = revenueP50Total - annualOpex;
@@ -1703,7 +1713,8 @@ function buildPreRows(
       iferP90Keuro +
       opexDetailsP50.tfKeuro +
       opexDetailsP50.cfeKeuro +
-      aleasP90Keuro;
+      aleasP90Keuro +
+      engagementsKeuro;
     // Banking CFADS (P90) kEUR = revenue P90 - OPEX P90 (DSCR sizing base).
     const cfadsP90 = revenueP90 - opexP90Keuro;
 
