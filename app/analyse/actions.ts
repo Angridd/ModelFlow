@@ -23,6 +23,7 @@ import {
 import {
   buildFinanceInput,
   computeFinanceFromInput,
+  computeVanBruteNetteKeuro,
   pickReferenceScenario,
 } from "@/app/lib/scenarioMetrics";
 import { prisma } from "@/app/lib/prisma";
@@ -108,19 +109,23 @@ export async function computeTornado(projectId: string): Promise<TornadoRow[]> {
   const base = buildFinanceInput(project, scenario);
   const baseM = calculateScenarioMetrics(base);
 
+  // baseNpv/lowNpv/highNpv portent la VAN BRUTE (indicateur principal).
+  const baseVanBrute = computeVanBruteNetteKeuro(baseM, base).vanBruteKeuro;
   const variables: TornadoVariable[] = ["tariff", "capex", "yield", "debtRate", "merchant"];
   const rows = variables.map((variable): TornadoRow => {
-    const low = calculateScenarioMetrics(perturb(base, variable, 1 - DELTA));
-    const high = calculateScenarioMetrics(perturb(base, variable, 1 + DELTA));
+    const lowInput = perturb(base, variable, 1 - DELTA);
+    const highInput = perturb(base, variable, 1 + DELTA);
+    const low = calculateScenarioMetrics(lowInput);
+    const high = calculateScenarioMetrics(highInput);
     return {
       variable,
       label: LABELS[variable],
       baseIrr: baseM.investorIrr,
       lowIrr: low.investorIrr,
       highIrr: high.investorIrr,
-      baseNpv: baseM.npv,
-      lowNpv: low.npv,
-      highNpv: high.npv,
+      baseNpv: baseVanBrute,
+      lowNpv: computeVanBruteNetteKeuro(low, lowInput).vanBruteKeuro,
+      highNpv: computeVanBruteNetteKeuro(high, highInput).vanBruteKeuro,
     };
   });
 
@@ -167,34 +172,35 @@ export async function computePortfolioStress(
     const stress = computeFinanceFromInput(applyStressDeltas(input, deltas));
 
     const baseHealth = classifyHealth({
-      npv: base.metrics.npv,
+      vanBruteKeuro: base.vanBruteKeuro,
       investorIrr: base.metrics.investorIrr,
       gearingPct: base.gearingPct,
       dscr: base.metrics.dscr,
     });
     const stressHealth = classifyHealth({
-      npv: stress.metrics.npv,
+      vanBruteKeuro: stress.vanBruteKeuro,
       investorIrr: stress.metrics.investorIrr,
       gearingPct: stress.gearingPct,
       dscr: stress.metrics.dscr,
     });
 
+    // baseNpv/stressNpv/totaux portent la VAN BRUTE (indicateur principal).
     rows.push({
       id: project.id,
       name: project.name,
       capacityMw: project.capacityMw,
       baseIrr: base.metrics.investorIrr,
       stressIrr: stress.metrics.investorIrr,
-      baseNpv: base.metrics.npv,
-      stressNpv: stress.metrics.npv,
+      baseNpv: base.vanBruteKeuro,
+      stressNpv: stress.vanBruteKeuro,
       baseHealth,
       stressHealth,
     });
 
     baseIrrs.push(base.metrics.investorIrr);
     stressIrrs.push(stress.metrics.investorIrr);
-    baseNpvTotal += base.metrics.npv;
-    stressNpvTotal += stress.metrics.npv;
+    baseNpvTotal += base.vanBruteKeuro;
+    stressNpvTotal += stress.vanBruteKeuro;
     baseDebtTotal += base.debtRetenuKeuro;
     stressDebtTotal += stress.debtRetenuKeuro;
     baseEquityTotal += base.ccaKeuro;

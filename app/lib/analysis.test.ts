@@ -28,7 +28,8 @@ function makeMetrics(over: Partial<ProjectMetrics> = {}): ProjectMetrics {
     capacityMw: 10,
     commissioningYear: 2026,
     investorIrr: 12,
-    npv: 1000,
+    vanBruteKeuro: 1000,
+    vanNetteKeuro: 200,
     debtKeuro: 8000,
     ccaKeuro: 2000,
     capexEffectifKeuro: 10000,
@@ -91,8 +92,8 @@ describe("stats de base", () => {
 });
 
 describe("criticité economics", () => {
-  it("critique si VAN < 0 ou TRI < 7,5 %", () => {
-    expect(classifyHealth(makeMetrics({ npv: -1 }))).toBe("critical");
+  it("critique si VAN brute < 0 ou TRI < 7,5 %", () => {
+    expect(classifyHealth(makeMetrics({ vanBruteKeuro: -1 }))).toBe("critical");
     expect(classifyHealth(makeMetrics({ investorIrr: 7 }))).toBe("critical");
   });
   it("tendu si gearing ≥ 94,5 % ou DSCR ≤ 1,16", () => {

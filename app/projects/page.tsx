@@ -180,9 +180,9 @@ export default async function ProjectsPage() {
                         </span>
                       </div>
                       <div className="project-card-kpi">
-                        <span className="project-card-kpi-label">VAN nette</span>
+                        <span className="project-card-kpi-label">VAN brute</span>
                         <span className="project-card-kpi-value">
-                          {fmtNpv(finance.metrics.npv)}
+                          {fmtNpv(finance.vanBruteKeuro)}
                         </span>
                       </div>
                       <div className="project-card-kpi">

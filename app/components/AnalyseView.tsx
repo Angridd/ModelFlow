@@ -281,7 +281,7 @@ function PipelineTab({ projects }: { projects: ProjectAnalysis[] }) {
               <th>Techno</th>
               <th>MW</th>
               <th>TRI inv.</th>
-              <th>VAN nette</th>
+              <th>VAN brute</th>
               <th>Dette</th>
               <th>Gearing</th>
               <th>DSCR</th>
@@ -299,7 +299,7 @@ function PipelineTab({ projects }: { projects: ProjectAnalysis[] }) {
                 <td>{r.technology}</td>
                 <td>{fmtNum(r.capacityMw, 1)}</td>
                 <td className={r.investorIrr < 7.5 ? "val-neg" : "val-pos"}>{fmtPct(r.investorIrr)}</td>
-                <td className={r.npv >= 0 ? "val-pos" : "val-neg"}>{fmtKeuro(r.npv)}</td>
+                <td className={r.vanBruteKeuro >= 0 ? "val-pos" : "val-neg"}>{fmtKeuro(r.vanBruteKeuro)}</td>
                 <td>{fmtKeuro(r.debtKeuro)}</td>
                 <td>{fmtPct(r.gearingPct)}</td>
                 <td>{fmtNum(r.dscr, 2)}</td>
@@ -661,7 +661,7 @@ function SensitivityTab({ projects }: { projects: ProjectAnalysis[] }) {
     <div className="card">
       <h2 className="section-title">Tornado de sensibilité (±10 %)</h2>
       <p className="section-subtitle">
-        Impact d'une variation ±10 % de chaque hypothèse sur le {metric === "irr" ? "TRI investisseur" : "VAN nette"} — recalcul moteur à la demande.
+        Impact d'une variation ±10 % de chaque hypothèse sur le {metric === "irr" ? "TRI investisseur" : "VAN brute"} — recalcul moteur à la demande.
       </p>
 
       <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end", marginTop: "1rem" }}>
@@ -677,7 +677,7 @@ function SensitivityTab({ projects }: { projects: ProjectAnalysis[] }) {
           <p className="meta-label" style={{ marginBottom: "0.35rem" }}>Métrique</p>
           <select style={selectStyle} value={metric} onChange={(e) => setMetric(e.target.value as "irr" | "npv")}>
             <option value="irr">TRI investisseur</option>
-            <option value="npv">VAN nette</option>
+            <option value="npv">VAN brute</option>
           </select>
         </div>
         <button className="btn-primary" onClick={run} disabled={pending || !projectId}>
@@ -839,7 +839,7 @@ function StressTab() {
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <StressKpi
-              label="VAN nette portefeuille"
+              label="VAN brute portefeuille"
               before={fmtKeuro(agg.baseNpvTotal)}
               after={fmtKeuro(agg.stressNpvTotal)}
               delta={{ text: `${fmtSigned(deltaVanTotal, 0, " k€")} (ΔVAN totale)`, positive: deltaVanTotal >= 0 }}

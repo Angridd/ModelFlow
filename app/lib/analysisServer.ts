@@ -24,7 +24,11 @@ import {
   calculateScenarioMetrics,
   type FinanceEngineInput,
 } from "@/app/lib/finance/engine";
-import { buildFinanceInput, computeProjectFinance } from "@/app/lib/scenarioMetrics";
+import {
+  buildFinanceInput,
+  computeProjectFinance,
+  computeVanBruteNetteKeuro,
+} from "@/app/lib/scenarioMetrics";
 
 type ProjectWithScenarios = Project & { scenarios: Scenario[] };
 
@@ -32,7 +36,8 @@ type ProjectWithScenarios = Project & { scenarios: Scenario[] };
 type ProjectBundle = {
   analysis: ProjectAnalysis;
   input: FinanceEngineInput;
-  baseNpv: number;
+  /** VAN BRUTE de base (référence des ΔVAN leviers). */
+  baseVanBruteKeuro: number;
   baseInvestorIrr: number;
 };
 
@@ -71,7 +76,8 @@ export function buildProjectBundle(
       capacityMw: project.capacityMw,
       commissioningYear: project.commissioningYear,
       investorIrr: finance.metrics.investorIrr,
-      npv: finance.metrics.npv,
+      vanBruteKeuro: finance.vanBruteKeuro,
+      vanNetteKeuro: finance.vanNetteKeuro,
       debtKeuro: finance.debtRetenuKeuro,
       ccaKeuro: finance.ccaKeuro,
       capexEffectifKeuro: finance.capexEffectifKeuro,
@@ -109,7 +115,7 @@ export function buildProjectBundle(
   return {
     analysis,
     input,
-    baseNpv: finance.metrics.npv,
+    baseVanBruteKeuro: finance.vanBruteKeuro,
     baseInvestorIrr: finance.metrics.investorIrr,
   };
 }
@@ -176,13 +182,14 @@ export function buildPortfolioAnalysis(
 
     const perturbed: FinanceEngineInput = { ...bundle.input, ...plan.override };
     const m = calculateScenarioMetrics(perturbed);
+    const vanBrutePerturbed = computeVanBruteNetteKeuro(m, perturbed).vanBruteKeuro;
     return {
       projectId: a.projectId,
       projectName: a.projectName,
       poste: a.poste,
       savingKeuro,
       deviationPct: a.deviationPct,
-      deltaVanKeuro: m.npv - bundle.baseNpv,
+      deltaVanKeuro: vanBrutePerturbed - bundle.baseVanBruteKeuro,
       deltaIrrPp: m.investorIrr - bundle.baseInvestorIrr,
       approximate: plan.approximate,
       indicative: false,

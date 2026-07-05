@@ -283,3 +283,110 @@ an1 = 868 903,7 · an20 = 776 010,3 · an21 = 615 330,1 · an24 = 564 133,9
 
 Hors modèle (ne PAS implémenter) : dépôt de garantie 240 k€ (aucun flux), lignes ancillary/BESS
 (OFF, non sommées), plafonnement report déficitaire, haircut merchant, taxes dans le sizing.
+
+
+---
+
+## Annexe A — Fiche projet canonique (schéma de saisie MF)
+
+> **Le contrat** : ces champs sont TOUT ce qui distingue un projet d'un autre. Si un champ
+> n'est pas ici, MF le calcule (mécanisme du template) ; s'il y est, il vient du BP du projet.
+> Un champ vide = alerte, pas un défaut silencieux. Valeurs d'exemple = Sigoulès.
+
+### A.1 Identité & timing (5)
+| Champ MF | Unité | Sigoulès |
+|---|---|---|
+| `commissioningYear` | année | 2029 |
+| `constructionYears` | ans | 1 |
+| `projectLifeYears` | ans | 35 |
+| `discountRate` | % | 7,5 |
+| projectType (courbe) | Fixed/Tracker | Fixed |
+
+### A.2 Technique & production (7)
+| Champ MF | Unité | Sigoulès |
+|---|---|---|
+| `capacityMw` | MWc | 12 |
+| `yieldMwh` | kWh/kWp | 1 360 |
+| `unavailability` | % | 0,01 |
+| `degradationRate` | %/an | 0,4 |
+| `iferRpn` (RPN) | ratio | 1,35 |
+| Wc panneau / long / larg | Wc, m, m | 650 / 2,382 / 1,134 |
+| `surfaceHa` | ha | 12 |
+
+(%P90/P50 = 0,93 : constante template, ne pas saisir.)
+
+### A.3 CAPEX (8)
+| Champ MF | Unité | Sigoulès |
+|---|---|---|
+| `prixModuleUSDWc` | $/Wp | 0,17 |
+| `tauxEURUSD` | — | 1,16 |
+| `boSCtWc` | ct€/Wp | 36 |
+| `contingencyRate` | % | 2 |
+| `raccordementOuvrageKEuro` | k€ | 5 000 |
+| `devFeesKEuroPerMW` (MOD) | k€/MWp | 110 |
+| `indemnitesImmoKeuro` | k€ | 90 |
+| `margeFactKeuro` | k€ | 0 (auto si gearing < seuil) |
+
+(Taxe aménagement/archéo : calculée. Financing fees : calculées depuis A.5 + PLT.)
+
+### A.4 Offtake & revenus (7)
+| Champ MF | Unité | Sigoulès |
+|---|---|---|
+| `tariff` (PPA 1) | €/MWh | 73 |
+| `contractDuration` | ans | 20 |
+| `tariffInflationRate` | %/an | 0,4 |
+| `capacityCertificateMw` | MW | 0,3 |
+| `goStartYear` / `goPriceBase` | an / €/MWh | 21 / 1 |
+| courbe merchant | ref techno | Fixed (partagée) |
+| `indexAn1` courbes (G8) | — | 1,10245 (dérivable de MES + série IMF) |
+
+### A.5 Dette & fees (9)
+| Champ MF | Unité | Sigoulès |
+|---|---|---|
+| `debtInterestRate` (all-in) | % | 4,2 |
+| `debtTenorYears` | ans | 24 |
+| `gearingMaxPct` | % | 95 |
+| `dscrSchedule` | ratios | 1,15 (PPA) / 1,40 (merchant) |
+| `dsraMonths` | mois | 6 |
+| dsrfFeeRate | % | 1,4 (souvent standard) |
+| `agentFeeAnnuelKeuro` (an1) | k€ | 1,0 |
+| `ccaRemunRate` (SHL) | % | 5 |
+| fees : legal / DD / arranger / participant / bank doc / interim / commitment | €, %PLT | 10 k / 5 k / 0,8% / 0,4% / 1,5 €/kW / 2,5% / 0,1% |
+
+### A.6 OPEX (9)
+| Champ MF | Unité | Sigoulès |
+|---|---|---|
+| `loyerMode` + `loyerValeur` | €/ha | 2 500 |
+| `loyerInflation` | %/an | 0,4 |
+| `omFixedEuroKwc` | €/kWc | 6 |
+| `backOfficeKeuro` | k€ | 22,5 |
+| `assuranceRate` | % revenu | 1,5 |
+| `balancingCost` | €/MWh | 2 |
+| `diversOpexKeuro` (Other) | k€ | 10,833 (compteur+télécom+inspection+autoconso) |
+| `aleasOpexRate` | % rev an1 | 0,5 |
+| démantèlement total (an25-29) | k€ | 120 |
+
+(Inflation OPEX 2% : constante template.)
+
+### A.7 Fiscal & taxes locales (10)
+| Champ MF | Unité | Sigoulès |
+|---|---|---|
+| `tauxIS` | % | 25 |
+| `iferRate1` / `iferRate2` | €/kVA | 3,5 / 8,5 |
+| `methodeTaxes` | mode | appreciation_directe |
+| `baseFonciereKeuro`* | k€ | 267,245 (calculable, Fix 2) |
+| `valeurTerrainKeuro` | k€ | 60 (5 000 €/ha × ha) |
+| rateset TF : commune/EPCI/TSE/GEMAPI/TEOM | déc. | 0,36 / 0,0287 / 0,0024 / 0,0023 / 0 |
+| rateset CFE : commune/EPCI/TSECfe/GEMAPICfe/CCI | déc. | 0 / 0,2594 / 0,0086 / 0 / 0,0112 |
+| `inflationTaxes` | %/an | 2 |
+
+*optionnel depuis Fix 2 (calculé des €/Wc) — override possible.
+Rateset : change par commune mais « en général je garde les mêmes » → pré-remplir, ajuster si besoin.
+
+### A.8 Hors fiche (ne JAMAIS saisir — le moteur calcule ou ignore)
+Taxe aménagement/archéo · financing fees en montant · frais de gestion taxes · DSRF annuel
+en montant · base CFE distincte · haircut merchant · taxes dans le sizing · dépôt de garantie
+(aucun flux) · lignes BESS/ancillary · `taxeFinaleSizingKeuro` (=0) · loyerMode "fixe".
+
+**Total : ~45 champs, dont ~15 quasi constants d'un projet à l'autre** (fees bancaires, DSCR,
+IS, IFER, inflations). Une fiche réellement « à remplir » ≈ 30 valeurs lues dans le BP projet.

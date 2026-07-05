@@ -290,7 +290,8 @@ export function buildBpModel(project: BpProjectFields, scenario: Scenario): BpMo
       lines: [
         scalarLine("TRI investisseur", "%", metrics.investorIrr),
         scalarLine("TRI projet", "%", metrics.irr),
-        scalarLine("VAN nette", "kEUR", metrics.npv),
+        scalarLine("VAN brute", "kEUR", finance.vanBruteKeuro),
+        scalarLine("VAN nette", "kEUR", finance.vanNetteKeuro),
         scalarLine("LCOE", "EUR/MWh", metrics.lcoe),
         scalarLine("DSCR minimum", "ratio", metrics.dscr),
         scalarLine("CAPEX effectif", "kEUR", finance.capexEffectifKeuro),

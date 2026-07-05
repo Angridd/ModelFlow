@@ -100,7 +100,10 @@ export type ProjectMetrics = {
   capacityMw: number;
   commissioningYear: number;
   investorIrr: number;
-  npv: number;
+  /** VAN BRUTE (indicateur VAN principal, cible BP). */
+  vanBruteKeuro: number;
+  /** VAN NETTE (secondaire) = VAN brute − dev fees. */
+  vanNetteKeuro: number;
   debtKeuro: number;
   ccaKeuro: number;
   capexEffectifKeuro: number;
@@ -177,9 +180,10 @@ export const HEALTH_META: Record<Health, { label: string; emoji: string; color: 
 
 export function classifyHealth(m: Pick<
   ProjectMetrics,
-  "npv" | "investorIrr" | "gearingPct" | "dscr"
+  "vanBruteKeuro" | "investorIrr" | "gearingPct" | "dscr"
 >): Health {
-  if (m.npv < 0 || m.investorIrr < IRR_CRITICAL_PCT) return "critical";
+  // Criticité sur la VAN BRUTE (indicateur principal), pas l'ancienne « VAN projet ».
+  if (m.vanBruteKeuro < 0 || m.investorIrr < IRR_CRITICAL_PCT) return "critical";
   const gearingTense = m.gearingPct != null && m.gearingPct >= GEARING_TENSE_PCT;
   const dscrTense = m.dscr != null && m.dscr <= DSCR_TENSE;
   if (gearingTense || dscrTense) return "tense";
@@ -474,7 +478,7 @@ export const BENCHMARK_COLUMNS: readonly BenchmarkColumn[] = [
   { key: "capexPerMwc", label: "CAPEX", unit: "k€/MWc", goodDirection: "low", digits: 0 },
   { key: "opexPerMwc", label: "OPEX an-1", unit: "k€/MWc", goodDirection: "low", digits: 1 },
   { key: "debtPerMwc", label: "Dette", unit: "k€/MWc", goodDirection: "low", digits: 0 },
-  { key: "vanPerMwc", label: "VAN nette", unit: "k€/MWc", goodDirection: "high", digits: 0 },
+  { key: "vanPerMwc", label: "VAN brute", unit: "k€/MWc", goodDirection: "high", digits: 0 },
   { key: "investorIrr", label: "TRI inv.", unit: "%", goodDirection: "high", digits: 1 },
   { key: "gearingPct", label: "Gearing", unit: "%", goodDirection: "low", digits: 1 },
   { key: "dscr", label: "DSCR", unit: "x", goodDirection: "high", digits: 2 },
@@ -642,7 +646,7 @@ export function benchmarkValue(m: ProjectMetrics, key: BenchmarkColumnKey): numb
     case "debtPerMwc":
       return perMwc(m.debtKeuro, m.capacityMw);
     case "vanPerMwc":
-      return perMwc(m.npv, m.capacityMw);
+      return perMwc(m.vanBruteKeuro, m.capacityMw);
     case "investorIrr":
       return m.investorIrr;
     case "gearingPct":

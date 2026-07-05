@@ -180,6 +180,39 @@ export function buildFinanceInput(
   };
 }
 
+/**
+ * VAN BRUTE / NETTE du BP — l'indicateur VAN PRINCIPAL de l'appli (la brute), calé sur les cibles
+ * BP (data/cibles/*.json, vérifié sur les 25 projets). Composition = pure composition de sorties
+ * moteur DÉJÀ exposées (aucune modif d'engine.ts) :
+ *
+ *   VAN brute = VAN des flux EQUITY actualisés à discountRate (= metrics.investorNpv)
+ *             + D  (réintégration de la marge MOD = modRetraitement × (1 − IS)).
+ *   VAN nette = VAN brute − E  (retrait du coût de dev / dev fees = modRetraitement × (1 − IS)).
+ *
+ * D et E dérivent tous deux du même montant MOD (modRetraitementKeuro, à défaut devFees =
+ * devFeesKEuroPerMW × MW) : c'est ce que reproduit `E = vanBrute − vanNette` sur les 25 cibles
+ * (preuve : Aérodrome, devFees=0 mais E=629,5 = modRetr 839,3 × 0,75). Numériquement VAN nette =
+ * metrics.investorNpv. Les deux réintégrations sont posées à la date d'investissement (non
+ * actualisées : elles réduisent/majorent la mise en an0).
+ *
+ * Responsivité : investorNpv réagit aux flux equity (stress test, leviers) ; modRetraitement/IS
+ * réagissent aux leviers de coût. Résiduel vs cible BP = écart de calibration des flux equity
+ * (démantèlement an25-30 non modélisé, timing-IS) — documenté par projet (flags des cibles).
+ */
+export function computeVanBruteNetteKeuro(
+  metrics: FinanceEngineResult,
+  input: FinanceEngineInput,
+): { vanBruteKeuro: number; vanNetteKeuro: number } {
+  const isFactor = 1 - Math.max(0, input.tauxIS ?? 0) / 100;
+  const modKeuro =
+    input.modRetraitementKeuro ?? (input.devFeesKEuroPerMW ?? 0) * input.capacityMw;
+  const margeMODKeuro = modKeuro * isFactor; // D — marge MOD réintégrée (brute)
+  const devFeesKeuro = modKeuro * isFactor; // E — coût de dev retiré (nette)
+  const vanBruteKeuro = Math.round((metrics.investorNpv + margeMODKeuro) * 100) / 100;
+  const vanNetteKeuro = Math.round((vanBruteKeuro - devFeesKeuro) * 100) / 100;
+  return { vanBruteKeuro, vanNetteKeuro };
+}
+
 /** Métriques + structure de financement dérivée (dette / CCA / gearing / CAPEX), en k€. */
 export type ProjectFinance = {
   metrics: FinanceEngineResult;
@@ -190,6 +223,10 @@ export type ProjectFinance = {
   debtRetenuKeuro: number;
   ccaKeuro: number;
   gearingPct: number | null;
+  /** VAN BRUTE (indicateur VAN principal, cible BP `vanBruteKeuro`). Cf computeVanBruteNetteKeuro. */
+  vanBruteKeuro: number;
+  /** VAN NETTE (secondaire, cible BP `vanNetteKeuro`) = VAN brute − dev fees. */
+  vanNetteKeuro: number;
 };
 
 /**
@@ -218,6 +255,7 @@ export function computeFinanceFromInput(input: FinanceEngineInput): ProjectFinan
   const ccaKeuro = Math.max(0, capexEffectifKeuro - debtRetenuKeuro);
   const gearingPct =
     metrics.sizing?.gearingActuel != null ? metrics.sizing.gearingActuel * 100 : null;
+  const { vanBruteKeuro, vanNetteKeuro } = computeVanBruteNetteKeuro(metrics, input);
   return {
     metrics,
     capexCalibKeuro,
@@ -225,6 +263,8 @@ export function computeFinanceFromInput(input: FinanceEngineInput): ProjectFinan
     debtRetenuKeuro,
     ccaKeuro,
     gearingPct,
+    vanBruteKeuro,
+    vanNetteKeuro,
   };
 }
 

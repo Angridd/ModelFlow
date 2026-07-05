@@ -23,7 +23,10 @@ export type DashboardRow = {
   capacityMw: number;
   commissioningYear: number;
   investorIrr: number;
-  npv: number;
+  /** VAN BRUTE (indicateur VAN principal, cible BP). */
+  vanBruteKeuro: number;
+  /** VAN NETTE (secondaire) = VAN brute − dev fees. */
+  vanNetteKeuro: number;
   debtKeuro: number;
   equityCcaKeuro: number;
   capexEffectifKeuro: number;
@@ -90,7 +93,7 @@ type SortKey =
   | "capacityMw"
   | "commissioningYear"
   | "investorIrr"
-  | "npv"
+  | "vanBruteKeuro"
   | "debtKeuro"
   | "gearingPct"
   | "dscr"
@@ -181,7 +184,7 @@ export function PortfolioDashboard({ rows }: { rows: DashboardRow[] }) {
   const [techFilter, setTechFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [yearFilter, setYearFilter] = useState<string>("all");
-  const [sortKey, setSortKey] = useState<SortKey>("npv");
+  const [sortKey, setSortKey] = useState<SortKey>("vanBruteKeuro");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const technologies = useMemo(
@@ -225,7 +228,8 @@ export function PortfolioDashboard({ rows }: { rows: DashboardRow[] }) {
     const totalCapex = filtered.reduce((s, r) => s + r.capexEffectifKeuro, 0);
     const totalDebt = filtered.reduce((s, r) => s + r.debtKeuro, 0);
     const totalEquity = filtered.reduce((s, r) => s + r.equityCcaKeuro, 0);
-    const totalNpv = filtered.reduce((s, r) => s + r.npv, 0);
+    const totalVanBrute = filtered.reduce((s, r) => s + r.vanBruteKeuro, 0);
+    const totalVanNette = filtered.reduce((s, r) => s + r.vanNetteKeuro, 0);
     const irrs = filtered.map((r) => r.investorIrr).filter((v) => Number.isFinite(v));
     const irrMedian = median(irrs);
     const irrMin = irrs.length ? Math.min(...irrs) : null;
@@ -243,7 +247,8 @@ export function PortfolioDashboard({ rows }: { rows: DashboardRow[] }) {
       totalCapex,
       totalDebt,
       totalEquity,
-      totalNpv,
+      totalVanBrute,
+      totalVanNette,
       irrMedian,
       irrMin,
       irrMax,
@@ -257,8 +262,8 @@ export function PortfolioDashboard({ rows }: { rows: DashboardRow[] }) {
   const vanData = useMemo(
     () =>
       [...filtered]
-        .sort((a, b) => b.npv - a.npv)
-        .map((r) => ({ name: r.name, npv: r.npv })),
+        .sort((a, b) => b.vanBruteKeuro - a.vanBruteKeuro)
+        .map((r) => ({ name: r.name, van: r.vanBruteKeuro })),
     [filtered],
   );
 
@@ -331,10 +336,10 @@ export function PortfolioDashboard({ rows }: { rows: DashboardRow[] }) {
         <KpiCard label="Dette totale" value={fmtMeuro(agg.totalDebt)} />
         <KpiCard label="Equity / CCA" value={fmtMeuro(agg.totalEquity)} />
         <KpiCard
-          label="VAN nette portefeuille"
-          value={fmtMeuro(agg.totalNpv)}
-          sub="somme des VAN nettes projet"
-          tone={agg.totalNpv < 0 ? "negative" : "positive"}
+          label="VAN brute portefeuille"
+          value={fmtMeuro(agg.totalVanBrute)}
+          sub={`VAN nette ${fmtMeuro(agg.totalVanNette)}`}
+          tone={agg.totalVanBrute < 0 ? "negative" : "positive"}
         />
         <KpiCard
           label="TRI investisseur médian"
@@ -403,7 +408,7 @@ export function PortfolioDashboard({ rows }: { rows: DashboardRow[] }) {
       {/* ── Graphiques ── */}
       <section className="grid gap-4 lg:grid-cols-2">
         <ChartCard
-          title="VAN nette par projet"
+          title="VAN brute par projet"
           subtitle="k€, triée — vert = créatrice de valeur, rouge = destructrice"
           full
         >
@@ -423,9 +428,9 @@ export function PortfolioDashboard({ rows }: { rows: DashboardRow[] }) {
                   content={(p) => <ChartTooltip {...p} format={(v) => fmtMeuro(v, 2)} />}
                 />
                 <ReferenceLine x={0} stroke="#9ca3af" />
-                <Bar dataKey="npv" name="VAN nette" radius={[0, 4, 4, 0]} isAnimationActive={false}>
+                <Bar dataKey="van" name="VAN brute" radius={[0, 4, 4, 0]} isAnimationActive={false}>
                   {vanData.map((d) => (
-                    <Cell key={d.name} fill={d.npv >= 0 ? COLORS.positive : COLORS.negative} />
+                    <Cell key={d.name} fill={d.van >= 0 ? COLORS.positive : COLORS.negative} />
                   ))}
                 </Bar>
               </BarChart>
@@ -542,7 +547,8 @@ export function PortfolioDashboard({ rows }: { rows: DashboardRow[] }) {
                 <SortableTh label="MW" k="capacityMw" current={sortKey} arrow={sortArrow} onClick={toggleSort} />
                 <SortableTh label="MES" k="commissioningYear" current={sortKey} arrow={sortArrow} onClick={toggleSort} />
                 <SortableTh label="TRI inv." k="investorIrr" current={sortKey} arrow={sortArrow} onClick={toggleSort} />
-                <SortableTh label="VAN nette" k="npv" current={sortKey} arrow={sortArrow} onClick={toggleSort} />
+                <SortableTh label="VAN brute" k="vanBruteKeuro" current={sortKey} arrow={sortArrow} onClick={toggleSort} />
+                <th>VAN nette</th>
                 <SortableTh label="Dette" k="debtKeuro" current={sortKey} arrow={sortArrow} onClick={toggleSort} />
                 <SortableTh label="Gearing" k="gearingPct" current={sortKey} arrow={sortArrow} onClick={toggleSort} />
                 <SortableTh label="DSCR" k="dscr" current={sortKey} arrow={sortArrow} onClick={toggleSort} />
@@ -561,7 +567,8 @@ export function PortfolioDashboard({ rows }: { rows: DashboardRow[] }) {
                   <td>{fmtNum(r.capacityMw, 1)}</td>
                   <td>{r.commissioningYear > 0 ? r.commissioningYear : "—"}</td>
                   <td className="val-pos">{fmtPct(r.investorIrr)}</td>
-                  <td className={r.npv >= 0 ? "val-pos" : "val-neg"}>{fmtMeuro(r.npv, 2)}</td>
+                  <td className={r.vanBruteKeuro >= 0 ? "val-pos" : "val-neg"}>{fmtMeuro(r.vanBruteKeuro, 2)}</td>
+                  <td className={r.vanNetteKeuro >= 0 ? "val-pos" : "val-neg"}>{fmtMeuro(r.vanNetteKeuro, 2)}</td>
                   <td>{fmtMeuro(r.debtKeuro, 2)}</td>
                   <td>{fmtPct(r.gearingPct)}</td>
                   <td>{fmtNum(r.dscr)}</td>

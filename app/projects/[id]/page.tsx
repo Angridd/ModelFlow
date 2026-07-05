@@ -16,7 +16,11 @@ import {
 import { AnimatedKpiCards } from "@/app/components/AnimatedKpiCards";
 import { Breadcrumbs } from "@/app/components/Breadcrumbs";
 import { ProjectFinancialCharts } from "@/app/components/ProjectFinancialCharts";
-import { buildFinanceInput as buildScenarioInput, parseDscrSchedule } from "@/app/lib/scenarioMetrics";
+import {
+  buildFinanceInput as buildScenarioInput,
+  computeVanBruteNetteKeuro,
+  parseDscrSchedule,
+} from "@/app/lib/scenarioMetrics";
 import { generateSensitivityRows } from "@/app/lib/sensitivity";
 import { prisma } from "@/app/lib/prisma";
 
@@ -117,8 +121,14 @@ export default async function ProjectDetailPage({
   const analysisMetrics = analysisScenario
     ? calculateScenarioMetrics(buildFinanceInput(analysisScenario))
     : null;
-  const kpiNpv =
-    referenceMetrics?.npv ?? maxValue(scenarios.map((scenario) => scenario.npv));
+  // VAN principale = VAN BRUTE (cible BP). Composée depuis les sorties moteur (investorNpv + marge
+  // MOD réintégrée). VAN nette = brute − dev fees. Cf app/lib/scenarioMetrics.ts.
+  const referenceVan =
+    referenceMetrics && projectReferenceScenario
+      ? computeVanBruteNetteKeuro(referenceMetrics, buildFinanceInput(projectReferenceScenario))
+      : null;
+  const kpiVanBrute =
+    referenceVan?.vanBruteKeuro ?? maxValue(scenarios.map((scenario) => scenario.npv));
   // TRI principal = TRI INVESTISSEUR (equity BP, = investorIrr), la métrique calée sur bp_projet_pipe.
   // Fallback legacy (pas de scénario de référence) : max des TRI projet persistés.
   const kpiIrr =
@@ -135,6 +145,16 @@ export default async function ProjectDetailPage({
       scenario.id,
       calculateScenarioMetrics(buildFinanceInput(scenario)),
     ] as const),
+  );
+  // VAN brute/nette par scénario (composée depuis les métriques ci-dessus + inputs MOD/IS).
+  const vanByScenarioId = new Map(
+    scenarios.map((scenario) => {
+      const m = metricsByScenarioId.get(scenario.id);
+      return [
+        scenario.id,
+        m ? computeVanBruteNetteKeuro(m, buildFinanceInput(scenario)) : null,
+      ] as const;
+    }),
   );
   const importScenariosForProject = importScenarios.bind(null, project.id);
   const cashFlowScenario = projectReferenceScenario ?? analysisScenario;
@@ -180,18 +200,15 @@ export default async function ProjectDetailPage({
     sizing !== null
       ? sizing.gearingActuel * 100
       : null;
-  const analysisDevFeesKeuro =
-    analysisScenario !== undefined
-      ? (analysisScenario.devFeesKEuroPerMW ?? 0) * project.capacityMw
+  // VAN BRUTE (principal) / NETTE (secondaire) du scénario analysé, calées sur le BP (cf
+  // app/lib/scenarioMetrics.ts : VAN brute = flux equity actualisés + marge MOD réintégrée ;
+  // VAN nette = VAN brute − dev fees). Composition de sorties moteur, aucun double comptage.
+  const analysisVan =
+    analysisMetrics && analysisScenario
+      ? computeVanBruteNetteKeuro(analysisMetrics, buildFinanceInput(analysisScenario))
       : null;
-  // VAN nette = m.npv : les dev fees sont DÉJÀ déduits (comptés dans le CAPEX effectif). C'est la
-  // convention « VANn » de calibrate_all. VAN brute = VAN nette + dev fees (avant nettage de la marge
-  // de développement). L'ancien code déduisait les dev fees une seconde fois (double comptage).
-  const analysisVanNetteKeuro = analysisMetrics?.npv ?? analysisScenario?.npv ?? null;
-  const analysisVanBruteKeuro =
-    analysisVanNetteKeuro !== null && analysisDevFeesKeuro !== null
-      ? analysisVanNetteKeuro + analysisDevFeesKeuro
-      : null;
+  const analysisVanBruteKeuro = analysisVan?.vanBruteKeuro ?? analysisScenario?.npv ?? null;
+  const analysisVanNetteKeuro = analysisVan?.vanNetteKeuro ?? null;
   const financingChartData =
     sizing !== null && ccaKeuro !== null
       ? [
@@ -346,12 +363,12 @@ export default async function ProjectDetailPage({
       <AnimatedKpiCards
         cards={[
           {
-            label: projectReferenceScenario ? "VAN nette référence" : "Meilleure VAN",
-            value: kpiNpv,
+            label: projectReferenceScenario ? "VAN brute référence" : "Meilleure VAN brute",
+            value: kpiVanBrute,
             suffix: " M€",
             scale: 1000,
             decimals: 2,
-            tone: kpiNpv !== null && kpiNpv < 0 ? "negative" : "positive",
+            tone: kpiVanBrute !== null && kpiVanBrute < 0 ? "negative" : "positive",
           },
           {
             label: projectReferenceScenario ? "TRI investisseur" : "Meilleur TRI",
@@ -379,9 +396,9 @@ export default async function ProjectDetailPage({
       >
         <div className="kpi-card fade-up delay-1">
           <span className="kpi-label">
-            {projectReferenceScenario ? "VAN référence" : "Meilleure VAN"}
+            {projectReferenceScenario ? "VAN brute référence" : "Meilleure VAN brute"}
           </span>
-          <span className="kpi-value">{formatMillionEuros(kpiNpv)}</span>
+          <span className="kpi-value">{formatMillionEuros(kpiVanBrute)}</span>
         </div>
         <div className="kpi-card fade-up delay-2">
           <span className="kpi-label">
@@ -717,15 +734,15 @@ export default async function ProjectDetailPage({
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
-            <p className="meta-label">VAN nette</p>
-            <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--ps-green)", marginTop: "0.2rem" }}>
-              {formatMillionEuros(analysisVanNetteKeuro)}
-            </p>
-          </div>
-          <div>
             <p className="meta-label">VAN brute</p>
             <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--ps-blue-dark)", marginTop: "0.2rem" }}>
               {formatMillionEuros(analysisVanBruteKeuro)}
+            </p>
+          </div>
+          <div>
+            <p className="meta-label">VAN nette</p>
+            <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--ps-green)", marginTop: "0.2rem" }}>
+              {formatMillionEuros(analysisVanNetteKeuro)}
             </p>
           </div>
           <div>
@@ -936,7 +953,7 @@ export default async function ProjectDetailPage({
                 <th>Tarif</th>
                 <th>Dette</th>
                 <th>DSCR</th>
-                <th>VAN nette</th>
+                <th>VAN brute</th>
                 <th>TRI inv.</th>
                 <th>LCOE</th>
                 <th className="col-left">Actions</th>
@@ -960,7 +977,7 @@ export default async function ProjectDetailPage({
                   <td>{formatNumber(scenario.debtRate, " %")}</td>
                   <td>{formatNumber(scenario.dscr > 0 ? scenario.dscr : null)}</td>
                   <td className="val-pos">
-                    {formatMillionEuros(metricsByScenarioId.get(scenario.id)?.npv ?? scenario.npv)}
+                    {formatMillionEuros(vanByScenarioId.get(scenario.id)?.vanBruteKeuro ?? scenario.npv)}
                   </td>
                   <td className="val-pos">
                     {formatNumber(metricsByScenarioId.get(scenario.id)?.investorIrr ?? scenario.irr, " %")}
