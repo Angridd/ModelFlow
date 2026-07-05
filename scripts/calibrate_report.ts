@@ -26,6 +26,29 @@ import {
 import type { FinanceEngineInput } from "../app/lib/finance/engine";
 import { CAPACITY_PRICE_CURVE, merchantCurveForTechnology } from "../app/lib/finance/merchantCurves";
 import type { DscrTranche } from "../app/lib/finance/types";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { slugify } from "./read_bp_matrix";
+
+const CIBLES_DIR = path.resolve(process.cwd(), "data/cibles");
+
+// Inputs moteur non persistés en Scenario (opexEngagementsKeuroByYear, margeFactFigeeKeuro),
+// portés par data/cibles/<slug>.json → engineOnly (produit par read_bp_matrix). Sans cette
+// injection, le rapport affiche un faux gearing (95 %) sur les projets à engagements.
+type CiblesEngineOnly = {
+  opexEngagementsKeuroByYear?: number[] | null;
+  margeFactFigeeKeuro?: number | null;
+};
+
+function loadEngineOnly(projectName: string): CiblesEngineOnly | undefined {
+  try {
+    const dest = path.join(CIBLES_DIR, `${slugify(projectName)}.json`);
+    const c = JSON.parse(readFileSync(dest, "utf8")) as { engineOnly?: CiblesEngineOnly };
+    return c.engineOnly;
+  } catch {
+    return undefined;
+  }
+}
 
 const adapter = new PrismaBetterSqlite3({
   url: process.env.DATABASE_URL ?? "file:./prisma/dev.db",
@@ -47,9 +70,13 @@ function parseDscrSchedule(json: string | null): DscrTranche[] | null {
 function buildFinanceInput(
   project: NonNullable<Awaited<ReturnType<typeof loadProject>>>,
   scenario: NonNullable<Awaited<ReturnType<typeof loadProject>>>["scenarios"][number],
+  engineOnly?: CiblesEngineOnly,
 ): FinanceEngineInput {
   const merchantCurves = merchantCurveForTechnology(project.technology);
   return {
+    // Inputs moteur non persistés (cf calibrate_all.buildFinanceInput) : portés par les cibles.
+    opexEngagementsKeuroByYear: engineOnly?.opexEngagementsKeuroByYear ?? undefined,
+    margeFactFigeeKeuro: engineOnly?.margeFactFigeeKeuro ?? null,
     capacityMw: project.capacityMw,
     commissioningYear: project.commissioningYear,
     auroraCurves: merchantCurves,
@@ -313,7 +340,7 @@ async function main() {
     targets = JSON.parse(fs.readFileSync(targetsPath, "utf8"));
   }
 
-  const input = buildFinanceInput(project, scenario);
+  const input = buildFinanceInput(project, scenario, loadEngineOnly(project.name));
   const { rows } = buildReportRows(input);
   printReport(project.name, scenario.name, rows, targets);
 

@@ -145,6 +145,12 @@ export type FinanceEngineInput = FinancialAssumptions & {
   // lumpy et front-loadés → routés ADDITIVEMENT dans opexP50 ET opexP90 SANS ré-indexation
   // (contrairement à diversOpexKeuro). Absent/[] → aucun changement (rétrocompat stricte).
   opexEngagementsKeuroByYear?: number[] | null;
+  // Marge facturable FIGÉE par le BP (feuille Inp_Opération, ligne « Dont Marge facturable »),
+  // en k€. Non-null → désactive la boucle endogène `ajusteMargeFacturable` et impose cette valeur
+  // (les k€ correspondants sont déjà inclus dans le CAPEX via `indemnitesImmoKeuro`, d'où 0 pour
+  // ne pas les compter deux fois). Le cap gearing reste actif. null → boucle endogène inchangée
+  // (rétrocompat stricte). ENGINE-ONLY : non persisté en base, comme opexEngagementsKeuroByYear.
+  margeFactFigeeKeuro?: number | null;
   loyerMode?: string | null;
   loyerValeur?: number | null;
   loyerInflation?: number | null;
@@ -2058,22 +2064,33 @@ function calculateFinancing(input: FinanceEngineInput): SizingComputation {
 
   const gearingMaxPct = resolveGearingMaxPct(input);
   const marginResult =
-    gearingMaxPct === null
-      ? sizingWithFacturableMargin(
+    input.margeFactFigeeKeuro != null
+      ? // Marge facturable figée par le BP : on impose la valeur (cap gearing conservé) et on
+        // court-circuite la boucle endogène `ajusteMargeFacturable`.
+        sizingWithFacturableMargin(
           input,
           initialInvestment,
-          0,
-          effectiveSchedule,
-          effectiveTenor,
-          null,
-        )
-      : ajusteMargeFacturable(
-          input,
-          initialInvestment,
+          input.margeFactFigeeKeuro,
           effectiveSchedule,
           effectiveTenor,
           gearingMaxPct,
-        );
+        )
+      : gearingMaxPct === null
+        ? sizingWithFacturableMargin(
+            input,
+            initialInvestment,
+            0,
+            effectiveSchedule,
+            effectiveTenor,
+            null,
+          )
+        : ajusteMargeFacturable(
+            input,
+            initialInvestment,
+            effectiveSchedule,
+            effectiveTenor,
+            gearingMaxPct,
+          );
   const capexEffectif = initialInvestment + marginResult.sizing.margeFactKeuro;
   const ccaDrawdownKeuro = Math.max(0, capexEffectif - marginResult.sizing.debtRetenuKeuro);
   const ccaPrincipalKeuro = ccaDrawdownKeuro * (1 + ccaRemunRate) ** constructionYears;

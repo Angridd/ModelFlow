@@ -41,11 +41,15 @@ function buildFinanceInput(
   project: NonNullable<Awaited<ReturnType<typeof loadProjects>>>[number],
   scenario: NonNullable<Awaited<ReturnType<typeof loadProjects>>>[number]["scenarios"][number],
   opexEngagementsKeuroByYear?: number[],
+  margeFactFigeeKeuro?: number | null,
 ): FinanceEngineInput {
   return {
     // OPEX engagements (moteur uniquement, non persisté en Scenario) : porté par les cibles
     // (data/cibles/<slug>.json → engineOnly, produit par read_bp_matrix). Absent → inchangé.
     opexEngagementsKeuroByYear,
+    // Marge facturable figée par le BP (moteur uniquement) : idem, porté par engineOnly.
+    // Non-null → désactive la boucle endogène. Absent/null → inchangé.
+    margeFactFigeeKeuro,
     capacityMw: project.capacityMw,
     commissioningYear: project.commissioningYear,
     auroraCurves: merchantCurveForTechnology(project.technology),
@@ -161,7 +165,10 @@ type Cibles = {
   technology: string;
   targets: Record<string, number | null>;
   flags: string[];
-  engineOnly?: { opexEngagementsKeuroByYear?: number[] | null };
+  engineOnly?: {
+    opexEngagementsKeuroByYear?: number[] | null;
+    margeFactFigeeKeuro?: number | null;
+  };
 };
 
 function loadCibles(): Map<string, Cibles> {
@@ -219,6 +226,7 @@ async function main() {
       project,
       scenario,
       c.engineOnly?.opexEngagementsKeuroByYear ?? undefined,
+      c.engineOnly?.margeFactFigeeKeuro ?? null,
     );
     const m = calculateScenarioMetrics(input);
 

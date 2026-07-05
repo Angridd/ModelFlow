@@ -346,6 +346,12 @@ export function buildProject(
     flags.push("Aucun engagement Inp_Opération trouvé (série vide → OPEX inchangé)");
   }
 
+  // Marge facturable figée par le BP (r32 « Dont Marge facturable » € → k€). Les k€ sont déjà
+  // inclus dans le CAPEX via indemnitesImmoKeuro → on impose 0 pour ne pas les compter deux fois
+  // et désactiver la boucle endogène. r32 ≠ 0 uniquement sur Ychoux → null partout ailleurs
+  // (rétrocompat stricte). ENGINE-ONLY : pas de colonne Prisma.
+  const margeFactFigeeKeuro = margeFacturableEuro > 0 ? 0 : null;
+
   const engineOnly = {
     capacityMw,
     commissioningYear: mes,
@@ -354,6 +360,7 @@ export function buildProject(
     debtSizingLowW: 0.3,
     ...persistedEngineInputs,
     opexEngagementsKeuroByYear,
+    margeFactFigeeKeuro,
   };
 
   const scenario: Record<string, unknown> = {
