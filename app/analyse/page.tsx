@@ -33,6 +33,9 @@ export default async function AnalysePage() {
             </Link>
           </p>
         </div>
+        <Link href="/api/projects/export" className="btn-secondary">
+          Exporter tout (Excel)
+        </Link>
       </div>
 
       {analyses.length === 0 ? (

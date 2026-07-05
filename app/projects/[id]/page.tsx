@@ -325,6 +325,13 @@ export default async function ProjectDetailPage({
               Voir le modèle BP
             </Link>
             <Link
+              href={`/api/projects/${project.id}/export`}
+              className="btn-secondary"
+              style={{ background: "rgba(255,255,255,0.12)", borderColor: "rgba(255,255,255,0.2)", color: "white" }}
+            >
+              Exporter Excel (BP)
+            </Link>
+            <Link
               href={`/projects/${project.id}/scenarios/new`}
               className="btn-primary"
               style={{ background: "white", color: "var(--ps-blue-dark)" }}

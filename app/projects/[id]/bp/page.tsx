@@ -133,9 +133,14 @@ export default async function ProjectBpPage({
               {nbYears} années
             </p>
           </div>
-          <Link href={`/projects/${project.id}`} className="btn-secondary">
-            ← Retour à la fiche
-          </Link>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            <Link href={`/api/projects/${project.id}/export`} className="btn-secondary">
+              Exporter Excel (BP)
+            </Link>
+            <Link href={`/projects/${project.id}`} className="btn-secondary">
+              ← Retour à la fiche
+            </Link>
+          </div>
         </div>
       </div>
 
