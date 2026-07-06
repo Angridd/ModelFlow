@@ -152,6 +152,7 @@ const MAPPINGS: Mapping[] = [
   { mfSection: "OPEX par poste (P50)", mfLabel: "Taxe foncière (TF)", sheet: "C_P50", rows: [191], sign: -1 },
   { mfSection: "OPEX par poste (P50)", mfLabel: "CFE", sheet: "C_P50", rows: [192], sign: -1 },
   { mfSection: "OPEX par poste (P50)", mfLabel: "Aléas", sheet: "C_P50", rows: [201], sign: -1 },
+  { mfSection: "OPEX par poste (P50)", mfLabel: "Démantèlement", sheet: "C_P50", rows: [195], sign: -1 },
   { mfSection: "OPEX par poste (P50)", mfLabel: "Engagements", sheet: "C_P50", rows: [199], sign: -1 },
   { mfSection: "OPEX par poste (P50)", mfLabel: "Total OPEX", sheet: "C_P50", rows: [204], sign: -1 },
   // ── EBITDA ─────────────────────────────────────────────────────────────────────────────────

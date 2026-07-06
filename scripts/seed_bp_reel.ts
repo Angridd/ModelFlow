@@ -49,6 +49,8 @@ async function main() {
     const engagements = b.engineOnly.opexEngagementsKeuroByYear as number[] | undefined;
     const tfKeuroByYear = b.engineOnly.tfKeuroByYear as number[] | undefined;
     const cfeKeuroByYear = b.engineOnly.cfeKeuroByYear as number[] | undefined;
+    const demantelementKeuroByYear =
+      b.engineOnly.demantelementKeuroByYear as number[] | undefined;
     const margeFactFigeeKeuro = b.engineOnly.margeFactFigeeKeuro as number | null | undefined;
     const margeFactAmortissableKeuro =
       b.engineOnly.margeFactAmortissableKeuro as number | null | undefined;
@@ -61,6 +63,11 @@ async function main() {
         tfKeuroByYear && tfKeuroByYear.length > 0 ? JSON.stringify(tfKeuroByYear) : null,
       cfeKeuroByYear:
         cfeKeuroByYear && cfeKeuroByYear.length > 0 ? JSON.stringify(cfeKeuroByYear) : null,
+      // Démantèlement appliqué (item 2) : JSON k€ an-par-an (an25-29), null si absent.
+      demantelementKeuroByYear:
+        demantelementKeuroByYear && demantelementKeuroByYear.length > 0
+          ? JSON.stringify(demantelementKeuroByYear)
+          : null,
       margeFactFigeeKeuro: margeFactFigeeKeuro ?? null,
       // Marge facturable amortissable (item 7) : base D&A Type 2 uniquement, null → inchangé.
       margeFactAmortissableKeuro: margeFactAmortissableKeuro ?? null,

@@ -80,6 +80,8 @@ export function buildFinanceInput(
     // TF/CFE appliquées (item 4) : mêmes JSON k€ an-par-an que les engagements. null → base calculée.
     tfKeuroByYear: parseEngagements(scenario.tfKeuroByYear),
     cfeKeuroByYear: parseEngagements(scenario.cfeKeuroByYear),
+    // Démantèlement appliqué (item 2) : JSON k€ an-par-an (an25-29 uniquement). null → 0.
+    demantelementKeuroByYear: parseEngagements(scenario.demantelementKeuroByYear),
     margeFactFigeeKeuro: scenario.margeFactFigeeKeuro,
     // Marge facturable amortissable (item 7) : base D&A Type 2 uniquement. null → inchangé.
     margeFactAmortissableKeuro: scenario.margeFactAmortissableKeuro,

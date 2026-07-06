@@ -153,6 +153,13 @@ export type FinanceEngineInput = FinancialAssumptions & {
   // colonnes Scenario.tfKeuroByYear / cfeKeuroByYear (String? JSON, comme opexEngagementsKeuroByYear).
   tfKeuroByYear?: number[] | null;
   cfeKeuroByYear?: number[] | null;
+  // Démantèlement RÉELLEMENT APPLIQUÉ par le BP (C_P50/C_P90 r195), en k€ par ANNÉE PROJET
+  // (index 0 = an1) — poste OPEX des années 25-29 UNIQUEMENT (constant, non indexé :
+  // Inp_Assumption r294 étalé sur 5 ans, ex. Ychoux 131 700 € → 26,34 k€/an). Additif au
+  // Total OPEX P50 ET P90 (item 2) ; les années hors 25-29 sont à 0 dans la série. Absent/[]
+  // → 0 (rétrocompat stricte). Persisté : colonne Scenario.demantelementKeuroByYear
+  // (String? JSON, comme tfKeuroByYear).
+  demantelementKeuroByYear?: number[] | null;
   // Marge facturable FIGÉE par le BP (feuille Inp_Opération, ligne « Dont Marge facturable »),
   // en k€. Non-null → désactive la boucle endogène `ajusteMargeFacturable` et impose cette valeur
   // (les k€ correspondants sont déjà inclus dans le CAPEX via `indemnitesImmoKeuro`, d'où 0 pour
@@ -353,6 +360,7 @@ export type OpexDetails = {
   tfKeuro: number;
   cfeKeuro: number;
   aleasKeuro: number;
+  demantelementKeuro: number;
   opexTotalKeuro: number;
   opexPerMwKeuro: number;
 };
@@ -1023,6 +1031,10 @@ export function calculateOpexDetails(
       ? aleasBaseKeuro * (1 + inflationOMRate) ** (year - 1)
       : asRate(input.aleasOpexRate ?? 0.5) * revenueP50Keuro;
 
+  // Item 2 : démantèlement appliqué par le BP (C_P50/C_P90 r195) — an25-29 uniquement, constant
+  // non indexé. Piloté par la série (0 hors an25-29). Absent → 0 (rétrocompat stricte).
+  const demantelementKeuro = input.demantelementKeuroByYear?.[year - 1] ?? 0;
+
   if (!hasDetailedOpex) {
     const legacyOpexKeuro =
       input.opex * input.capacityMw * (1 + asRate(input.opexInflationRate)) ** year;
@@ -1033,7 +1045,8 @@ export function calculateOpexDetails(
       iferKeuro +
       tfKeuro +
       cfeKeuro +
-      aleasKeuro;
+      aleasKeuro +
+      demantelementKeuro;
 
     return {
       hasDetailedOpex,
@@ -1049,6 +1062,7 @@ export function calculateOpexDetails(
       tfKeuro,
       cfeKeuro,
       aleasKeuro,
+      demantelementKeuro,
       opexTotalKeuro,
       opexPerMwKeuro: input.capacityMw > 0 ? opexTotalKeuro / input.capacityMw : 0,
     };
@@ -1092,7 +1106,8 @@ export function calculateOpexDetails(
     iferKeuro +
     tfKeuro +
     cfeKeuro +
-    aleasKeuro;
+    aleasKeuro +
+    demantelementKeuro;
 
   return {
     hasDetailedOpex,
@@ -1108,6 +1123,7 @@ export function calculateOpexDetails(
     tfKeuro,
     cfeKeuro,
     aleasKeuro,
+    demantelementKeuro,
     opexTotalKeuro,
     opexPerMwKeuro: input.capacityMw > 0 ? opexTotalKeuro / input.capacityMw : 0,
   };
@@ -1756,6 +1772,9 @@ function buildPreRows(
       opexDetailsP50.tfKeuro +
       opexDetailsP50.cfeKeuro +
       aleasP90Keuro +
+      // Démantèlement (item 2) : présent dans C_P90 r195 comme en P50 (série identique, non
+      // indexée). Sans effet sur le sizing (an25-29 > ténor) mais aligne l'EBITDA/CFADS P90.
+      opexDetailsP50.demantelementKeuro +
       engagementsKeuro;
     // Banking CFADS (P90) kEUR = revenue P90 - OPEX P90 (DSCR sizing base).
     const cfadsP90 = revenueP90 - opexP90Keuro;

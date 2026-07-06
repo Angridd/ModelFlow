@@ -193,6 +193,7 @@ export function buildBpModel(project: BpProjectFields, scenario: Scenario): BpMo
         line("Taxe foncière (TF)", "kEUR", opexSerie((od) => od.tfKeuro)),
         line("CFE", "kEUR", opexSerie((od) => od.cfeKeuro)),
         line("Aléas", "kEUR", opexSerie((od) => od.aleasKeuro)),
+        line("Démantèlement", "kEUR", opexSerie((od) => od.demantelementKeuro)),
         // Engagements = total OPEX moteur (incl. engagements) − total des postes ci-dessus.
         line(
           "Engagements",
@@ -306,7 +307,6 @@ export function buildBpModel(project: BpProjectFields, scenario: Scenario): BpMo
   // Champs du BP présents dans la spec mais non exposés au grain annuel par le moteur.
   const gaps: string[] = [
     "Revenus P50 : split PPA / merchant / capacité / GO non exposé par AnnualCashFlow (seul le total revenueP50Keuro l'est) — ligne « Revenus P50 (total) » agrégée.",
-    "Démantèlement (BP §1.7, 24 k€/an an25-29) : non modélisé par le moteur, donc absent du modèle.",
   ];
 
   return {

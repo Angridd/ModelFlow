@@ -225,6 +225,37 @@
       6.322103713804356,
       6.448545788080445
     ],
+    "demantelementKeuroByYear": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      26.34,
+      26.34,
+      26.34,
+      26.34,
+      26.34
+    ],
     "margeFactFigeeKeuro": 0,
     "margeFactAmortissableKeuro": 193.135986328125
   },
@@ -255,8 +286,8 @@
     "equityRequiredKeuro": 510.19330322083084
   },
   "flags": [
-    "Démantèlement 131700 € an25-30 non modélisé (flux surestimés)",
     "Engagements = BP single-project C_P50 r199 (série appliquée, indexée 2%/an)",
-    "TF/CFE = BP single-project C_P50 r191/r192 (série appliquée)"
+    "TF/CFE = BP single-project C_P50 r191/r192 (série appliquée)",
+    "Démantèlement = BP single-project C_P50 r195 (an25-29, non indexé)"
   ]
 }

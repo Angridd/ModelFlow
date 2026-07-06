@@ -63,6 +63,7 @@ function buildFinanceInput(
   tfKeuroByYear?: number[],
   cfeKeuroByYear?: number[],
   margeFactAmortissableKeuro?: number | null,
+  demantelementKeuroByYear?: number[],
 ): FinanceEngineInput {
   return {
     // OPEX engagements (moteur uniquement, non persisté en Scenario) : porté par les cibles
@@ -71,6 +72,8 @@ function buildFinanceInput(
     // TF/CFE appliquées (item 4) : idem, portées par engineOnly. Absent → base calculée.
     tfKeuroByYear,
     cfeKeuroByYear,
+    // Démantèlement appliqué (item 2) : idem, porté par engineOnly. Absent → 0.
+    demantelementKeuroByYear,
     // Marge facturable figée par le BP (moteur uniquement) : idem, porté par engineOnly.
     // Non-null → désactive la boucle endogène. Absent/null → inchangé.
     margeFactFigeeKeuro,
@@ -195,6 +198,7 @@ type Cibles = {
     opexEngagementsKeuroByYear?: number[] | null;
     tfKeuroByYear?: number[] | null;
     cfeKeuroByYear?: number[] | null;
+    demantelementKeuroByYear?: number[] | null;
     margeFactFigeeKeuro?: number | null;
     margeFactAmortissableKeuro?: number | null;
   };
@@ -261,6 +265,7 @@ async function main() {
       c.engineOnly?.tfKeuroByYear ?? undefined,
       c.engineOnly?.cfeKeuroByYear ?? undefined,
       c.engineOnly?.margeFactAmortissableKeuro ?? null,
+      c.engineOnly?.demantelementKeuroByYear ?? undefined,
     );
     const m = calculateScenarioMetrics(input);
 

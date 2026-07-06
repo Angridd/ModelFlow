@@ -224,6 +224,37 @@
       2.7825509969453077,
       2.8382020168842135
     ],
+    "demantelementKeuroByYear": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      9.380000000000003,
+      9.380000000000003,
+      9.380000000000003,
+      9.380000000000003,
+      9.380000000000003
+    ],
     "margeFactFigeeKeuro": null,
     "margeFactAmortissableKeuro": null
   },
@@ -256,8 +287,8 @@
   "flags": [
     "MRA r256=21200 aberrante (>100 €/kWc) → ignorée (BP applique 0)",
     "Achat de terrain 545970 € replié dans indemnités (financé, non amorti)",
-    "Démantèlement 46900 € an25-30 non modélisé (flux surestimés)",
     "Engagements = BP single-project C_P50 r199 (série appliquée, indexée 2%/an)",
-    "TF/CFE = BP single-project C_P50 r191/r192 (série appliquée)"
+    "TF/CFE = BP single-project C_P50 r191/r192 (série appliquée)",
+    "Démantèlement = BP single-project C_P50 r195 (an25-29, non indexé)"
   ]
 }

@@ -146,6 +146,8 @@ export type BpGroundTruth = {
   appliedTariffAn1: number | null;
   tfKeuroByYear: number[];
   cfeKeuroByYear: number[];
+  // Démantèlement appliqué (C_P50 r195) : an25-29 uniquement, constant non indexé (item 2).
+  demantelementKeuroByYear: number[];
 };
 
 export function buildGroundTruthBySlug(): Map<string, BpGroundTruth> {
@@ -200,6 +202,7 @@ export function buildGroundTruthBySlug(): Map<string, BpGroundTruth> {
       appliedTariffAn1: g(73, an1),
       tfKeuroByYear: readTax(191),
       cfeKeuroByYear: readTax(192),
+      demantelementKeuroByYear: readTax(195),
     });
   }
   return map;
@@ -351,8 +354,11 @@ export function buildProject(
     );
   }
 
+  // Démantèlement (item 2) : r294 = TOTAL € (étalé par le BP sur an25-29, constant non indexé).
+  // La série RÉELLEMENT APPLIQUÉE (C_P50 r195, ground truth) est routée plus bas
+  // (demantelementKeuroByYear) ; le flag « non modélisé » ne subsiste que sans data/N.xlsm.
   const dismantling = num(cell, 294, col);
-  if (dismantling != null && dismantling > 0) {
+  if (dismantling != null && dismantling > 0 && !groundTruth?.demantelementKeuroByYear?.length) {
     flags.push(`Démantèlement ${Math.round(dismantling)} € an25-30 non modélisé (flux surestimés)`);
   }
 
@@ -501,6 +507,13 @@ export function buildProject(
     flags.push("TF/CFE = BP single-project C_P50 r191/r192 (série appliquée)");
   }
 
+  // Démantèlement RÉELLEMENT APPLIQUÉ (item 2) : C_P50 r195 du single-project — an25-29
+  // uniquement, constant non indexé (= Inp_Assumption r294 / 5). Absent → [] → OPEX inchangé.
+  const demantelementKeuroByYear = groundTruth?.demantelementKeuroByYear ?? [];
+  if (demantelementKeuroByYear.length > 0) {
+    flags.push("Démantèlement = BP single-project C_P50 r195 (an25-29, non indexé)");
+  }
+
   // Marge facturable figée par le BP (r32 « Dont Marge facturable » € → k€). Les k€ sont déjà
   // inclus dans le CAPEX via indemnitesImmoKeuro → on impose 0 pour ne pas les compter deux fois
   // et désactiver la boucle endogène. r32 ≠ 0 uniquement sur Ychoux → null partout ailleurs
@@ -525,6 +538,7 @@ export function buildProject(
     opexEngagementsKeuroByYear,
     tfKeuroByYear,
     cfeKeuroByYear,
+    demantelementKeuroByYear,
     margeFactFigeeKeuro,
     margeFactAmortissableKeuro,
   };
