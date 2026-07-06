@@ -245,6 +245,11 @@ export type AnnualCashFlow = {
   debtOutstandingKeuro: number;
   cfadsP90Keuro: number;
   cfadsP90AfterTaxKeuro: number;
+  // Cas de dimensionnement (P90) — item 8 Phase 2 : IS du sizing déduit du CFADS de dette
+  // (C_P90 r244), intérêts SHL propres au scénario P90 (r233), solde SHL P90 de fin d'année.
+  isP90Keuro: number;
+  intSHLP90Keuro: number;
+  shlP90OutstandingKeuro: number;
   amort: number;
   vncKeuro: number;
   ebit: number;
@@ -1217,26 +1222,22 @@ export function sculptDebt(
   return { debtAmountKeuro, schedule: result.schedule };
 }
 
-// CFADS de sizing BP = pré-IS pour an1..tenor-1, moins la "Taxes P&L" de la dernière année du
-// tenor uniquement (seul IS injecté dans le repayment ; les IS des années suivantes tombent
-// hors tenor et n'affectent pas le sizing). Cf CALIBRATION.md, "MÉCANISME DE SCULPTING COMPLET".
-function resolveCfadsSizingKeuro(
-  row: { year: number; cfadsP90Keuro: number },
-  tenorYears: number,
-  taxeFinaleSizingKeuro: number,
-) {
-  return row.year === tenorYears
-    ? row.cfadsP90Keuro - taxeFinaleSizingKeuro
-    : row.cfadsP90Keuro;
+// CFADS de sizing BP (item 8 Phase 2) = EBITDA_P90 net de l'IS du cas de dimensionnement,
+// année par année (C_P90 r260 = r226 EBITDA + r244 IS = C_Financing r80/r84). Vérifié à l'euro
+// sur data/<N>.xlsm : r260 == EBITDA + IS pour les 25 projets. L'IS P90 (isP90Keuro) est calculé
+// dans applyWaterfall (P&L P90 complet : D&A, intérêts dette sizée, intérêts SHL P90, DSRF, agent
+// fee) puis reporté sur chaque ligne. IS = 0 (tauxIS null OU cumEBT P90 < 0) → CFADS pré-IS →
+// comportement inchangé (rétrocompat + projets « verts » à SHL couvrant restent identiques).
+function resolveCfadsSizingKeuro(row: { cfadsP90Keuro: number; isP90Keuro?: number }) {
+  return row.cfadsP90Keuro - (row.isP90Keuro ?? 0);
 }
 
 function debtScheduleFromRetainedDebt(
-  cashFlows: ReadonlyArray<{ year: number; cfadsP90Keuro: number }>,
+  cashFlows: ReadonlyArray<{ year: number; cfadsP90Keuro: number; isP90Keuro?: number }>,
   dscrSchedule: DscrTranche[],
   debtInterestRatePercent: number,
   tenorYears: number,
   debtRetenuKeuro: number,
-  taxeFinaleSizingKeuro: number,
 ) {
   const debtRate = asRate(debtInterestRatePercent);
   const schedule = new Map<number, RetainedDebtScheduleItem>();
@@ -1250,8 +1251,7 @@ function debtScheduleFromRetainedDebt(
 
     const interest = outstanding * debtRate;
     const targetDebtService =
-      resolveCfadsSizingKeuro(row, tenorYears, taxeFinaleSizingKeuro) /
-      dscrForYear(row.year, dscrSchedule);
+      resolveCfadsSizingKeuro(row) / dscrForYear(row.year, dscrSchedule);
     const principal = Math.min(Math.max(0, targetDebtService - interest), outstanding);
 
     outstanding = Math.max(0, outstanding - principal);
@@ -1262,11 +1262,10 @@ function debtScheduleFromRetainedDebt(
 }
 
 function presentValueDebtCapacity(
-  cashFlows: ReadonlyArray<{ year: number; cfadsP90Keuro: number }>,
+  cashFlows: ReadonlyArray<{ year: number; cfadsP90Keuro: number; isP90Keuro?: number }>,
   dscrSchedule: DscrTranche[],
   debtInterestRatePercent: number,
   tenorYears: number,
-  taxeFinaleSizingKeuro: number,
 ) {
   const debtRate = asRate(debtInterestRatePercent);
 
@@ -1275,9 +1274,7 @@ function presentValueDebtCapacity(
     cashFlows
       .filter((row) => row.year <= tenorYears)
       .reduce((pv, row) => {
-        const service =
-          resolveCfadsSizingKeuro(row, tenorYears, taxeFinaleSizingKeuro) /
-          dscrForYear(row.year, dscrSchedule);
+        const service = resolveCfadsSizingKeuro(row) / dscrForYear(row.year, dscrSchedule);
         return pv + service / (1 + debtRate) ** row.year;
       }, 0),
   );
@@ -1301,7 +1298,14 @@ function sizingWithFacturableMargin(
   const capexEffectifKeuro = capexTotalKeuro + margeFactKeuro;
   const debtGearingMaxKeuro =
     gearingMaxPct !== null ? capexEffectifKeuro * gearingMaxPct / 100 : null;
-  const taxeFinaleSizingKeuro = input.taxeFinaleSizingKeuro ?? 0;
+  // Point fixe IS_P90 ↔ dette (item 8) : le CFADS de sizing est net de l'IS P90, lequel dépend
+  // des intérêts de la dette sizée ET des intérêts SHL du cas P90. Le SHL P90 = CCA (capex − dette)
+  // capitalisé en construction ; on le refeed à chaque itération via debtRetenuKeuro courant. Le BP
+  // fige cette circularité par macro copier-coller ; ici la boucle converge en 2-4 itérations.
+  const ccaRemunRateVal = asRate(input.ccaRemunRate ?? 0);
+  const constructionYears = resolveConstructionYears(input);
+  const shlP90Principal = (debtKeuro: number) =>
+    Math.max(0, capexEffectifKeuro - debtKeuro) * (1 + ccaRemunRateVal) ** constructionYears;
   let debtRetenuKeuro = 0;
   let scheduleByYear = new Map<number, RetainedDebtScheduleItem>();
   let preRows = buildPreRows(input, capexEffectifKeuro);
@@ -1313,6 +1317,8 @@ function sizingWithFacturableMargin(
     dscrSchedule,
     debtTenorYears,
     0,
+    ccaRemunRateVal,
+    shlP90Principal(debtRetenuKeuro),
   );
   let debtSculptedKeuro = 0;
   let iterationsCount = 0;
@@ -1325,7 +1331,6 @@ function sizingWithFacturableMargin(
       input.debtInterestRate,
       debtTenorYears,
       debtRetenuKeuro,
-      taxeFinaleSizingKeuro,
     );
     preRows = buildPreRows(input, capexEffectifKeuro);
     taxRows = applyWaterfall(
@@ -1336,13 +1341,14 @@ function sizingWithFacturableMargin(
       dscrSchedule,
       debtTenorYears,
       0,
+      ccaRemunRateVal,
+      shlP90Principal(debtRetenuKeuro),
     );
     debtSculptedKeuro = presentValueDebtCapacity(
       taxRows,
       dscrSchedule,
       input.debtInterestRate,
       debtTenorYears,
-      taxeFinaleSizingKeuro,
     );
 
     const nextDebtRetenuKeuro =
@@ -1364,7 +1370,6 @@ function sizingWithFacturableMargin(
     input.debtInterestRate,
     debtTenorYears,
     debtRetenuKeuro,
-    taxeFinaleSizingKeuro,
   );
   preRows = buildPreRows(input, capexEffectifKeuro);
   taxRows = applyWaterfall(
@@ -1375,13 +1380,14 @@ function sizingWithFacturableMargin(
     dscrSchedule,
     debtTenorYears,
     0,
+    ccaRemunRateVal,
+    shlP90Principal(debtRetenuKeuro),
   );
   debtSculptedKeuro = presentValueDebtCapacity(
     taxRows,
     dscrSchedule,
     input.debtInterestRate,
     debtTenorYears,
-    taxeFinaleSizingKeuro,
   );
 
   const gearingActuel =
@@ -1799,6 +1805,10 @@ function applyWaterfall(
   effectiveTenor: number,
   ccaPrincipalKeuro: number,
   ccaRemunRate: number = 0,
+  // Solde SHL du cas de dimensionnement (P90) au démarrage MES = CCA (capex − dette) capitalisée
+  // en construction. Sert au P&L P90 (intérêts SHL r233) qui pilote l'IS de sizing (item 8). Séparé
+  // de ccaPrincipalKeuro (cascade P50) : pendant le sizing on passe 0 côté P50 et le vrai CCA ici.
+  ccaP90PrincipalKeuro: number = 0,
 ): Array<AnnualCashFlow & { cfadsP90AfterTaxKeuro: number }> {
   let ccaOutstanding = Math.max(0, ccaPrincipalKeuro);
   // Report déficitaire : le cumEBT démarre à 0. Le BP ne seede PAS l'intérêt SHL capitalisé an0
@@ -1809,7 +1819,11 @@ function applyWaterfall(
   let cumEbtP90 = 0;
   let resultatCumule = 0;
   let dsraSolde = 0;
-  const taxeFinaleSizingKeuro = input.taxeFinaleSizingKeuro ?? 0;
+  // Cascade SHL du cas P90 (indépendante de la cascade P50) : le SHL est servi par le cash P90
+  // résiduel après service dette ; ce qui n'est pas couvert est capitalisé (solde croissant). Chez
+  // les projets à fort gearing (peu de CCA) il s'éteint vite → intérêts SHL → 0 → EBT P90 taxable ;
+  // chez les projets à faible gearing il grossit → maintient cumEBT P90 négatif → IS de sizing = 0.
+  let shlP90Outstanding = Math.max(0, ccaP90PrincipalKeuro);
 
   return preRows.map((pre) => {
     const scheduleItem = scheduleByYear.get(pre.year) ?? null;
@@ -1849,11 +1863,22 @@ function applyWaterfall(
     const resultatNet = ebt - is;
     resultatCumule += resultatNet;
     const cfadsAfterTax = pre.cashFlowKeuro - is;
+    // P&L du cas de dimensionnement (P90, C_P90) : EBT_P90 = EBITDA_P90 − D&A − intérêts dette
+    // sizée − intérêts SHL P90 (r233, sur solde SHL P90 courant) − DSRF − agent fee. IS_P90 =
+    // 25% × max(0, min(EBT_P90, cumEBT_P90)). Intérêts SHL P90 ≠ ccaInterets P50 (waterfall dédié).
+    const intSHLP90 = shlP90Outstanding * ccaRemunRate;
     const ebitP90 = pre.cfadsP90Keuro - pre.amort;
-    const ebtP90 = ebitP90 - interets - dsrfDeduction - agentFeeDeduction;
+    const ebtP90 = ebitP90 - debtInterest - intSHLP90 - dsrfDeduction - agentFeeDeduction;
     cumEbtP90 += ebtP90;
     const isP90 = computeIS(ebtP90, cumEbtP90, input.tauxIS);
     const debtService = sculptedService ?? pre.debtServiceKeuro;
+    // Cascade SHL P90 : cash P90 après IS de sizing et service dette → intérêts SHL (payés en
+    // priorité, le reste capitalisé) → remboursement principal (résidu). Met à jour le solde SHL
+    // reporté à l'année suivante. Hors ténor (year > effectiveTenor) : plus de dette → pas de sizing.
+    const cashForShlP90 = Math.max(0, pre.cfadsP90Keuro - isP90 - debtService);
+    const shlP90IntPaid = Math.min(cashForShlP90, intSHLP90);
+    const shlP90Repay = Math.min(shlP90Outstanding, cashForShlP90 - shlP90IntPaid);
+    shlP90Outstanding = Math.max(0, shlP90Outstanding + (intSHLP90 - shlP90IntPaid) - shlP90Repay);
     const nextDebtService =
       nextSculptedService ??
       (pre.year + 1 <= preRows.length
@@ -1914,6 +1939,9 @@ function applyWaterfall(
       debtServiceSculptedKeuro: sculptedService,
       debtOutstandingKeuro: scheduleItem?.outstanding ?? pre.standardDebtOutstandingKeuro,
       cfadsP90Keuro: pre.cfadsP90Keuro,
+      isP90Keuro: isP90,
+      intSHLP90Keuro: intSHLP90,
+      shlP90OutstandingKeuro: shlP90Outstanding,
       amort: pre.amort,
       vncKeuro: pre.vncKeuro,
       ebit,
@@ -1938,17 +1966,17 @@ function applyWaterfall(
       dsraRetraitKeuro: dsraRetrait,
       cashBloqueKeuro: cashBloque,
       cfadsP90AfterTaxKeuro: pre.cfadsP90Keuro - isP90,
-      // Standard DSCR: CFADS P90 de sizing (pré-IS, sauf "Taxes P&L" an tenor final) /
-      // constant-annuity service. Cf CALIBRATION.md, "MÉCANISME DE SCULPTING COMPLET".
+      // Standard DSCR: CFADS P90 de sizing (net de l'IS P90, item 8) / constant-annuity service.
       dscr:
         pre.debtServiceKeuro > 0
-          ? resolveCfadsSizingKeuro(pre, effectiveTenor, taxeFinaleSizingKeuro) /
+          ? resolveCfadsSizingKeuro({ cfadsP90Keuro: pre.cfadsP90Keuro, isP90Keuro: isP90 }) /
             pre.debtServiceKeuro
           : null,
       // Realized DSCR: CFADS P90 de sizing / service retenu (sculpté).
       dscrRealized:
         debtService > 0
-          ? resolveCfadsSizingKeuro(pre, effectiveTenor, taxeFinaleSizingKeuro) / debtService
+          ? resolveCfadsSizingKeuro({ cfadsP90Keuro: pre.cfadsP90Keuro, isP90Keuro: isP90 }) /
+            debtService
           : null,
       // Target DSCR for this year from the schedule (null when no sculpting or beyond tenor).
       dscrTargetAtYear:
@@ -1975,6 +2003,9 @@ function zeroAnnualCashFlow(year: number): AnnualCashFlow {
     debtOutstandingKeuro: 0,
     cfadsP90Keuro: 0,
     cfadsP90AfterTaxKeuro: 0,
+    isP90Keuro: 0,
+    intSHLP90Keuro: 0,
+    shlP90OutstandingKeuro: 0,
     amort: 0,
     vncKeuro: 0,
     ebit: 0,
@@ -2063,6 +2094,7 @@ function calculateFinancing(input: FinanceEngineInput): SizingComputation {
       effectiveTenor,
       ccaPrincipalKeuro,
       ccaRemunRate,
+      ccaPrincipalKeuro,
     );
 
     return {
@@ -2119,6 +2151,7 @@ function calculateFinancing(input: FinanceEngineInput): SizingComputation {
     effectiveTenor,
     ccaPrincipalKeuro,
     ccaRemunRate,
+    ccaPrincipalKeuro,
   );
 
   return {

@@ -159,15 +159,21 @@ describe("calibration Digoin — SAISIE PURE, chaîne calée à l'euro (base fon
     const capexTotalEuro = eur(capex.capexTotalKeuro + metrics.financingFeesKeuro);
     expectClose(capexTotalEuro, 3_401_358.93, 1, "① CAPEX total (capex+fees)");
 
-    // ② Dette sculptée (binding DSCR, gearing 93,86% < cap 95) & equity/SHL = solde
+    // ② Dette sculptée (binding DSCR, gearing 92,03% < cap 95) & equity/SHL = solde.
+    // ⚠️ Item 8 Phase 2 : le CFADS de dimensionnement est net de l'IS du cas P90. Digoin ayant un
+    // gearing élevé (≈92 %, petit CCA → SHL éteint tôt, plus de bouclier), il est TAXÉ dès l'an20
+    // (isP90 an20 ≈ 23,8 k€, an21 ≈ 32,6 k€) — cohérent avec le cluster taxé du BP (Villognon 92 %,
+    // Salbris 90,6 %, Ychoux 95 %, tous taxés dans leur feuille C_P90). La dette baisse donc de
+    // 3 192,5 → 3 130,4 k€ (méthode BP-correcte) ; les ex-valeurs verrouillaient la méthode pré-item-8
+    // (aucun IS de sizing). Le flux actionnaire an1 (P50) reste INCHANGÉ (63 832,15 €).
     const dette = metrics.sizing?.debtRetenuKeuro ?? 0;
     const gearing = (metrics.sizing?.gearingActuel ?? 0) * 100;
-    expectClose(eur(dette), 3_192_493.19, 100, "② dette sculptée");
-    expectClose(gearing, 93.86, 0.02, "② gearing %");
+    expectClose(eur(dette), 3_130_420.00, 100, "② dette sculptée");
+    expectClose(gearing, 92.03, 0.02, "② gearing %");
     expect(metrics.sizing?.bindingConstraint, "② binding = dscr (pas gearing-capped)").toBe(
       "dscr",
     );
-    expectClose(capexTotalEuro - eur(dette), 208_865.74, 100, "② equity/SHL");
+    expectClose(capexTotalEuro - eur(dette), 270_939.11, 100, "② equity/SHL");
 
     // ③ Production (P50 an1 = 4 950 · P90 = 4 603,5) — exact
     expectClose(at(1).productionP50Mwh, 4_950, 0.01, "③ prod P50 an1");
@@ -186,20 +192,22 @@ describe("calibration Digoin — SAISIE PURE, chaîne calée à l'euro (base fon
     expectClose(eur(taxes.tfAnnuelleKeuro), 1_598.86, 1, "TF an1");
     expectClose(eur(taxes.cfeAnnuelleKeuro), 1_243.61, 1, "CFE an1");
 
-    // Service dette an1 = 241 118,96 = principal 107 034,25 + intérêts 134 084,71.
+    // Service dette an1 = 241 118,95 = principal 109 641,52 + intérêts 131 477,43. Le service an1
+    // est INCHANGÉ (DSCR × CFADS P90 an1, IS_P90 an1 = 0) ; seule la ventilation intérêts/principal
+    // bouge car la dette totale a baissé (item 8 : intérêt an1 = dette × 4,2 %).
     // ⚠️ row.interets = intérêts DETTE + intérêts SHL ; l'intérêt dette pur = interets − ccaInterets.
     const ds = at(1).debtServiceSculptedKeuro ?? at(1).debtServiceKeuro;
     const debtInterest = at(1).interets - at(1).ccaInteretsKeuro;
-    expectClose(eur(ds), 241_118.96, 1, "service dette an1");
-    expectClose(eur(debtInterest), 134_084.71, 1, "intérêts dette an1");
-    expectClose(eur(ds - debtInterest), 107_034.25, 1, "principal dette an1");
+    expectClose(eur(ds), 241_118.95, 1, "service dette an1");
+    expectClose(eur(debtInterest), 131_477.43, 1, "intérêts dette an1");
+    expectClose(eur(ds - debtInterest), 109_641.52, 1, "principal dette an1");
 
-    // ④ Flux actionnaire an1 (FCF after debt service) = 63 832,15 € — exact
+    // ④ Flux actionnaire an1 (FCF after debt service) = 63 832,15 € — exact (inchangé item 8)
     expectClose(eur(at(1).fluxActionnaire), 63_832.15, 1, "④ flux actionnaire an1");
 
-    // ④ TRI investisseur = 23,89 % (mise 208 866, fort levier). MF 23,92 %, Δ 0,03pp = résiduel
-    // démantèlement an25-29 (G7) non modélisé (identique au résiduel Sigoulès, cf CALIBRATION.md).
-    expectClose(metrics.investorIrr, 23.89, 0.05, "④ TRI investisseur");
+    // ④ TRI investisseur = 19,24 % (mise 270 939 relevée par l'IS de sizing item 8, fort levier).
+    // Résiduel démantèlement an25-29 (G7) non modélisé (identique au résiduel Sigoulès, cf CALIBRATION.md).
+    expectClose(metrics.investorIrr, 19.24, 0.05, "④ TRI investisseur");
   });
 });
 
@@ -225,7 +233,7 @@ describe("calibration Digoin — DIAGNOSTIC des gaps génériques restants (cand
     const input = digoinInput("override");
     const metrics = calculateScenarioMetrics(input);
     console.log("\n=== GAP B — TRI projet & VAN (réintégrations D/E/F + démantèlement) ===");
-    console.log(`  TRI investisseur  MF ${metrics.investorIrr}%   cible 23,89%   (calé, Δ démant. G7)`);
+    console.log(`  TRI investisseur  MF ${metrics.investorIrr}%   cible 19,24%   (item 8 : CFADS sizing net d'IS P90)`);
     console.log(`  TRI projet (irr)  MF ${metrics.irr}%   cible brut 8,24% / net 6,77%`);
     console.log(`  doubleIRR.irrInvest MF ${metrics.doubleIRR?.irrInvest}%   (projet EBITDA−IS)`);
     console.log(`  npv MF ${metrics.npv} k€ · investorNpv ${metrics.investorNpv} k€ · cible VAN 876,1 / 436,1 k€`);

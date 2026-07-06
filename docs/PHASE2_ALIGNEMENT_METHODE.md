@@ -5,18 +5,31 @@
 > le BP **ligne à ligne, année par année**, sur les 25 projets — ce qui calera aussi la VAN
 > brute à l'euro et les 3 derniers rouges (Golf de Baugé, Selles-sur-Cher 1, Villognon).
 >
-> **AVANCEMENT 2026-07-06 — 23/25 calés.** Items **5** (engagements = série appliquée BP r199,
-> commit `c58153a`) et **4** (TF/CFE = série appliquée BP r191/r192, commit `d0c2655`) faits :
-> engagements et taxes désormais **ligne-à-ligne exacts** sur les 25 projets. Selles-sur-Cher 1
-> et Salbris (regressé transitoirement par l'item 5, cf § compensation) sont repassés VERTS.
-> **Restent 2 rouges — tous deux pilotés par l'item 8** (queue merchant P90 du dimensionnement) :
-> • **Villognon** dette +1,76 % (14,5 k€/MW) : CFADS P90 exact an1-19 puis +9,6 % an20 → +32 % an24.
-> • **Golf de Baugé** TRI inv +0,84 pp : dette +0,88 % (sous seuil) mais amplifiée sur l'équity
->   (CCA −7,8 %) car gearing élevé. Le sur-dimensionnement vient aussi de la queue merchant P90.
-> Diagnostic item 8 chiffré : prix de dimensionnement merchant BP an21 ≈ 62 €/MWh vs MF ≈ 71
-> (blend 0,7 central + 0,3 low trop haut ; le BP pondère bien plus la courbe Low en queue).
-> ⚠️ Logique P90 PARTAGÉE (« calée sur Sigoulès ») → ne toucher qu'en mesurant les 25 (risque
-> sur les 23 verts). N'affecte que les projets à ténor > 20 ans (dette en années merchant).
+> **AVANCEMENT 2026-07-06 — 23/25 calés, item 8 FAIT.** Items **5** (engagements, commit `c58153a`),
+> **4** (TF/CFE, commit `d0c2655`) et **8** (CFADS de dimensionnement net de l'IS P90) faits.
+>
+> **Item 8 — RECLASSÉ : le driver N'EST PAS le blend merchant, c'est l'IS déduit du CFADS de
+> sizing.** Le blend 0,7 central / 0,3 low est EXACT (prix MF = prix BP au centime, hypothèse
+> « Low pur en queue » RÉFUTÉE). Le vrai mécanisme BP (vérifié à l'euro sur data/<N>.xlsm :
+> C_P90 r260 = r226 EBITDA + r244 IS = C_Financing r80/r84) : `CFADS_sizing(y) = EBITDA_P90(y) −
+> IS_P90(y)`, `IS_P90 = 25% × max(0, min(EBT_P90, cumEBT_P90))`, report déficitaire intégral.
+> EBT_P90 = EBITDA_P90 − D&A − intérêts dette sizée − **intérêts SHL du cas P90** (waterfall dédié,
+> capitalisés/croissants) − DSRF − agent fee. Câblé dans `applyWaterfall` (P&L P90 + cascade SHL P90)
+> et `resolveCfadsSizingKeuro` ; point fixe IS↔dette dans la boucle de sizing (convergence **2-7
+> itérations** selon le projet). **Résultat :**
+> • **Villognon** ROUGE→VERT : IS_P90 calé à **±1 €** vs BP (an20-24), dette 16 157 = BP (0,00 %).
+> • **Golf de Baugé** ROUGE→VERT : dette −0,3 %, TRI inv Δ−0,18 pp.
+> • Les 8 projets « verts » à SHL couvrant restent à IS_P90 = 0 (cumEBT P90 négatif tout le ténor).
+>
+> **Restent 2 rouges — NOUVEAUX, pilotés par l'item 7 (D&A), pas par l'item 8** (cas de compensation
+> classique : l'item 8 a retiré l'erreur « pas d'IS de sizing » qui masquait l'écart D&A) :
+> • **Ychoux** TRI inv Δ−1,80 pp : dette −0,4 % (2,96 k€/MW, DANS le bruit) mais gearing 95 % → équity
+>   à 5 % du CAPEX amplifie tout écart. Cause = **D&A MF −2,6 % vs BP** (359,9 vs 369,6 k€/an) → cumEBT
+>   P90 franchit le seuil un an trop tôt → sur-taxation an17. intérêts SHL = 0 des deux côtés (pur D&A).
+> • **Salbris** TRI inv Δ−1,22 pp : dette −0,4 % (3,3 k€/MW, dans le bruit) ; **D&A MF +1,5 % vs BP** +
+>   SHL P90 remboursé un peu trop lentement. Gearing 90,6 % → même amplification.
+> Ces deux écarts D&A sont l'item 7 exact (« Ychoux = seul où MF < BP ») : latents avant, révélés par
+> l'item 8. La dette RESTE dans le bruit (±0,4 %, < 12 k€/MW) ; seul le TRI (équity fine) casse.
 
 ## Comment travailler (méthode imposée)
 - **Outil de vérité** : `npx tsx scripts/compare_bp_project.ts "<nom>"` (ou `… <N> --full`) —
@@ -117,20 +130,29 @@ où l'écart apparaît (sur les échantillons Fable).
   Comparer C_D&A du projet vs `calculateAnnualCashFlows` amort.
 - **Code** : `engine.ts` D&A (mapping des classes Type1/Type2/NoD&A), coef dégressif.
 
-### 8. Courbe P90 merchant en queue de dette (4/7) ⭐ PROCHAIN — pilote les 2 rouges restants
-> Diagnostic 2026-07-06 : c'est l'unique driver des 2 rouges (Villognon dette, Baugé TRI). Le prix
-> de DIMENSIONNEMENT merchant (C_Financing r80 EBITDA PV, ≠ C_P90 r73 qui reste au tarif P50) chute
-> fort dès an21 côté BP (Villognon an21 ≈ 62 €/MWh) mais MF applique 0,7 central + 0,3 low ≈ 71.
-> Le blend MF sur-évalue la queue → CFADS P90 an20-24 trop haut → dette sur-dimensionnée. NB : la
-> baisse commence à an20 (transition), et n'affecte que les ténors > 20 ans. Piste : lire/derive le
-> vrai blend BP (semble ~Low pur en queue) — mesurer sur les 25 (surtout ténor>20 : Villognon,
-> Baugé, Orval, Langon, Montcuq 3, Selles, Villeherviers, Salbris). NE PAS casser Sigoulès (calé).
-- **Symptôme** : CFADS P90 des années merchant (an21-24) trop haute chez MF (+6 à +34 % — Ychoux
-  +34 % an24, dette éteinte 1 an trop tôt). Ratio P90/P50 merchant : MF ≈ 0,75 vs BP ≈ 0,58 sur
-  certains projets. Calé uniquement sur Sigoulès.
-- **BP** : blend 70 % Central / 30 % Low sur la courbe merchant en P90 ; vérifier que MF applique
-  le bon blend et le bon ratio prod P90 en années merchant.
-- **Code** : `engine.ts` P90 sizing merchant (debtSizingCentralW/LowW, prix merchant P90).
+### 8. CFADS de dimensionnement net de l'IS P90 ✅ FAIT — driver reclassé (blend merchant DISCULPÉ)
+> **Le blend merchant n'était PAS le driver** (hypothèse « Low pur en queue » réfutée : prix de
+> sizing MF = prix BP au centime, blend 0,7/0,3 exact). Le VRAI driver = le BP dimensionne la dette
+> sur un CFADS **net de l'IS du cas P90** : `CFADS_sizing(y) = EBITDA_P90(y) − IS_P90(y)` avec
+> `IS_P90 = 25% × max(0, min(EBT_P90, cumEBT_P90))` (report déficitaire intégral). Vérifié à l'euro
+> sur data/<N>.xlsm (C_P90 r260 = r226 + r244 = C_Financing r80/r84) pour les 25.
+> - **EBT_P90** = EBITDA_P90 − D&A − intérêts dette sizée − **intérêts SHL du cas P90** − DSRF −
+>   agent fee. Le SHL P90 a un waterfall PROPRE (≠ série P50) : servi par le cash P90 résiduel après
+>   dette, capitalisé quand le cash manque. Gearing élevé (peu de CCA) → SHL éteint tôt → intérêts →
+>   0 → EBT P90 taxable (Villognon/Salbris/Ychoux). Gearing faible → SHL grossit → cumEBT P90 négatif
+>   tout le ténor → IS de sizing = 0 (Sigoulès/Orval/Langon/Montcuq 3/Selles/Villeherviers ×3).
+> - **Circularité IS ↔ intérêts dette sizée ↔ dette** : résolue par point fixe dans la boucle de
+>   sizing (`sizingWithFacturableMargin`, refeed du SHL P90 = capex − dette courante), 2-7 itérations.
+> - **Code** : `applyWaterfall` (P&L P90 : `intSHLP90`, `isP90`, cascade SHL P90 ; nouveaux champs
+>   `isP90Keuro`/`intSHLP90Keuro`/`shlP90OutstandingKeuro`), `resolveCfadsSizingKeuro` (= cfadsP90 −
+>   isP90), boucle de sizing (param `ccaP90PrincipalKeuro`). `taxeFinaleSizingKeuro` (ancien proxy
+>   « 15,129 à l'an24 » figé) DÉPRÉCIÉ dans le sizing. Rétrocompat : `tauxIS` null → isP90 = 0 → inchangé.
+> - **Validation** : Villognon IS_P90 = ±1 € vs BP (an20-24), dette 0,00 % ; Baugé dette −0,3 % ;
+>   Sigoulès/Orval/Selles inchangés (IS_P90 = 0). Bancs `calibration_sigoules`/`bauge`/`digoin`
+>   verts (Digoin — anchor gearing 92 % — mis à jour vers la dette BP-correcte 3 130,4 k€).
+> - **RESTE l'item 7 (D&A)** : Ychoux/Salbris passent ROUGES sur le TRI (dette dans le bruit) car
+>   leur écart D&A, jusqu'ici masqué par « pas d'IS de sizing », décale d'un an le franchissement du
+>   seuil cumEBT P90. Compensation classique → faire l'item 7 pour atteindre 25/25.
 
 ### 9. Timing IS / report déficitaire (7/7) — À FAIRE APRÈS 1-8
 - **Symptôme** : déficit fiscal cumulé diverge dès an1 (−9 à −25 %, car OPEX an1 MF ≠ BP) puis
@@ -153,28 +175,31 @@ où l'écart apparaît (sur les échantillons Fable).
   service (déjà calé). Le waterfall SHL affecte surtout l'AFFICHAGE et la VAN equity — vérifier
   que corriger le SHL ne casse pas le TRI investisseur déjà calé.
 
-## Les 3 rouges de départ — état 2026-07-06
-- **Selles-sur-Cher 1** : ✅ VERT. Base TF/CFE (−68 %/−77 %) résolue par l'item 4 (méthode comptable
-  routée), + engagements item 5. Dette −0,2 %, TF/CFE +0,00 % ligne-à-ligne.
-- **Golf de Baugé** : 🔴 TRI inv +0,84 pp. Engagements (item 5) + TF/CFE (item 4) faits ; reste la
-  queue merchant P90 (item 8) qui sur-dimensionne la dette de 0,88 % → CCA/équity → TRI.
-- **Villognon** : 🔴 dette +1,76 % (14,5 k€/MW). TF/CFE (item 4) + engagements (item 5) faits ;
-  reste **exclusivement** la queue merchant P90 (item 8, CFADS an20-24 +9→+32 %).
-- *(bonus)* **Salbris** : regressé par l'item 5 (compensation) puis re-VERT par l'item 4.
+## Les rouges — état 2026-07-06 (après item 8)
+- **Selles-sur-Cher 1** : ✅ VERT (items 4 + 5). Dette −0,2 %, TF/CFE ligne-à-ligne.
+- **Golf de Baugé** : ✅ VERT (item 8). Dette −0,3 %, TRI inv Δ−0,18 pp. Le sur-dimensionnement
+  venait de l'absence d'IS de sizing, pas de la queue merchant (blend disculpé).
+- **Villognon** : ✅ VERT (item 8). IS_P90 calé ±1 € vs BP an20-24, dette 16 157 = BP (0,00 %).
+- **Ychoux** : 🔴 NOUVEAU. TRI inv Δ−1,80 pp (dette −0,4 %, dans le bruit). Driver = **item 7 (D&A
+  MF −2,6 %)** amplifié par le gearing 95 %. intérêts SHL = 0 des deux côtés → pur D&A.
+- **Salbris** : 🔴 NOUVEAU. TRI inv Δ−1,22 pp (dette −0,4 %). Driver = **item 7 (D&A MF +1,5 %)** +
+  SHL P90 remboursé un peu lentement. Gearing 90,6 %.
 
 ## Estimation
 ≈ 3-6 h de travail en arrière-plan, ~8-12 itérations moteur. Items 1-6 rapides (~1,5-2,5 h),
 7-8 (~45 min), 9-10 (cascade IS/SHL) = la partie incertaine, plusieurs passes (~1-2,5 h).
 Committer à chaque correction (progrès banké).
 
-## Reprendre (au 2026-07-06 — 23/25)
+## Reprendre (au 2026-07-06 — 23/25, item 8 fait)
 0. Pipeline de mesure après TOUTE modif d'extraction/moteur (l'ordre compte) :
    `npx tsx scripts/read_bp_matrix.ts` (régénère data/cibles/) → `DATABASE_URL="file:./prisma/dev.db"
    npx tsx scripts/seed_bp_reel.ts` (réécrit la DB) → `npx tsx scripts/calibrate_all.ts` (compteur).
    ⚠️ calibrate_all lit data/cibles/*.json ; le comparateur lit la DB (Prisma). Régénérer LES DEUX.
    Après un changement de schéma Prisma : `npx prisma generate` (explicite) avant de re-seed/build.
-1. `npx tsx scripts/calibrate_all.ts` → 23/25 (rouges : Villognon dette, Baugé TRI).
-2. `npx tsx scripts/compare_bp_project.ts "Villognon" --full` → CFADS P90 exact an1-19, diverge an20+.
-3. **Attaquer l'item 8** (queue merchant P90, cf § item 8 pour le diagnostic chiffré) : c'est le seul
-   driver des 2 rouges. Mesurer sur les 25 (surtout ténor>20). Puis items 9 (IS) et 10 (SHL waterfall
-   — pilote les TOP divergences résiduelles CCA/dividendes). Commit à chaque correction.
+1. `npx tsx scripts/calibrate_all.ts` → 23/25 (rouges : **Ychoux** TRI, **Salbris** TRI — tous deux
+   D&A/item 7 amplifié par gearing ≥90 %, dette dans le bruit). Villognon + Baugé désormais VERTS.
+2. **Attaquer l'item 7 (D&A)** : c'est le driver des 2 rouges restants (compensation révélée par
+   l'item 8). Comparer `calculateAnnualCashFlows(...).amort` (P90 = P50) à C_D&A/C_P90 r228 par projet :
+   Ychoux D&A MF −2,6 %, Salbris +1,5 % — base amortissable (split Type1/Type2, contingency) par site.
+   Cibler le franchissement du seuil cumEBT P90 à la BONNE année (Ychoux an17, Salbris an20).
+3. Puis items 9 (timing IS P50) et 10 (waterfall SHL P50 — affichage/VAN). Commit à chaque correction.
