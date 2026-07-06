@@ -113,7 +113,7 @@ export function buildBpModel(project: BpProjectFields, scenario: Scenario): BpMo
         row.revenueP50Keuro,
         row.productionP50Mwh,
         capex.capexTotalKeuro,
-        undefined,
+        row.revenueP50PvKeuro,
         row.year === 1 ? undefined : aleasBaseAn1,
       ),
     );
@@ -306,7 +306,6 @@ export function buildBpModel(project: BpProjectFields, scenario: Scenario): BpMo
   // Champs du BP présents dans la spec mais non exposés au grain annuel par le moteur.
   const gaps: string[] = [
     "Revenus P50 : split PPA / merchant / capacité / GO non exposé par AnnualCashFlow (seul le total revenueP50Keuro l'est) — ligne « Revenus P50 (total) » agrégée.",
-    "Assurance (OPEX P50) re-dérivée sur le revenu total ; le moteur l'assoit sur le revenu PV (hors capacité/GO), non exposé → léger écart possible les années à capacité/GO.",
     "Démantèlement (BP §1.7, 24 k€/an an25-29) : non modélisé par le moteur, donc absent du modèle.",
   ];
 

@@ -242,6 +242,9 @@ export type AnnualCashFlow = {
   productionP50Mwh: number;
   productionP90Mwh: number;
   revenueP50Keuro: number;
+  // Revenu énergie PV PUR (hors certificat capacité / GO) — assiette de l'assurance (item 3).
+  // Champ ADDITIF d'exposition : déjà calculé par le moteur (revenueP50), simplement forwardé.
+  revenueP50PvKeuro: number;
   revenueP90Keuro: number;
   opexKeuro: number;
   cashFlowKeuro: number;
@@ -368,6 +371,8 @@ type PreRow = {
   productionP50Mwh: number;
   productionP90Mwh: number;
   revenueP50Keuro: number;
+  // Revenu énergie PV pur (hors capacité/GO) — assiette assurance, forwardé vers AnnualCashFlow.
+  revenueP50PvKeuro: number;
   revenueP90Keuro: number;
   opexKeuro: number;
   cashFlowKeuro: number;
@@ -1771,6 +1776,7 @@ function buildPreRows(
       productionP50Mwh: productionP50,
       productionP90Mwh: productionP90,
       revenueP50Keuro: revenueP50Total,
+      revenueP50PvKeuro: revenueP50,
       revenueP90Keuro: revenueP90,
       opexKeuro: annualOpex,
       cashFlowKeuro: cfadsP50,
@@ -1940,6 +1946,7 @@ function applyWaterfall(
       productionP50Mwh: pre.productionP50Mwh,
       productionP90Mwh: pre.productionP90Mwh,
       revenueP50Keuro: pre.revenueP50Keuro,
+      revenueP50PvKeuro: pre.revenueP50PvKeuro,
       revenueP90Keuro: pre.revenueP90Keuro,
       opexKeuro: pre.opexKeuro,
       cashFlowKeuro: pre.cashFlowKeuro,
@@ -2003,6 +2010,7 @@ function zeroAnnualCashFlow(year: number): AnnualCashFlow {
     productionP50Mwh: 0,
     productionP90Mwh: 0,
     revenueP50Keuro: 0,
+    revenueP50PvKeuro: 0,
     revenueP90Keuro: 0,
     opexKeuro: 0,
     cashFlowKeuro: 0,
