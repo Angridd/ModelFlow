@@ -182,6 +182,6 @@
     "MRA r256=21200 aberrante (>100 €/kWc) → ignorée (BP applique 0)",
     "Achat de terrain 545970 € replié dans indemnités (financé, non amorti)",
     "Démantèlement 46900 € an25-30 non modélisé (flux surestimés)",
-    "Engagements Inp_Opération remplacés par le BP single-project (≈0 opérationnel, saisie pure)"
+    "Engagements = BP single-project C_P50 r199 (série appliquée, indexée 2%/an)"
   ]
 }

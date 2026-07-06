@@ -114,43 +114,7 @@
     "batimentsFonciersKeuro": 0,
     "modRetraitementKeuro": 547.8000000000001,
     "valeurTerrainKeuro": 78.46300000000001,
-    "opexEngagementsKeuroByYear": [
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
+    "opexEngagementsKeuroByYear": [],
     "margeFactFigeeKeuro": null
   },
   "dscrSchedule": [
@@ -180,6 +144,8 @@
     "equityRequiredKeuro": 1824.5243458916502
   },
   "flags": [
-    "Démantèlement 49800 € an25-30 non modélisé (flux surestimés)"
+    "Démantèlement 49800 € an25-30 non modélisé (flux surestimés)",
+    "Engagements = BP single-project C_P50 r199 (série appliquée, indexée 2%/an)",
+    "Aucun engagement (série vide → OPEX inchangé)"
   ]
 }

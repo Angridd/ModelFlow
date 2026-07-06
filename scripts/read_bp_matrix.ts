@@ -447,22 +447,21 @@ export function buildProject(
   // OPEX « engagements » an-par-an (k€, an1..anN) — routé ADDITIVEMENT SANS ré-indexation dans
   // engine.buildPreRows. Persisté via la colonne Scenario.opexEngagementsKeuroByYear (String? JSON)
   // et saisissable au formulaire (grille an-par-an). Absent → [] → inchangé.
-  // Source = Inp_Opération (hors remboursement loyer / Foncier, cf buildEngagementsBySlug). GARDE-FOU
-  // ground truth : si le BP single-project (data/N.xlsm r199) n'applique quasiment AUCUN engagement
-  // sur la fenêtre de dimensionnement (20 ans) alors qu'Inp_Opération en liste, on adopte la série
-  // du BP (fidèle). Seul Digoin est concerné : « saisie pure » → r199 ≈ 0 (hors provision an34)
-  // vs portefeuille 36 k€/an d'Environnement. Les autres (r199 opérationnel non nul) sont inchangés.
-  let opexEngagementsKeuroByYear = engagementsBySlug?.get(slugify(name)) ?? [];
-  const sizingSum = (s: number[]) => s.slice(0, 20).reduce((a, b) => a + Math.abs(b), 0);
-  if (
-    groundTruth &&
-    sizingSum(groundTruth.engagements) < 1 &&
-    sizingSum(opexEngagementsKeuroByYear) > 5
-  ) {
-    flags.push(
-      "Engagements Inp_Opération remplacés par le BP single-project (≈0 opérationnel, saisie pure)",
-    );
+  //
+  // SOURCE (Phase 2, item 5) : la série RÉELLEMENT APPLIQUÉE par le BP est C_P50 r199 du single-
+  // project (data/N.xlsm), DÉJÀ indexée ~2 %/an (provisions comprises). Le portefeuille Inp_Opération
+  // (buildEngagementsBySlug) porte, lui, une série NON indexée (an1 identique mais plate ensuite) qui
+  // sous-charge l'OPEX de ~15-18 % sur les 20 ans de dimensionnement → CFADS P90 gonflé → dette
+  // sur-dimensionnée (cause des rouges Baugé/Villognon/Selles). On adopte donc le ground truth r199
+  // DÈS QU'UN data/N.xlsm existe (série exacte, provisions incluses) ; repli sur Inp_Opération pour
+  // les projets sans single-project. Digoin (« saisie pure » : r199 ≈ 0 sauf provision an34) est
+  // couvert naturellement — son r199 exact remplace les 36 k€/an d'Environnement du portefeuille.
+  let opexEngagementsKeuroByYear: number[];
+  if (groundTruth) {
     opexEngagementsKeuroByYear = groundTruth.engagements;
+    flags.push("Engagements = BP single-project C_P50 r199 (série appliquée, indexée 2%/an)");
+  } else {
+    opexEngagementsKeuroByYear = engagementsBySlug?.get(slugify(name)) ?? [];
   }
   if (opexEngagementsKeuroByYear.length === 0) {
     flags.push("Aucun engagement (série vide → OPEX inchangé)");
