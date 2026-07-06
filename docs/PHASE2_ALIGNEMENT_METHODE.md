@@ -5,11 +5,15 @@
 > le BP **ligne à ligne, année par année**, sur les 25 projets — ce qui calera aussi la VAN
 > brute à l'euro et les 3 derniers rouges (Golf de Baugé, Selles-sur-Cher 1, Villognon).
 >
-> **AVANCEMENT 2026-07-06 — 23/25 calés, items 4/5/7/8 FAITS.** Items **5** (engagements, commit
-> `c58153a`), **4** (TF/CFE, commit `d0c2655`), **8** (CFADS de dimensionnement net de l'IS P90,
-> commit `6c33c89`) et **7** (D&A : apport affaire hors base, marge facturable amortie — dotation
-> ligne-à-ligne ✓ sur les 25, cf § item 7) faits. Ychoux/Salbris restent ROUGES TRI mais par
-> d'AUTRES items (9/10/6/2) — leur D&A est désormais exact.
+> **AVANCEMENT 2026-07-06 (soir) — 24/25 calés, items 2/3/4/5/6/7/8 FAITS.** Items **5**
+> (engagements, commit `c58153a`), **4** (TF/CFE, commit `d0c2655`), **8** (CFADS de
+> dimensionnement net de l'IS P90, commit `6c33c89`), **7** (D&A — dotation ligne-à-ligne ✓ sur
+> les 25), **3** (assurance — bug d'AFFICHAGE bpModel uniquement, moteur déjà juste, commit
+> `58fd8f7`), **2** (démantèlement an25-29, commit `b53e163`) et **6** (MRA en paliers, commit
+> `674dee5`) faits. **MRA + Démantèlement + Total OPEX = 0,00 % ligne-à-ligne sur LES 25.**
+> **Ychoux ROUGE→VERT** (item 6 : TRI inv Δ−0,83 → −0,19 pp). Reste **Salbris** (Δ−1,22 pp :
+> timing IS item 9 + CAPEX +0,59 % pré-existant). La compensation redoutée sur Baugé/Selles n'a
+> PAS eu lieu (Baugé Δ−0,18 → −0,08 pp, Selles inchangé — tous deux VERTS).
 >
 > **Item 8 — RECLASSÉ : le driver N'EST PAS le blend merchant, c'est l'IS déduit du CFADS de
 > sizing.** Le blend 0,7 central / 0,3 low est EXACT (prix MF = prix BP au centime, hypothèse
@@ -68,14 +72,31 @@ où l'écart apparaît (sur les échantillons Fable).
   `curveIndexAn1` dans read_bp_matrix (formule `1.10245×1.02^(mes-2029)`), `merchantCurves.ts`.
 - **Attention** : logique PARTAGÉE → mesurer l'effet sur Sigoulès/Baugé (MES 2028/2029).
 
-### 2. Démantèlement an25-29 (7/7) — poste OPEX manquant (G7)
+### 2. Démantèlement an25-29 (7/7) — poste OPEX manquant (G7) ✅ FAIT (commit b53e163)
+> La série RÉELLEMENT APPLIQUÉE est **C_P50/C_P90 r195** : constante an25-29, NON indexée
+> (= Inp_Assumption r294 TOTAL €, étalé sur 5 ans — ex. Ychoux 131 700 € → 26,34 k€/an ; ⚠️ le
+> diagnostic initial confondait total et annuel). Routée comme TF/CFE : colonne
+> `Scenario.demantelementKeuroByYear` (String? JSON, migration `add_demantelement`), poste
+> `demantelementKeuro` dans `calculateOpexDetails` (P50) + somme P90 (r195 présent dans C_P90
+> aussi ; sans effet sizing, an25-29 > ténor). Ligne « Démantèlement » ajoutée à bpModel +
+> compare_bp_project. **Démantèlement 0,00 % ligne-à-ligne ; Total OPEX an25-29 −4 % → ~−0,45 %
+> (résidu = MRA, item 6) ; Sigoulès Total OPEX 0,00 % sur les 35 ans.** Compteur stable.
+
 - **Symptôme** : Total OPEX MF −4 à −8 % sur an25-29 → EBITDA/CFADS P50 gonflés +4 à +7,7 %.
 - **BP** : 24-40 k€/an (≈ 10 000 €/MWc) sur an25-29, non indexé (SPEC_BP_SIGOULES §1.7).
 - **Code** : nouvel input optionnel (ex. `demantelementKeuroTotal` ou €/MWc) routé dans l'OPEX
   des années 25-29 seulement. Lire la valeur par projet (Inp_Opération / Inp_Assumption).
 - Anchor-safe (input optionnel null-default). Impacte TRI projet + VAN.
 
-### 3. Assurance (7/7) — assiette + indexation
+### 3. Assurance (7/7) — assiette + indexation ✅ FAIT (commit 58fd8f7 — display-only)
+> **Le moteur était DÉJÀ juste** (assiette = revenu PV pur, ×1,02^(y−1)). Le faux écart venait du
+> COMPARATEUR : `bpModel.ts` rappelait `calculateOpexDetails` avec `undefined` en 6e argument
+> (`revenueP50PvKeuro`) → fallback sur le revenu TOTAL (capacité+GO) → lignes « Assurance » ET
+> « Engagements » (dérivée par différence) faussées à l'affichage les années à capacité/GO.
+> Fix : champ ADDITIF `revenueP50PvKeuro` (PreRow → AnnualCashFlow, simple forward de la valeur
+> déjà calculée) passé par bpModel. ZÉRO changement de calcul moteur : dette/TRI/VAN strictement
+> inchangés, compteur inchangé. Assurance + Engagements → 0,00 % ligne-à-ligne (Baugé, Sigoulès).
+
 - **Symptôme** : MF > BP, +0,8 % an1 dérivant à +6-7 % an35.
 - **BP** : `1,5 % × RevenuesPV_énergie(y) × 1,02^(y−1)` — assiette = revenu PV PUR (hors
   capacité/GO), avec facteur ×(1+inflation). Cf SPEC §2.4 (le facteur inflation EST dans le BP).
@@ -117,7 +138,17 @@ où l'écart apparaît (sur les échantillons Fable).
   l'indexation 2 %. ⚠️ Phase 1 a montré qu'indexer NAÏVEMENT partout régresse Salbris → lire la
   vraie série par projet est plus sûr.
 
-### 6. MRA — calendrier en paliers (5/7)
+### 6. MRA — calendrier en paliers (5/7) ✅ FAIT (commit 674dee5)
+> Série RÉELLEMENT APPLIQUÉE **C_P50 r189** (déjà indexée 2 %/an, flag exploitation inclus)
+> routée comme TF/CFE : colonne `Scenario.mraKeuroByYear` (String? JSON, migration
+> `add_mra_series`), override au calcul MRA (`mraKeuroByYear[y-1] ?? formule scalaire plate`),
+> `hasDetailedOpexInput` étendu ; le P90/sizing suit via `opexDetailsP50.mraKeuro`.
+> Mur-de-Sologne (r189 = plat) et MRA nulles → strictement inchangés. **MRA + Total OPEX
+> 0,00 % ligne-à-ligne sur LES 25. Compteur 23→24/25 : Ychoux ROUGE→VERT** (Δ−0,83 → −0,19 pp,
+> l'écart de timing d'impôt attendu ne s'est PAS matérialisé en rouge). Salbris −1,35 → −1,22 pp
+> (reste ROUGE : timing IS item 9 + CAPEX +0,59 %). Baugé Δ−0,18 → −0,08 pp (pas de régression
+> par compensation). Tests calibration verts SANS modification (les ancres ne routent pas la série).
+
 - **Symptôme** : BP en paliers de remplacement (an1-4 à ~50 % du niveau, sauts an5/an9/an12/an19) ;
   MF applique un niveau plat indexé. Signature récurrente : +97 % an1-4, puis +7,5 %/−26 %/−9 %.
 - **BP** : profil de renouvellement onduleurs (garantie constructeur) — une courbe MRA par année,
@@ -196,33 +227,33 @@ où l'écart apparaît (sur les échantillons Fable).
   service (déjà calé). Le waterfall SHL affecte surtout l'AFFICHAGE et la VAN equity — vérifier
   que corriger le SHL ne casse pas le TRI investisseur déjà calé.
 
-## Les rouges — état 2026-07-06 (après item 8)
-- **Selles-sur-Cher 1** : ✅ VERT (items 4 + 5). Dette −0,2 %, TF/CFE ligne-à-ligne.
-- **Golf de Baugé** : ✅ VERT (item 8). Dette −0,3 %, TRI inv Δ−0,18 pp. Le sur-dimensionnement
-  venait de l'absence d'IS de sizing, pas de la queue merchant (blend disculpé).
-- **Villognon** : ✅ VERT (item 8). IS_P90 calé ±1 € vs BP an20-24, dette 16 157 = BP (0,00 %).
-- **Ychoux** : 🔴 NOUVEAU. TRI inv Δ−1,80 pp (dette −0,4 %, dans le bruit). Driver = **item 7 (D&A
-  MF −2,6 %)** amplifié par le gearing 95 %. intérêts SHL = 0 des deux côtés → pur D&A.
-- **Salbris** : 🔴 NOUVEAU. TRI inv Δ−1,22 pp (dette −0,4 %). Driver = **item 7 (D&A MF +1,5 %)** +
-  SHL P90 remboursé un peu lentement. Gearing 90,6 %.
+## Les rouges — état 2026-07-06 soir (après items 2/3/6) : 24/25
+- **Selles-sur-Cher 1** : ✅ VERT (items 4 + 5). Dette 0,0 %, TF/CFE ligne-à-ligne. La régression
+  par compensation redoutée avec l'item 6 n'a PAS eu lieu.
+- **Golf de Baugé** : ✅ VERT (item 8, consolidé par 6). Dette −0,2 %, TRI inv Δ−0,08 pp.
+- **Villognon** : ✅ VERT (item 8). Dette −0,1 %, TRI inv Δ−0,17 pp.
+- **Ychoux** : ✅ VERT (item 6). TRI inv Δ−0,83 → **−0,19 pp**, dette −0,0 %. La MRA en paliers
+  était le driver résiduel ; le timing d'impôt n'a finalement pas dégradé le TRI (pas besoin de
+  l'item 9 pour le caler).
+- **Salbris** : 🔴 SEUL ROUGE. TRI inv Δ−1,22 pp (dette −0,4 %, gearing 90,6 % → équity fine).
+  Drivers restants : **timing IS P50 (item 9)**, SHL/CCA (item 10) et **CAPEX +0,59 %
+  pré-existant** à creuser. MRA/TF/CFE/engagements/démantèlement/D&A désormais exacts chez lui.
 
 ## Estimation
 ≈ 3-6 h de travail en arrière-plan, ~8-12 itérations moteur. Items 1-6 rapides (~1,5-2,5 h),
 7-8 (~45 min), 9-10 (cascade IS/SHL) = la partie incertaine, plusieurs passes (~1-2,5 h).
 Committer à chaque correction (progrès banké).
 
-## Reprendre (au 2026-07-06 — 23/25, items 4/5/7/8 faits)
+## Reprendre (au 2026-07-06 soir — 24/25, items 2/3/4/5/6/7/8 faits)
 0. Pipeline de mesure après TOUTE modif d'extraction/moteur (l'ordre compte) :
    `npx tsx scripts/read_bp_matrix.ts` (régénère data/cibles/) → `DATABASE_URL="file:./prisma/dev.db"
    npx tsx scripts/seed_bp_reel.ts` (réécrit la DB) → `npx tsx scripts/calibrate_all.ts` (compteur).
    ⚠️ calibrate_all lit data/cibles/*.json ; le comparateur lit la DB (Prisma). Régénérer LES DEUX.
    Après un changement de schéma Prisma : `npx prisma generate` (explicite) avant de re-seed/build.
-1. `npx tsx scripts/calibrate_all.ts` → 23/25. Rouges : **Ychoux** TRI Δ−0,83 pp, **Salbris** TRI
-   Δ−1,33 pp — le D&A (item 7) est désormais EXACT chez eux ; le résidu est multi-items, amplifié
-   par gearing ≥90 % (équity fine) : OPEX an1-3 −0,7/−0,8 % (MRA item 6 ?), timing IS P50 dès an1
-   (item 9 — déficit fiscal cumulé an1 : Ychoux BP 384,5 vs MF 361,3), SHL/CCA (item 10 — Salbris
-   CCA +11 %), démantèlement an25-30 (item 2, VAN). Salbris : CAPEX +0,59 % pré-existant à creuser.
-2. **Attaquer l'item 9 (timing IS P50)** puis **10 (waterfall SHL)** — dernières cascades communes ;
-   au passage vérifier l'OPEX an1-3 d'Ychoux/Salbris (balancing/MRA, item 6 ?) via le comparateur.
-3. Items 2 (démantèlement an25-29) et 6 (MRA paliers) pour la VAN/le ligne-à-ligne complet.
-   Commit à chaque correction.
+1. `npx tsx scripts/calibrate_all.ts` → 24/25. Seul rouge : **Salbris** TRI Δ−1,22 pp. Tous les
+   postes OPEX (O&M/MRA/TF/CFE/engagements/démantèlement) + D&A sont désormais EXACTS chez lui —
+   le résidu = timing IS P50 (item 9), SHL/CCA (item 10) et CAPEX +0,59 % pré-existant, amplifiés
+   par le gearing 90,6 % (équity fine).
+2. **Attaquer l'item 9 (timing IS P50)** puis **10 (waterfall SHL)** — dernières cascades communes.
+   Reste aussi l'item 1 (tarif merchant an21+) pour le ligne-à-ligne « Tarif appliqué » (sans
+   effet compteur à ce stade). Commit à chaque correction.
