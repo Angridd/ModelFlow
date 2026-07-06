@@ -145,6 +145,14 @@ export type FinanceEngineInput = FinancialAssumptions & {
   // lumpy et front-loadés → routés ADDITIVEMENT dans opexP50 ET opexP90 SANS ré-indexation
   // (contrairement à diversOpexKeuro). Absent/[] → aucun changement (rétrocompat stricte).
   opexEngagementsKeuroByYear?: number[] | null;
+  // TF / CFE RÉELLEMENT APPLIQUÉES par le BP (C_P50 r191 / r192), en k€ par ANNÉE PROJET (index
+  // 0 = an1), routées par projet (item 4). Priment sur la base calculée par calculateTaxesFoncieres
+  // quand présentes : la MÉTHODE d'assiette du BP (comptable si achat terrain, sinon appréciation
+  // directe) varie par site et n'est pas reconstituable simplement — la série appliquée est le
+  // ground truth exact. Absent/[] → base calculée (rétrocompat stricte). Persistées en base :
+  // colonnes Scenario.tfKeuroByYear / cfeKeuroByYear (String? JSON, comme opexEngagementsKeuroByYear).
+  tfKeuroByYear?: number[] | null;
+  cfeKeuroByYear?: number[] | null;
   // Marge facturable FIGÉE par le BP (feuille Inp_Opération, ligne « Dont Marge facturable »),
   // en k€. Non-null → désactive la boucle endogène `ajusteMargeFacturable` et impose cette valeur
   // (les k€ correspondants sont déjà inclus dans le CAPEX via `indemnitesImmoKeuro`, d'où 0 pour
@@ -983,6 +991,13 @@ export function calculateOpexDetails(
     baseCapexKeuro ?? resolveBaseCapexKeuro(input),
     year,
   );
+  // Item 4 : TF/CFE RÉELLEMENT APPLIQUÉES par le BP (C_P50 r191/r192), routées par projet quand
+  // disponibles. La MÉTHODE d'assiette du BP varie par site (« comptable seule si achat terrain »
+  // — ex. Selles/Villognon — sinon « appréciation directe » — ex. Baugé), avec un facteur ~2,5×
+  // entre les deux ; la série appliquée est le ground truth exact, insensible à ce choix. Absent
+  // (aucun data/N.xlsm) → base calculée par calculateTaxesFoncieres (rétrocompat stricte).
+  const tfKeuro = input.tfKeuroByYear?.[year - 1] ?? taxesLocales.tfKeuro;
+  const cfeKeuro = input.cfeKeuroByYear?.[year - 1] ?? taxesLocales.cfeKeuro;
 
   // Aléas P50 = base an1 FIGÉE × 1.02^(year-1) (fichier c_p50.xlsx exact), pas 0.5% du revenu
   // courant — même mécanique que l'aléas P90 (base an1 figée). an1 : les deux formules
@@ -1000,8 +1015,8 @@ export function calculateOpexDetails(
       assuranceKeuro +
       balancingKeuro +
       iferKeuro +
-      taxesLocales.tfKeuro +
-      taxesLocales.cfeKeuro +
+      tfKeuro +
+      cfeKeuro +
       aleasKeuro;
 
     return {
@@ -1015,8 +1030,8 @@ export function calculateOpexDetails(
       balancingKeuro,
       iferKeuro,
       baseTaxesKeuro: taxesLocales.baseTaxesKeuro,
-      tfKeuro: taxesLocales.tfKeuro,
-      cfeKeuro: taxesLocales.cfeKeuro,
+      tfKeuro,
+      cfeKeuro,
       aleasKeuro,
       opexTotalKeuro,
       opexPerMwKeuro: input.capacityMw > 0 ? opexTotalKeuro / input.capacityMw : 0,
@@ -1059,8 +1074,8 @@ export function calculateOpexDetails(
     assuranceKeuro +
     balancingKeuro +
     iferKeuro +
-    taxesLocales.tfKeuro +
-    taxesLocales.cfeKeuro +
+    tfKeuro +
+    cfeKeuro +
     aleasKeuro;
 
   return {
@@ -1074,8 +1089,8 @@ export function calculateOpexDetails(
     balancingKeuro,
     iferKeuro,
     baseTaxesKeuro: taxesLocales.baseTaxesKeuro,
-    tfKeuro: taxesLocales.tfKeuro,
-    cfeKeuro: taxesLocales.cfeKeuro,
+    tfKeuro,
+    cfeKeuro,
     aleasKeuro,
     opexTotalKeuro,
     opexPerMwKeuro: input.capacityMw > 0 ? opexTotalKeuro / input.capacityMw : 0,

@@ -60,11 +60,16 @@ function buildFinanceInput(
   scenario: NonNullable<Awaited<ReturnType<typeof loadProjects>>>[number]["scenarios"][number],
   opexEngagementsKeuroByYear?: number[],
   margeFactFigeeKeuro?: number | null,
+  tfKeuroByYear?: number[],
+  cfeKeuroByYear?: number[],
 ): FinanceEngineInput {
   return {
     // OPEX engagements (moteur uniquement, non persisté en Scenario) : porté par les cibles
     // (data/cibles/<slug>.json → engineOnly, produit par read_bp_matrix). Absent → inchangé.
     opexEngagementsKeuroByYear,
+    // TF/CFE appliquées (item 4) : idem, portées par engineOnly. Absent → base calculée.
+    tfKeuroByYear,
+    cfeKeuroByYear,
     // Marge facturable figée par le BP (moteur uniquement) : idem, porté par engineOnly.
     // Non-null → désactive la boucle endogène. Absent/null → inchangé.
     margeFactFigeeKeuro,
@@ -185,6 +190,8 @@ type Cibles = {
   flags: string[];
   engineOnly?: {
     opexEngagementsKeuroByYear?: number[] | null;
+    tfKeuroByYear?: number[] | null;
+    cfeKeuroByYear?: number[] | null;
     margeFactFigeeKeuro?: number | null;
   };
 };
@@ -247,6 +254,8 @@ async function main() {
       scenario,
       c.engineOnly?.opexEngagementsKeuroByYear ?? undefined,
       c.engineOnly?.margeFactFigeeKeuro ?? null,
+      c.engineOnly?.tfKeuroByYear ?? undefined,
+      c.engineOnly?.cfeKeuroByYear ?? undefined,
     );
     const m = calculateScenarioMetrics(input);
 

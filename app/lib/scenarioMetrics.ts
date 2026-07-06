@@ -77,6 +77,9 @@ export function buildFinanceInput(
 ): FinanceEngineInput {
   return {
     opexEngagementsKeuroByYear: parseEngagements(scenario.opexEngagementsKeuroByYear),
+    // TF/CFE appliquées (item 4) : mêmes JSON k€ an-par-an que les engagements. null → base calculée.
+    tfKeuroByYear: parseEngagements(scenario.tfKeuroByYear),
+    cfeKeuroByYear: parseEngagements(scenario.cfeKeuroByYear),
     margeFactFigeeKeuro: scenario.margeFactFigeeKeuro,
     capacityMw: project.capacityMw,
     commissioningYear: project.commissioningYear,

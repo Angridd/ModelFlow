@@ -141,7 +141,12 @@ const N_TO_NAME: Record<number, string> = {
   24: "Villeherviers-Les Bruyères", 25: "Villognon", 26: "Ychoux 2 +",
 };
 
-export type BpGroundTruth = { engagements: number[]; appliedTariffAn1: number | null };
+export type BpGroundTruth = {
+  engagements: number[];
+  appliedTariffAn1: number | null;
+  tfKeuroByYear: number[];
+  cfeKeuroByYear: number[];
+};
 
 export function buildGroundTruthBySlug(): Map<string, BpGroundTruth> {
   const map = new Map<string, BpGroundTruth>();
@@ -176,7 +181,26 @@ export function buildGroundTruthBySlug(): Map<string, BpGroundTruth> {
     }
     while (engagements.length && Math.abs(engagements[engagements.length - 1]) < 1e-9) engagements.pop();
 
-    map.set(slugify(name), { engagements, appliedTariffAn1: g(73, an1) });
+    // TF (r191) / CFE (r192) RÉELLEMENT APPLIQUÉES (charge négative → k€ positifs). La méthode
+    // d'assiette du BP varie par site (comptable si achat terrain, sinon appréciation directe) →
+    // on lit la série appliquée directement (item 4). Longueur = durée de vie (35 ans).
+    const readTax = (rowNum: number): number[] => {
+      const s: number[] = [];
+      for (let k = 0; k < ENG_MAX_YEARS; k += 1) {
+        const v = g(rowNum, an1 + k);
+        if (v === null) break;
+        s.push(-v / 1000);
+      }
+      while (s.length && Math.abs(s[s.length - 1]) < 1e-9) s.pop();
+      return s;
+    };
+
+    map.set(slugify(name), {
+      engagements,
+      appliedTariffAn1: g(73, an1),
+      tfKeuroByYear: readTax(191),
+      cfeKeuroByYear: readTax(192),
+    });
   }
   return map;
 }
@@ -467,6 +491,16 @@ export function buildProject(
     flags.push("Aucun engagement (série vide → OPEX inchangé)");
   }
 
+  // TF / CFE RÉELLEMENT APPLIQUÉES par le BP (item 4) : C_P50 r191 / r192 du single-project. La
+  // MÉTHODE d'assiette du BP varie par site (« comptable seule si achat terrain » — Selles/Villognon,
+  // ×~2,5 vs appréciation directe — Baugé) et n'est pas reconstituable simplement depuis 0,017 €/Wc.
+  // On route la série appliquée exacte dès qu'un data/N.xlsm existe ; sinon base calculée (fallback).
+  const tfKeuroByYear = groundTruth?.tfKeuroByYear ?? [];
+  const cfeKeuroByYear = groundTruth?.cfeKeuroByYear ?? [];
+  if (groundTruth && (tfKeuroByYear.length > 0 || cfeKeuroByYear.length > 0)) {
+    flags.push("TF/CFE = BP single-project C_P50 r191/r192 (série appliquée)");
+  }
+
   // Marge facturable figée par le BP (r32 « Dont Marge facturable » € → k€). Les k€ sont déjà
   // inclus dans le CAPEX via indemnitesImmoKeuro → on impose 0 pour ne pas les compter deux fois
   // et désactiver la boucle endogène. r32 ≠ 0 uniquement sur Ychoux → null partout ailleurs
@@ -482,6 +516,8 @@ export function buildProject(
     debtSizingLowW: 0.3,
     ...persistedEngineInputs,
     opexEngagementsKeuroByYear,
+    tfKeuroByYear,
+    cfeKeuroByYear,
     margeFactFigeeKeuro,
   };
 

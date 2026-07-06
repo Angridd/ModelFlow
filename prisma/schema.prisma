@@ -145,6 +145,10 @@ model Scenario {
   // endogène, 0 = figée). Cf scripts/read_bp_matrix.ts (engineOnly) et app/lib/finance/engine.ts.
   opexEngagementsKeuroByYear String?
   margeFactFigeeKeuro        Float?
+  // TF / CFE appliquées par le BP (C_P50 r191 / r192), tableaux k€ an-par-an encodés JSON (item 4).
+  // Priment sur la base calculée quand présentes ; null → base calculée (rétrocompat stricte).
+  tfKeuroByYear              String?
+  cfeKeuroByYear             String?
   dscr                     Float
   npv                      Float
   irr                      Float

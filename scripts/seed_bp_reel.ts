@@ -47,11 +47,18 @@ async function main() {
     // engagements est encodé JSON (comme dscrSchedule), la marge figée telle quelle (null/0). Ainsi
     // la page projet (buildFinanceInput lit la DB) reproduit la dette/TRI de calibrate_all.
     const engagements = b.engineOnly.opexEngagementsKeuroByYear as number[] | undefined;
+    const tfKeuroByYear = b.engineOnly.tfKeuroByYear as number[] | undefined;
+    const cfeKeuroByYear = b.engineOnly.cfeKeuroByYear as number[] | undefined;
     const margeFactFigeeKeuro = b.engineOnly.margeFactFigeeKeuro as number | null | undefined;
     const scenario: Record<string, unknown> = {
       ...b.scenario,
       opexEngagementsKeuroByYear:
         engagements && engagements.length > 0 ? JSON.stringify(engagements) : null,
+      // TF/CFE appliquées (item 4) : JSON k€ an-par-an, null si absent (fallback base calculée).
+      tfKeuroByYear:
+        tfKeuroByYear && tfKeuroByYear.length > 0 ? JSON.stringify(tfKeuroByYear) : null,
+      cfeKeuroByYear:
+        cfeKeuroByYear && cfeKeuroByYear.length > 0 ? JSON.stringify(cfeKeuroByYear) : null,
       margeFactFigeeKeuro: margeFactFigeeKeuro ?? null,
       dscr: metrics.dscr ?? 0,
       npv: metrics.npv,
