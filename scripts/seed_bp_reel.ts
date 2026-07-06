@@ -51,6 +51,7 @@ async function main() {
     const cfeKeuroByYear = b.engineOnly.cfeKeuroByYear as number[] | undefined;
     const demantelementKeuroByYear =
       b.engineOnly.demantelementKeuroByYear as number[] | undefined;
+    const mraKeuroByYear = b.engineOnly.mraKeuroByYear as number[] | undefined;
     const margeFactFigeeKeuro = b.engineOnly.margeFactFigeeKeuro as number | null | undefined;
     const margeFactAmortissableKeuro =
       b.engineOnly.margeFactAmortissableKeuro as number | null | undefined;
@@ -68,6 +69,9 @@ async function main() {
         demantelementKeuroByYear && demantelementKeuroByYear.length > 0
           ? JSON.stringify(demantelementKeuroByYear)
           : null,
+      // MRA appliquée (item 6) : JSON k€ an-par-an (paliers), null → scalaire mraEuroKwc.
+      mraKeuroByYear:
+        mraKeuroByYear && mraKeuroByYear.length > 0 ? JSON.stringify(mraKeuroByYear) : null,
       margeFactFigeeKeuro: margeFactFigeeKeuro ?? null,
       // Marge facturable amortissable (item 7) : base D&A Type 2 uniquement, null → inchangé.
       margeFactAmortissableKeuro: margeFactAmortissableKeuro ?? null,

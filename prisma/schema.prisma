@@ -156,6 +156,10 @@ model Scenario {
   // Démantèlement appliqué par le BP (C_P50 r195), tableau k€ an-par-an encodé JSON (item 2) :
   // poste OPEX an25-29 uniquement, constant non indexé. null → 0 (rétrocompat stricte).
   demantelementKeuroByYear   String?
+  // MRA appliquée par le BP (C_P50 r189), tableau k€ an-par-an encodé JSON (item 6) : courbe en
+  // PALIERS (renouvellement onduleurs), déjà indexée 2 %/an. Prime sur le scalaire mraEuroKwc
+  // quand présente ; null → formule scalaire plate (rétrocompat stricte).
+  mraKeuroByYear             String?
   dscr                     Float
   npv                      Float
   irr                      Float

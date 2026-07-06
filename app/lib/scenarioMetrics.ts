@@ -82,6 +82,8 @@ export function buildFinanceInput(
     cfeKeuroByYear: parseEngagements(scenario.cfeKeuroByYear),
     // Démantèlement appliqué (item 2) : JSON k€ an-par-an (an25-29 uniquement). null → 0.
     demantelementKeuroByYear: parseEngagements(scenario.demantelementKeuroByYear),
+    // MRA appliquée (item 6) : JSON k€ an-par-an (paliers onduleurs). null → scalaire mraEuroKwc.
+    mraKeuroByYear: parseEngagements(scenario.mraKeuroByYear),
     margeFactFigeeKeuro: scenario.margeFactFigeeKeuro,
     // Marge facturable amortissable (item 7) : base D&A Type 2 uniquement. null → inchangé.
     margeFactAmortissableKeuro: scenario.margeFactAmortissableKeuro,

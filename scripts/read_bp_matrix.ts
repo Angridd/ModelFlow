@@ -148,6 +148,9 @@ export type BpGroundTruth = {
   cfeKeuroByYear: number[];
   // Démantèlement appliqué (C_P50 r195) : an25-29 uniquement, constant non indexé (item 2).
   demantelementKeuroByYear: number[];
+  // MRA appliquée (C_P50 r189) : courbe en PALIERS (garantie onduleurs), déjà indexée 2 %/an,
+  // flag exploitation inclus (item 6). Mur-de-Sologne : r189 = plat → inchangé.
+  mraKeuroByYear: number[];
 };
 
 export function buildGroundTruthBySlug(): Map<string, BpGroundTruth> {
@@ -203,6 +206,7 @@ export function buildGroundTruthBySlug(): Map<string, BpGroundTruth> {
       tfKeuroByYear: readTax(191),
       cfeKeuroByYear: readTax(192),
       demantelementKeuroByYear: readTax(195),
+      mraKeuroByYear: readTax(189),
     });
   }
   return map;
@@ -514,6 +518,15 @@ export function buildProject(
     flags.push("Démantèlement = BP single-project C_P50 r195 (an25-29, non indexé)");
   }
 
+  // MRA RÉELLEMENT APPLIQUÉE (item 6) : C_P50 r189 du single-project — courbe en PALIERS
+  // (profil de renouvellement onduleurs / garantie constructeur), déjà indexée 2 %/an. Le
+  // scalaire mraEuroKwc (moyenne 35 ans plate) reste le fallback sans data/N.xlsm. Les projets
+  // à MRA nulle (r189 = 0 partout) → série vide → fallback scalaire (0) → inchangés.
+  const mraKeuroByYear = groundTruth?.mraKeuroByYear ?? [];
+  if (mraKeuroByYear.length > 0) {
+    flags.push("MRA = BP single-project C_P50 r189 (paliers onduleurs, série appliquée)");
+  }
+
   // Marge facturable figée par le BP (r32 « Dont Marge facturable » € → k€). Les k€ sont déjà
   // inclus dans le CAPEX via indemnitesImmoKeuro → on impose 0 pour ne pas les compter deux fois
   // et désactiver la boucle endogène. r32 ≠ 0 uniquement sur Ychoux → null partout ailleurs
@@ -539,6 +552,7 @@ export function buildProject(
     tfKeuroByYear,
     cfeKeuroByYear,
     demantelementKeuroByYear,
+    mraKeuroByYear,
     margeFactFigeeKeuro,
     margeFactAmortissableKeuro,
   };

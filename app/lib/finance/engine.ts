@@ -160,6 +160,13 @@ export type FinanceEngineInput = FinancialAssumptions & {
   // → 0 (rétrocompat stricte). Persisté : colonne Scenario.demantelementKeuroByYear
   // (String? JSON, comme tfKeuroByYear).
   demantelementKeuroByYear?: number[] | null;
+  // MRA RÉELLEMENT APPLIQUÉE par le BP (C_P50 r189), en k€ par ANNÉE PROJET (index 0 = an1) —
+  // courbe en PALIERS (profil de renouvellement onduleurs / garantie constructeur), déjà indexée
+  // 2 %/an, flag exploitation inclus (item 6). Prime sur la formule scalaire mraEuroKwc × MW ×
+  // 1,02^(y−1) (moyenne 35 ans plate) quand présente ; le P90 la reprend via opexDetailsP50.
+  // Absent/[] → formule scalaire (rétrocompat stricte). Persistée : colonne
+  // Scenario.mraKeuroByYear (String? JSON, comme tfKeuroByYear).
+  mraKeuroByYear?: number[] | null;
   // Marge facturable FIGÉE par le BP (feuille Inp_Opération, ligne « Dont Marge facturable »),
   // en k€. Non-null → désactive la boucle endogène `ajusteMargeFacturable` et impose cette valeur
   // (les k€ correspondants sont déjà inclus dans le CAPEX via `indemnitesImmoKeuro`, d'où 0 pour
@@ -667,6 +674,7 @@ function hasDetailedOpexInput(input: FinanceEngineInput) {
   return (
     input.omFixedEuroKwc != null ||
     input.mraEuroKwc != null ||
+    input.mraKeuroByYear != null ||
     input.backOfficeKeuro != null ||
     input.diversOpexKeuro != null ||
     input.loyerMode != null ||
@@ -1072,10 +1080,13 @@ export function calculateOpexDetails(
     (input.omFixedEuroKwc ?? OM_FIXED_EURO_KWC_FALLBACK) *
     input.capacityMw *
     (1 + asRate(input.inflationOM ?? INFLATION_OM_FALLBACK)) ** (year - 1);
+  // Item 6 : MRA appliquée par le BP (C_P50 r189, paliers onduleurs déjà indexés 2 %/an) quand
+  // routée par projet ; sinon formule scalaire plate mraEuroKwc (rétrocompat stricte).
   const mraKeuro =
+    input.mraKeuroByYear?.[year - 1] ??
     (input.mraEuroKwc ?? MRA_EURO_KWC_FALLBACK) *
-    input.capacityMw *
-    (1 + asRate(input.inflationMRA ?? INFLATION_MRA_FALLBACK)) ** (year - 1);
+      input.capacityMw *
+      (1 + asRate(input.inflationMRA ?? INFLATION_MRA_FALLBACK)) ** (year - 1);
   const backOfficeKeuro =
     (input.backOfficeKeuro ?? BACK_OFFICE_KEURO_FALLBACK) *
     (1 + asRate(input.inflationBackOffice ?? INFLATION_BACK_OFFICE_FALLBACK)) ** (year - 1);
