@@ -1,9 +1,22 @@
-# Phase 2 — Aligner la MÉTHODE de calcul MF sur les BP (à faire)
+# Phase 2 — Aligner la MÉTHODE de calcul MF sur les BP (en cours)
 
 > Rédigé le 2026-07-05. État de départ : **22/25 projets calés** (dette/CAPEX/TRI) après
 > Phase 1 (corrections d'extraction, commit `61a0969`). Objectif Phase 2 : que MF reproduise
 > le BP **ligne à ligne, année par année**, sur les 25 projets — ce qui calera aussi la VAN
 > brute à l'euro et les 3 derniers rouges (Golf de Baugé, Selles-sur-Cher 1, Villognon).
+>
+> **AVANCEMENT 2026-07-06 — 23/25 calés.** Items **5** (engagements = série appliquée BP r199,
+> commit `c58153a`) et **4** (TF/CFE = série appliquée BP r191/r192, commit `d0c2655`) faits :
+> engagements et taxes désormais **ligne-à-ligne exacts** sur les 25 projets. Selles-sur-Cher 1
+> et Salbris (regressé transitoirement par l'item 5, cf § compensation) sont repassés VERTS.
+> **Restent 2 rouges — tous deux pilotés par l'item 8** (queue merchant P90 du dimensionnement) :
+> • **Villognon** dette +1,76 % (14,5 k€/MW) : CFADS P90 exact an1-19 puis +9,6 % an20 → +32 % an24.
+> • **Golf de Baugé** TRI inv +0,84 pp : dette +0,88 % (sous seuil) mais amplifiée sur l'équity
+>   (CCA −7,8 %) car gearing élevé. Le sur-dimensionnement vient aussi de la queue merchant P90.
+> Diagnostic item 8 chiffré : prix de dimensionnement merchant BP an21 ≈ 62 €/MWh vs MF ≈ 71
+> (blend 0,7 central + 0,3 low trop haut ; le BP pondère bien plus la courbe Low en queue).
+> ⚠️ Logique P90 PARTAGÉE (« calée sur Sigoulès ») → ne toucher qu'en mesurant les 25 (risque
+> sur les 23 verts). N'affecte que les projets à ténor > 20 ans (dette en années merchant).
 
 ## Comment travailler (méthode imposée)
 - **Outil de vérité** : `npx tsx scripts/compare_bp_project.ts "<nom>"` (ou `… <N> --full`) —
@@ -54,7 +67,15 @@ où l'écart apparaît (sur les échantillons Fable).
   ET le facteur ×1,02^(y−1). ⚠️ Un ancien fix avait retiré le facteur en croyant à un bug —
   le remettre à 2 %.
 
-### 4. Base TF/CFE (7/7 TF, 5/7 CFE) — multiplicateur d'assiette
+### 4. Base TF/CFE (7/7 TF, 5/7 CFE) — multiplicateur d'assiette ✅ FAIT (commit d0c2655)
+> **Résolu autrement que prévu.** La MÉTHODE d'assiette du BP varie PAR SITE (sélecteur R400/R405
+> de `Inp_Matrice_O&M_Taxes`) : « comptable seule si achat terrain » (Selles/Villognon, ×~2,5) vs
+> « appréciation directe » (Baugé). Reconstruire la base était fragile (batiments PTR/PDL R271,
+> dénominateur MOD R267, taux terrain 0,04 vs 0,08). On **route la série RÉELLEMENT APPLIQUÉE**
+> (C_P50 r191/r192, ground truth exact) comme les engagements → colonnes `tfKeuroByYear`/
+> `cfeKeuroByYear` (migration `add_tf_cfe_series`), override dans `calculateAnnualOpex`. TF/CFE
+> désormais +0,00 % ligne-à-ligne. Selles ROUGE→VERT, Salbris ROUGE→VERT.
+
 - **Symptôme** : écart CONSTANT toutes années (−8 à −14 % en général ; Salbris **+82 %** TF,
   Selles −68 %). Signe = base cadastrale mal calculée pour ces sites.
 - **BP** : Règle 6 (appréciation directe) déjà implémentée et calée sur Baugé/Sigoulès. L'écart
@@ -64,7 +85,14 @@ où l'écart apparaît (sur les échantillons Fable).
   investiguer en premier (peut-être extraction de la base, pas seulement méthode).
 - **Code** : `calculateTaxesFoncieres` dans engine.ts + extraction base dans read_bp_matrix.
 
-### 5. Engagements — indexation / fin de vie (6/7)
+### 5. Engagements — indexation / fin de vie (6/7) ✅ FAIT (commit c58153a)
+> Le portefeuille Inp_Opération porte une série NON indexée (an1 correct, plate ensuite) qui
+> sous-charge l'OPEX de ~15-18 % sur les 20 ans de dimensionnement → dette sur-dimensionnée. On
+> adopte la série RÉELLEMENT APPLIQUÉE (C_P50 r199, déjà indexée 2 %/an, provisions incluses)
+> dès qu'un data/N.xlsm existe (`buildGroundTruthBySlug`). Digoin (saisie pure) couvert. Dette
+> Baugé 2,9→1,0 %, Villognon 2,2→1,9 %, Selles 5,8→4,3 %. ⚠️ A transitoirement regressé Salbris
+> (cas de compensation documenté) — résorbé ensuite par l'item 4.
+
 - **Symptôme** : MF plat, BP indexé 2 %/an → MF dérive à −53 à −99 % en fin de vie (voire négatif).
 - **BP** : la série « Total Engagements » (Inp_Opération) est indexée ~2 %/an. MF route la série
   brute sans indexation (ou avec zéros de queue).
@@ -89,7 +117,14 @@ où l'écart apparaît (sur les échantillons Fable).
   Comparer C_D&A du projet vs `calculateAnnualCashFlows` amort.
 - **Code** : `engine.ts` D&A (mapping des classes Type1/Type2/NoD&A), coef dégressif.
 
-### 8. Courbe P90 merchant en queue de dette (4/7)
+### 8. Courbe P90 merchant en queue de dette (4/7) ⭐ PROCHAIN — pilote les 2 rouges restants
+> Diagnostic 2026-07-06 : c'est l'unique driver des 2 rouges (Villognon dette, Baugé TRI). Le prix
+> de DIMENSIONNEMENT merchant (C_Financing r80 EBITDA PV, ≠ C_P90 r73 qui reste au tarif P50) chute
+> fort dès an21 côté BP (Villognon an21 ≈ 62 €/MWh) mais MF applique 0,7 central + 0,3 low ≈ 71.
+> Le blend MF sur-évalue la queue → CFADS P90 an20-24 trop haut → dette sur-dimensionnée. NB : la
+> baisse commence à an20 (transition), et n'affecte que les ténors > 20 ans. Piste : lire/derive le
+> vrai blend BP (semble ~Low pur en queue) — mesurer sur les 25 (surtout ténor>20 : Villognon,
+> Baugé, Orval, Langon, Montcuq 3, Selles, Villeherviers, Salbris). NE PAS casser Sigoulès (calé).
 - **Symptôme** : CFADS P90 des années merchant (an21-24) trop haute chez MF (+6 à +34 % — Ychoux
   +34 % an24, dette éteinte 1 an trop tôt). Ratio P90/P50 merchant : MF ≈ 0,75 vs BP ≈ 0,58 sur
   certains projets. Calé uniquement sur Sigoulès.
@@ -118,17 +153,28 @@ où l'écart apparaît (sur les échantillons Fable).
   service (déjà calé). Le waterfall SHL affecte surtout l'AFFICHAGE et la VAN equity — vérifier
   que corriger le SHL ne casse pas le TRI investisseur déjà calé.
 
-## Les 3 rouges restants (résolus par la Phase 2)
-- **Golf de Baugé** : engagements non indexés (BP inflaté 82→148 k€) + MRA paliers → items 5 + 6.
-- **Selles-sur-Cher 1** : base TF/CFE (−68 %/−77 %) + queue merchant MES 2033 → items 4 + 1 + 8.
-- **Villognon** : base TF/CFE + sizing/amortissement dette → items 4 + 8.
+## Les 3 rouges de départ — état 2026-07-06
+- **Selles-sur-Cher 1** : ✅ VERT. Base TF/CFE (−68 %/−77 %) résolue par l'item 4 (méthode comptable
+  routée), + engagements item 5. Dette −0,2 %, TF/CFE +0,00 % ligne-à-ligne.
+- **Golf de Baugé** : 🔴 TRI inv +0,84 pp. Engagements (item 5) + TF/CFE (item 4) faits ; reste la
+  queue merchant P90 (item 8) qui sur-dimensionne la dette de 0,88 % → CCA/équity → TRI.
+- **Villognon** : 🔴 dette +1,76 % (14,5 k€/MW). TF/CFE (item 4) + engagements (item 5) faits ;
+  reste **exclusivement** la queue merchant P90 (item 8, CFADS an20-24 +9→+32 %).
+- *(bonus)* **Salbris** : regressé par l'item 5 (compensation) puis re-VERT par l'item 4.
 
 ## Estimation
 ≈ 3-6 h de travail en arrière-plan, ~8-12 itérations moteur. Items 1-6 rapides (~1,5-2,5 h),
 7-8 (~45 min), 9-10 (cascade IS/SHL) = la partie incertaine, plusieurs passes (~1-2,5 h).
 Committer à chaque correction (progrès banké).
 
-## Reprendre
-1. `npx tsx scripts/calibrate_all.ts` → état actuel (22/25).
-2. `npx tsx scripts/compare_bp_project.ts "Golf de Baugé" --full` → voir les écarts d'un rouge.
-3. Attaquer l'item 1, vérifier au comparateur, mettre à jour les tests ancres, commit. Répéter.
+## Reprendre (au 2026-07-06 — 23/25)
+0. Pipeline de mesure après TOUTE modif d'extraction/moteur (l'ordre compte) :
+   `npx tsx scripts/read_bp_matrix.ts` (régénère data/cibles/) → `DATABASE_URL="file:./prisma/dev.db"
+   npx tsx scripts/seed_bp_reel.ts` (réécrit la DB) → `npx tsx scripts/calibrate_all.ts` (compteur).
+   ⚠️ calibrate_all lit data/cibles/*.json ; le comparateur lit la DB (Prisma). Régénérer LES DEUX.
+   Après un changement de schéma Prisma : `npx prisma generate` (explicite) avant de re-seed/build.
+1. `npx tsx scripts/calibrate_all.ts` → 23/25 (rouges : Villognon dette, Baugé TRI).
+2. `npx tsx scripts/compare_bp_project.ts "Villognon" --full` → CFADS P90 exact an1-19, diverge an20+.
+3. **Attaquer l'item 8** (queue merchant P90, cf § item 8 pour le diagnostic chiffré) : c'est le seul
+   driver des 2 rouges. Mesurer sur les 25 (surtout ténor>20). Puis items 9 (IS) et 10 (SHL waterfall
+   — pilote les TOP divergences résiduelles CCA/dividendes). Commit à chaque correction.
