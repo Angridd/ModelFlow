@@ -81,6 +81,8 @@ export function buildFinanceInput(
     tfKeuroByYear: parseEngagements(scenario.tfKeuroByYear),
     cfeKeuroByYear: parseEngagements(scenario.cfeKeuroByYear),
     margeFactFigeeKeuro: scenario.margeFactFigeeKeuro,
+    // Marge facturable amortissable (item 7) : base D&A Type 2 uniquement. null → inchangé.
+    margeFactAmortissableKeuro: scenario.margeFactAmortissableKeuro,
     capacityMw: project.capacityMw,
     commissioningYear: project.commissioningYear,
     auroraCurves: merchantCurveForTechnology(project.technology),

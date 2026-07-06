@@ -160,6 +160,12 @@ export type FinanceEngineInput = FinancialAssumptions & {
   // (rétrocompat stricte). Persisté en base : colonne Scenario.margeFactFigeeKeuro (Float?),
   // saisissable au formulaire (section template) — comme opexEngagementsKeuroByYear (String? JSON).
   margeFactFigeeKeuro?: number | null;
+  // Marge facturable AMORTISSABLE (item 7) : part du MOD (« Dont Marge facturable », r32) déjà
+  // incluse dans le CAPEX (via indemnitesImmoKeuro) mais que le BP amortit en Type 2 (C_D&A r21 :
+  // MOD amorti = Coût du Dev + marge facturable). Ne modifie QUE la base D&A Type 2 — jamais le
+  // CAPEX total ni le sizing (margeFactFigeeKeuro reste le champ sizing). null → base inchangée
+  // (rétrocompat stricte). Persisté : colonne Scenario.margeFactAmortissableKeuro (Float?).
+  margeFactAmortissableKeuro?: number | null;
   loyerMode?: string | null;
   loyerValeur?: number | null;
   loyerInflation?: number | null;
@@ -1595,8 +1601,10 @@ function buildPreRows(
     input.debtMaturityYears,
   );
   // D&A — split Type 1 (dégressif) / Type 2 (linéaire) MAPPÉ depuis capexDetails si non saisi
-  // (template BP §2.5) : Type 1 = modules + BoS + contingency ; Type 2 = raccordement + apport
-  // affaire + dev fees (MOD). Non amortis (exclus) = financing fees + taxes foncières + indemnités.
+  // (template BP, vérifié à 0 € sur les 25 C_D&A — item 7) : Type 1 = modules + BoS + contingency ;
+  // Type 2 = raccordement + dev fees + marge facturable amortissable (= MOD facturé total, C_D&A
+  // r21). Non amortis (No D&A) = financing fees + APPORT AFFAIRE + indemnités/other (l'apport,
+  // Inp_Assumption r215, est dans « Other expenses » r231 du BP — jamais amorti).
   // capexType1/2 saisis → override (Baugé) ; capex legacy sans détail → bloc unique (inchangé).
   let capexType1Keuro = input.capexType1Keuro;
   let capexType2Keuro = input.capexType2Keuro;
@@ -1604,7 +1612,8 @@ function buildPreRows(
     capexType1Keuro =
       capexDetails.modulesKeuro + capexDetails.boSKeuro + capexDetails.contingencyKeuro;
     capexType2Keuro =
-      capexDetails.raccordementKeuro + capexDetails.apportAffaireKeuro + capexDetails.devFeesKeuro;
+      capexDetails.raccordementKeuro + capexDetails.devFeesKeuro +
+      (input.margeFactAmortissableKeuro ?? 0);
   }
   const amortizationSchedule = buildAmortizationSchedule(
     initialInvestment,

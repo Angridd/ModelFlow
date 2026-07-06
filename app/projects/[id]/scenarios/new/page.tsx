@@ -776,6 +776,17 @@ export default async function NewScenarioPage({
               />
             </label>
             <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+              <span>Marge facturable amortie (k€)</span>
+              <input
+                name="margeFactAmortissableKeuro"
+                type="number"
+                step="0.01"
+                placeholder="vide = non amortie"
+                title="Part du MOD (marge facturable) amortie en Type 2 par le BP (C_D&A). N'affecte que la base D&A — pas le CAPEX ni le sizing. Vide → base inchangée."
+                className="h-10 px-3"
+              />
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
               <span>Index courbe an1 (override)</span>
               <input
                 name="curveIndexAn1"

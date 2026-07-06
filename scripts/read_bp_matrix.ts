@@ -508,6 +508,13 @@ export function buildProject(
   // saisissable au formulaire (section template).
   const margeFactFigeeKeuro = margeFacturableEuro > 0 ? 0 : null;
 
+  // Marge facturable AMORTISSABLE (item 7) : le BP amortit le MOD facturé TOTAL en Type 2
+  // (C_D&A r21 = Coût du Dev r93 + « Dont Marge facturable » r32). Les k€ restent financés via
+  // indemnitesImmoKeuro (CAPEX inchangé) ; ce champ ne change QUE la base D&A Type 2 du moteur.
+  // r32 ≠ 0 uniquement sur Ychoux → null partout ailleurs (rétrocompat stricte).
+  const margeFactAmortissableKeuro =
+    margeFacturableEuro > 0 ? margeFacturableEuro / 1000 : null;
+
   const engineOnly = {
     capacityMw,
     commissioningYear: mes,
@@ -519,6 +526,7 @@ export function buildProject(
     tfKeuroByYear,
     cfeKeuroByYear,
     margeFactFigeeKeuro,
+    margeFactAmortissableKeuro,
   };
 
   const scenario: Record<string, unknown> = {

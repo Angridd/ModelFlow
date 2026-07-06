@@ -5,8 +5,11 @@
 > le BP **ligne à ligne, année par année**, sur les 25 projets — ce qui calera aussi la VAN
 > brute à l'euro et les 3 derniers rouges (Golf de Baugé, Selles-sur-Cher 1, Villognon).
 >
-> **AVANCEMENT 2026-07-06 — 23/25 calés, item 8 FAIT.** Items **5** (engagements, commit `c58153a`),
-> **4** (TF/CFE, commit `d0c2655`) et **8** (CFADS de dimensionnement net de l'IS P90) faits.
+> **AVANCEMENT 2026-07-06 — 23/25 calés, items 4/5/7/8 FAITS.** Items **5** (engagements, commit
+> `c58153a`), **4** (TF/CFE, commit `d0c2655`), **8** (CFADS de dimensionnement net de l'IS P90,
+> commit `6c33c89`) et **7** (D&A : apport affaire hors base, marge facturable amortie — dotation
+> ligne-à-ligne ✓ sur les 25, cf § item 7) faits. Ychoux/Salbris restent ROUGES TRI mais par
+> d'AUTRES items (9/10/6/2) — leur D&A est désormais exact.
 >
 > **Item 8 — RECLASSÉ : le driver N'EST PAS le blend merchant, c'est l'IS déduit du CFADS de
 > sizing.** Le blend 0,7 central / 0,3 low est EXACT (prix MF = prix BP au centime, hypothèse
@@ -122,7 +125,25 @@ où l'écart apparaît (sur les échantillons Fable).
 - **Code** : permettre une SÉRIE MRA an-par-an (comme les engagements) au lieu du scalaire
   `mraEuroKwc` indexé. Lire la courbe MRA du BP par projet.
 
-### 7. D&A dégressif (5/7) — base / coef
+### 7. D&A dégressif (5/7) — base / coef ✅ FAIT — dotation à 0 € sur les 25
+> **La contingency était DISCULPÉE et le Type 1 déjà exact** (MF modules+BOS+contingency = BP
+> Modules+BOS à 0 € sur les 25 C_D&A — la contingency BP est DANS le poste BOS ; mécanique
+> dégressif ×0,1125 + bascule linéaire an13 identique). Tout l'écart = la base **Type 2** :
+> le BP amortit `Grid connection + MOD facturé TOTAL` (= Coût du Dev r93 + « Dont Marge
+> facturable » r32, C_D&A r21) et met l'**Apport Affaires** (r215) dans « Other expenses »
+> r231 → **No D&A**. MF faisait l'inverse : apport amorti (13 projets, dotation +1 à +3 % —
+> Sigoulès +11,2 k€/an, Salbris +9,7) et marge facturable non amortie (Ychoux, seul r32 ≠ 0 :
+> 193 136 € → dotation −9,7 k€/an, le seul « MF < BP »). **Fix** : mapping auto
+> `capexType2 = raccordement + devFees + margeFactAmortissableKeuro` (nouveau champ Scenario,
+> migration `add_marge_fact_amortissable`, null → inchangé ; routé read_bp_matrix→seed→
+> scenarioMetrics/calibrate/report/check + formulaires). CAPEX total, sizing (margeFactFigee)
+> et base foncière (modRetraitement) INTOUCHÉS — seul le statut D&A change. **Résultat** :
+> dotation + VNC ligne-à-ligne ✓ sur les 25 ; Sigoulès TRI Δ 0,02→**0,00 pp** ; Baugé inchangé ;
+> Ychoux TRI Δ −1,80→**−0,83 pp** (encore ROUGE, bande 0,7) ; Salbris −1,22→−1,33 pp (ROUGE —
+> son ancienne dotation fausse compensait d'autres erreurs, cf § compensation). Les 2 rouges
+> résiduels ne sont PLUS du D&A : OPEX an1-3 (−0,7/−0,8 %), timing IS an1+ (item 9), SHL (10),
+> démantèlement an25-30 (item 2) ; Salbris a aussi un CAPEX +0,59 % pré-existant.
+
 - **Symptôme** : dotation MF +1 à +3 % (base amortissable trop haute), croissant en phase
   dégressive puis plateau. Ychoux = seul où MF < BP.
 - **BP** : dégressif coef 2,25 sur base Type 1 (modules+BOS) — déjà implémenté. L'écart +1-3 %
@@ -190,16 +211,18 @@ où l'écart apparaît (sur les échantillons Fable).
 7-8 (~45 min), 9-10 (cascade IS/SHL) = la partie incertaine, plusieurs passes (~1-2,5 h).
 Committer à chaque correction (progrès banké).
 
-## Reprendre (au 2026-07-06 — 23/25, item 8 fait)
+## Reprendre (au 2026-07-06 — 23/25, items 4/5/7/8 faits)
 0. Pipeline de mesure après TOUTE modif d'extraction/moteur (l'ordre compte) :
    `npx tsx scripts/read_bp_matrix.ts` (régénère data/cibles/) → `DATABASE_URL="file:./prisma/dev.db"
    npx tsx scripts/seed_bp_reel.ts` (réécrit la DB) → `npx tsx scripts/calibrate_all.ts` (compteur).
    ⚠️ calibrate_all lit data/cibles/*.json ; le comparateur lit la DB (Prisma). Régénérer LES DEUX.
    Après un changement de schéma Prisma : `npx prisma generate` (explicite) avant de re-seed/build.
-1. `npx tsx scripts/calibrate_all.ts` → 23/25 (rouges : **Ychoux** TRI, **Salbris** TRI — tous deux
-   D&A/item 7 amplifié par gearing ≥90 %, dette dans le bruit). Villognon + Baugé désormais VERTS.
-2. **Attaquer l'item 7 (D&A)** : c'est le driver des 2 rouges restants (compensation révélée par
-   l'item 8). Comparer `calculateAnnualCashFlows(...).amort` (P90 = P50) à C_D&A/C_P90 r228 par projet :
-   Ychoux D&A MF −2,6 %, Salbris +1,5 % — base amortissable (split Type1/Type2, contingency) par site.
-   Cibler le franchissement du seuil cumEBT P90 à la BONNE année (Ychoux an17, Salbris an20).
-3. Puis items 9 (timing IS P50) et 10 (waterfall SHL P50 — affichage/VAN). Commit à chaque correction.
+1. `npx tsx scripts/calibrate_all.ts` → 23/25. Rouges : **Ychoux** TRI Δ−0,83 pp, **Salbris** TRI
+   Δ−1,33 pp — le D&A (item 7) est désormais EXACT chez eux ; le résidu est multi-items, amplifié
+   par gearing ≥90 % (équity fine) : OPEX an1-3 −0,7/−0,8 % (MRA item 6 ?), timing IS P50 dès an1
+   (item 9 — déficit fiscal cumulé an1 : Ychoux BP 384,5 vs MF 361,3), SHL/CCA (item 10 — Salbris
+   CCA +11 %), démantèlement an25-30 (item 2, VAN). Salbris : CAPEX +0,59 % pré-existant à creuser.
+2. **Attaquer l'item 9 (timing IS P50)** puis **10 (waterfall SHL)** — dernières cascades communes ;
+   au passage vérifier l'OPEX an1-3 d'Ychoux/Salbris (balancing/MRA, item 6 ?) via le comparateur.
+3. Items 2 (démantèlement an25-29) et 6 (MRA paliers) pour la VAN/le ligne-à-ligne complet.
+   Commit à chaque correction.

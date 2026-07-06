@@ -62,6 +62,7 @@ function buildFinanceInput(
   margeFactFigeeKeuro?: number | null,
   tfKeuroByYear?: number[],
   cfeKeuroByYear?: number[],
+  margeFactAmortissableKeuro?: number | null,
 ): FinanceEngineInput {
   return {
     // OPEX engagements (moteur uniquement, non persisté en Scenario) : porté par les cibles
@@ -73,6 +74,8 @@ function buildFinanceInput(
     // Marge facturable figée par le BP (moteur uniquement) : idem, porté par engineOnly.
     // Non-null → désactive la boucle endogène. Absent/null → inchangé.
     margeFactFigeeKeuro,
+    // Marge facturable amortissable (item 7) : base D&A Type 2 uniquement. null → inchangé.
+    margeFactAmortissableKeuro,
     capacityMw: project.capacityMw,
     commissioningYear: project.commissioningYear,
     auroraCurves: merchantCurveForTechnology(project.technology),
@@ -193,6 +196,7 @@ type Cibles = {
     tfKeuroByYear?: number[] | null;
     cfeKeuroByYear?: number[] | null;
     margeFactFigeeKeuro?: number | null;
+    margeFactAmortissableKeuro?: number | null;
   };
 };
 
@@ -256,6 +260,7 @@ async function main() {
       c.engineOnly?.margeFactFigeeKeuro ?? null,
       c.engineOnly?.tfKeuroByYear ?? undefined,
       c.engineOnly?.cfeKeuroByYear ?? undefined,
+      c.engineOnly?.margeFactAmortissableKeuro ?? null,
     );
     const m = calculateScenarioMetrics(input);
 

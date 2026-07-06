@@ -145,6 +145,10 @@ model Scenario {
   // endogène, 0 = figée). Cf scripts/read_bp_matrix.ts (engineOnly) et app/lib/finance/engine.ts.
   opexEngagementsKeuroByYear String?
   margeFactFigeeKeuro        Float?
+  // Marge facturable AMORTISSABLE (item 7) : part du MOD (r32 « Dont Marge facturable ») déjà
+  // financée dans le CAPEX (via indemnitesImmoKeuro) mais amortie en Type 2 par le BP (C_D&A r21).
+  // null → base Type 2 inchangée (rétrocompat stricte).
+  margeFactAmortissableKeuro Float?
   // TF / CFE appliquées par le BP (C_P50 r191 / r192), tableaux k€ an-par-an encodés JSON (item 4).
   // Priment sur la base calculée quand présentes ; null → base calculée (rétrocompat stricte).
   tfKeuroByYear              String?

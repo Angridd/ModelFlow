@@ -50,6 +50,8 @@ async function main() {
     const tfKeuroByYear = b.engineOnly.tfKeuroByYear as number[] | undefined;
     const cfeKeuroByYear = b.engineOnly.cfeKeuroByYear as number[] | undefined;
     const margeFactFigeeKeuro = b.engineOnly.margeFactFigeeKeuro as number | null | undefined;
+    const margeFactAmortissableKeuro =
+      b.engineOnly.margeFactAmortissableKeuro as number | null | undefined;
     const scenario: Record<string, unknown> = {
       ...b.scenario,
       opexEngagementsKeuroByYear:
@@ -60,6 +62,8 @@ async function main() {
       cfeKeuroByYear:
         cfeKeuroByYear && cfeKeuroByYear.length > 0 ? JSON.stringify(cfeKeuroByYear) : null,
       margeFactFigeeKeuro: margeFactFigeeKeuro ?? null,
+      // Marge facturable amortissable (item 7) : base D&A Type 2 uniquement, null → inchangé.
+      margeFactAmortissableKeuro: margeFactAmortissableKeuro ?? null,
       dscr: metrics.dscr ?? 0,
       npv: metrics.npv,
       irr: metrics.irr,

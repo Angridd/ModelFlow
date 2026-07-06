@@ -38,6 +38,7 @@ const CIBLES_DIR = path.resolve(process.cwd(), "data/cibles");
 type CiblesEngineOnly = {
   opexEngagementsKeuroByYear?: number[] | null;
   margeFactFigeeKeuro?: number | null;
+  margeFactAmortissableKeuro?: number | null;
 };
 
 function loadEngineOnly(projectName: string): CiblesEngineOnly | undefined {
@@ -77,6 +78,7 @@ function buildFinanceInput(
     // Inputs moteur non persistés (cf calibrate_all.buildFinanceInput) : portés par les cibles.
     opexEngagementsKeuroByYear: engineOnly?.opexEngagementsKeuroByYear ?? undefined,
     margeFactFigeeKeuro: engineOnly?.margeFactFigeeKeuro ?? null,
+    margeFactAmortissableKeuro: engineOnly?.margeFactAmortissableKeuro ?? null,
     capacityMw: project.capacityMw,
     commissioningYear: project.commissioningYear,
     auroraCurves: merchantCurves,

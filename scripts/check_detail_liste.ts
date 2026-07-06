@@ -68,6 +68,8 @@ function buildFinanceInput(
   return {
     opexEngagementsKeuroByYear: engagements,
     margeFactFigeeKeuro: marge,
+    // Marge facturable amortissable (item 7) : colonne persistée, identique détail/liste.
+    margeFactAmortissableKeuro: scenario.margeFactAmortissableKeuro,
     capacityMw: project.capacityMw,
     commissioningYear: project.commissioningYear,
     auroraCurves: merchantCurveForTechnology(project.technology),
