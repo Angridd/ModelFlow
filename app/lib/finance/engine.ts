@@ -1604,8 +1604,9 @@ function sizingWithFacturableMargin(
   // fige cette circularité par macro copier-coller ; ici la boucle converge en 2-4 itérations.
   const ccaRemunRateVal = asRate(input.ccaRemunRate ?? 0);
   const constructionYears = resolveConstructionYears(input);
+  const shlP90Drawdown = (debtKeuro: number) => Math.max(0, capexEffectifKeuro - debtKeuro);
   const shlP90Principal = (debtKeuro: number) =>
-    Math.max(0, capexEffectifKeuro - debtKeuro) * (1 + ccaRemunRateVal) ** constructionYears;
+    shlP90Drawdown(debtKeuro) * (1 + ccaRemunRateVal) ** constructionYears;
   let debtRetenuKeuro = 0;
   let scheduleByYear = new Map<number, RetainedDebtScheduleItem>();
   let preRows = buildPreRows(input, capexEffectifKeuro);
@@ -1619,6 +1620,8 @@ function sizingWithFacturableMargin(
     0,
     ccaRemunRateVal,
     shlP90Principal(debtRetenuKeuro),
+    0,
+    shlP90Drawdown(debtRetenuKeuro),
   );
   let debtSculptedKeuro = 0;
   let iterationsCount = 0;
@@ -1643,6 +1646,8 @@ function sizingWithFacturableMargin(
       0,
       ccaRemunRateVal,
       shlP90Principal(debtRetenuKeuro),
+      0,
+      shlP90Drawdown(debtRetenuKeuro),
     );
     debtSculptedKeuro = presentValueDebtCapacity(
       taxRows,
@@ -1682,6 +1687,8 @@ function sizingWithFacturableMargin(
     0,
     ccaRemunRateVal,
     shlP90Principal(debtRetenuKeuro),
+    0,
+    shlP90Drawdown(debtRetenuKeuro),
   );
   debtSculptedKeuro = presentValueDebtCapacity(
     taxRows,
@@ -2126,6 +2133,9 @@ function applyWaterfall(
   // principal capitalisé (ccaPrincipalKeuro = drawdown × (1+r)^construction) : leur différence est
   // l'intérêt SHL capitalisé an0.
   ccaDrawdownKeuro: number = 0,
+  // Drawdown SHL du cas P90 (avant capitalisation an0) — SEED du cumEBT P90 (item 9b), qui pilote
+  // l'IS de sizing → la DETTE. Séparé du principal P90 (ccaP90PrincipalKeuro).
+  ccaP90DrawdownKeuro: number = 0,
 ): Array<AnnualCashFlow & { cfadsP90AfterTaxKeuro: number }> {
   let ccaOutstanding = Math.max(0, ccaPrincipalKeuro);
   // SEED du report déficitaire (item 9). Le BP cumule le cumEBT DEPUIS l'an0 (construction), où le
@@ -2135,7 +2145,10 @@ function applyWaterfall(
   // cascade P50 reçoit ccaPrincipal = ccaDrawdown = 0 → seed nul → dette inchangée. Cf CALIBRATION.md.
   const seedP50 = -Math.max(0, ccaPrincipalKeuro - ccaDrawdownKeuro);
   let cumEbtP50 = seedP50;
-  let cumEbtP90 = 0;
+  // Seed du cumEBT du cas de dimensionnement P90 (item 9b) : même mécanique (intérêt SHL P90
+  // capitalisé an0). Il maintient l'IS de sizing à 0 un an de plus → bascule IS_P90 = BP → dette
+  // BP. Pendant le sizing, ccaP90Principal/Drawdown portent le vrai SHL P90 (≠ 0) → seed effectif.
+  let cumEbtP90 = -Math.max(0, ccaP90PrincipalKeuro - ccaP90DrawdownKeuro);
   // resultatCumule = résultat net cumulé PUR (C_P50 r247), seedé au net income an0 (= EBT an0).
   let resultatCumule = seedP50;
   // retainedEarnings = bénéfices distribuables (C_P50 r311/r334), NETS des dividendes déjà versés —
@@ -2406,6 +2419,7 @@ function calculateFinancing(input: FinanceEngineInput): SizingComputation {
       ccaRemunRate,
       ccaPrincipalKeuro,
       ccaDrawdownKeuro,
+      ccaDrawdownKeuro,
     );
 
     return {
@@ -2463,6 +2477,7 @@ function calculateFinancing(input: FinanceEngineInput): SizingComputation {
     ccaPrincipalKeuro,
     ccaRemunRate,
     ccaPrincipalKeuro,
+    ccaDrawdownKeuro,
     ccaDrawdownKeuro,
   );
 

@@ -1,5 +1,28 @@
 # Phase 2 — Aligner la MÉTHODE de calcul MF sur les BP (en cours)
 
+> **AVANCEMENT 2026-07-07 (ter) — items 9 + 10 FAITS. 🎯 25/25 maintenu, cascade équity calée
+> ligne-à-ligne.** Deux commits couplés dans `applyWaterfall` (cascade P50) + le sizing P90 :
+> - **Commit 1 — cascade P50 (items 9a + 10a/b/c)** : (a) **SEED du cumEBT an0** = −intérêts SHL
+>   capitalisés (`ccaPrincipal − ccaDrawdown`), sur `cumEbtP50` ET un nouveau tracker
+>   `retainedEarnings` → l'IS bascule à l'année BP (déficit fiscal cumulé Sigoulès = BP à l'euro).
+>   La mine « no-seed » (ancienne note G5) est **RÉFUTÉE** : le seed est UNIVERSEL, vérifié sur les
+>   25 fichiers (C_P50 r243an1 − r242an1 = r243an0 = −r289an0). (b) **DSRA RETIRÉE** de la cascade
+>   P50 (le BP ne finance aucune réserve : r296 == r268 sur les 25) → champs dsra* = 0,
+>   `dsraInitialKeuro` du double-TRI intact. (c) **Capitalisation** des intérêts SHL P50 impayés
+>   (r289 an1+ ≠ 0 sur les projets cash-tight). (d) **Dividendes plafonnés** aux bénéfices
+>   distribuables (r311) ; excédent → nouveau champ `cashPoolingKeuro` (r319). **Résultat** : dette
+>   au centime inchangée ; TRI investisseur bouge TOUJOURS vers le BP (Orval 5,95→**6,07 = BP** ;
+>   Digoin 5,68→**5,82 = BP** ; Sigoulès 7,31→**7,33 = BP** ; Villeherviers-LG 5,83→6,01) ;
+>   dividendes/pooling Orval exacts à l'euro. Oracle `_audit_910f` : Δréel == Δsim sur les 25.
+> - **Commit 2 — seed P90 (item 9b, touche la DETTE)** : `cumEbtP90` seedé pareil → l'IS de sizing
+>   bascule à l'année BP sur les 4 projets P90-taxés. **Dette recalée VERS le BP** : Salbris
+>   −0,5→**−0,1 %** (TRI Δ−0,57→**−0,07 pp**), Villognon −0,1→−0,0 %, Baugé −0,2→−0,1 %, Ychoux
+>   TRI Δ−0,19→−0,04. Les 20 projets à IS_P90 = 0 : dette **strictement inchangée** (au k€). Ancres
+>   `calibration_sigoules` (IS an24 134 900 no-seed → **133 006 = cible BP**) et `calibration_digoin`
+>   (fiche P90-taxée : dette +1 450 € / +0,046 %, dans la bande de bruit ; le Digoin de PORTEFEUILLE
+>   data/3.xlsm a IS_P90 = 0 → dette exactement sur le BP) mises à jour. 37 tests finance verts.
+>   Résidus Salbris/Villognon an14-24 = **item 1** (queue merchant P90), hors périmètre 9/10.
+
 > **AVANCEMENT 2026-07-07 (bis) — item 1 FAIT (queue merchant P90 du sizing).** Le blend
 > Debt Sizing Curve est désormais LU du BP (« Inp_Curve price » r47 central / r48 low, col H,
 > `buildGroundTruthBySlug`) au lieu du 0,7/0,3 codé en dur. **Salbris = 1,0/0,0 (central pur)**
@@ -240,7 +263,16 @@ où l'écart apparaît (sur les échantillons Fable).
 >   leur écart D&A, jusqu'ici masqué par « pas d'IS de sizing », décale d'un an le franchissement du
 >   seuil cumEBT P90. Compensation classique → faire l'item 7 pour atteindre 25/25.
 
-### 9. Timing IS / report déficitaire (7/7) — À FAIRE APRÈS 1-8
+### 9. Timing IS / report déficitaire (7/7) ✅ FAIT (seed cumEBT an0 P50 + P90)
+> **Cause exacte trouvée = SEED du cumEBT an0** (pas les OPEX). Le BP cumule le déficit fiscal
+> DEPUIS l'an0 où EBT(an0) = −intérêts SHL capitalisés (`ccaPrincipal − ccaDrawdown`). UNIVERSEL,
+> vérifié à l'euro sur les 25 fichiers (C_P50 r243an1 − r242an1 = r243an0 = −r289an0) → **RÉFUTE
+> l'ancienne note « no-seed » G5** (millésime fiche antérieur, cascade SHL alors fausse). Câblé dans
+> `applyWaterfall` : `seedP50/seedP90 = −Math.max(0, ccaPrincipal − ccaDrawdown)` → `cumEbtP50` +
+> `retainedEarnings` (P50, commit 1) et `cumEbtP90` (P90, commit 2, via `shlP90Drawdown`). IS
+> bascule à l'année BP sur les 25 ; le seed P90 recale la DETTE des 4 projets P90-taxés vers le BP.
+> Ground truth exact : `compare_bp_project 21` (IS/déficit/résultat cumulés à l'euro).
+
 - **Symptôme** : déficit fiscal cumulé diverge dès an1 (−9 à −25 %, car OPEX an1 MF ≠ BP) puis
   explose ; IS décalé de plusieurs années (−79 % à +154 % l'année de bascule). Principal
   amplificateur des écarts CR/dividendes.
@@ -249,7 +281,18 @@ où l'écart apparaît (sur les échantillons Fable).
 - **BP** : `IS = 25 % × MIN(EBT, cumEBT)` (report intégral, SPEC §2.6) — déjà implémenté. Vérifier
   la base cumEBT (intérêts SHL capitalisés an0 ?) et le timing exact vs C_P50 r245 du projet.
 
-### 10. Waterfall SHL (7/7) — À FAIRE EN DERNIER
+### 10. Waterfall SHL (7/7) ✅ FAIT (no-DSRA + capitalisation + gate dividendes/pooling)
+> Trois corrections dans la cascade P50 de `applyWaterfall` (commit 1) : (a) **DSRA RETIRÉE** — le
+> BP ne finance aucune réserve de service de la dette (r296 « Cash flow available for SHL » == r268
+> « FCF after debt service » à l'euro sur les 25) ; l'ancienne DSRA ponctionnait le cash an1-2 et
+> décalait le sweep. Champs dsra* = 0 ; `dsraInitialKeuro` (double-TRI) intact. (b) **Capitalisation**
+> des intérêts SHL non couverts par le cash (r289 an1+ ≠ 0 → solde SHL croissant chez les cash-tight).
+> (c) **Dividendes plafonnés** aux bénéfices distribuables cumulés (r311) ; l'excédent → nouveau champ
+> `cashPoolingKeuro` (r319, affichage bpModel + mapping compare_bp_project). Le TRI investisseur
+> (FCF after debt service) n'utilise pas cette cascade → NON cassé (il bouge seulement via l'IS
+> retimé, TOUJOURS vers le BP). Dividendes/pooling Orval exacts à l'euro ; résidus Salbris/Villognon
+> = item 1 (merchant P90 queue).
+
 - **Symptôme** : MF ne rembourse pas an1 (sweep démarre an3), et/ou capitalisation des intérêts
   SHL différente → soldes ±100 % à ±3 900 %, dividendes ±100 à +1 200 % en fin de vie. Largement
   DÉRIVÉ de l'IS (9) et des CFADS (1-8).

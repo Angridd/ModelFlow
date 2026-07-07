@@ -170,14 +170,19 @@ describe("calibration Digoin — SAISIE PURE, chaîne calée à l'euro (base fon
     // Salbris 90,6 %, Ychoux 95 %, tous taxés dans leur feuille C_P90). La dette baisse donc de
     // 3 192,5 → 3 130,4 k€ (méthode BP-correcte) ; les ex-valeurs verrouillaient la méthode pré-item-8
     // (aucun IS de sizing). Le flux actionnaire an1 (P50) reste INCHANGÉ (63 832,15 €).
+    // Phase 2 item 9b (SEED du cumEBT P90 à l'intérêt SHL capitalisé an0) : retime la bascule IS_P90
+    // de la fiche d'un an → 3 130,4 → 3 131,9 k€ (+1 450 €, +0,046 %, dans la bande de bruit). Le
+    // Digoin de PORTEFEUILLE (data/3.xlsm) a IS_P90 = 0 → sa dette reste EXACTEMENT sur le BP
+    // (calibrate_all VERT). Cf 4 projets taxés (Baugé/Villognon/Ychoux/Salbris) recalés sur la
+    // bascule BP par le même seed.
     const dette = metrics.sizing?.debtRetenuKeuro ?? 0;
     const gearing = (metrics.sizing?.gearingActuel ?? 0) * 100;
-    expectClose(eur(dette), 3_130_420.00, 100, "② dette sculptée");
-    expectClose(gearing, 92.03, 0.02, "② gearing %");
+    expectClose(eur(dette), 3_131_870.00, 100, "② dette sculptée");
+    expectClose(gearing, 92.077, 0.02, "② gearing %"); // item 9b : 92,03 → 92,077 (dette +1 450 €)
     expect(metrics.sizing?.bindingConstraint, "② binding = dscr (pas gearing-capped)").toBe(
       "dscr",
     );
-    expectClose(capexTotalEuro - eur(dette), 270_939.11, 100, "② equity/SHL");
+    expectClose(capexTotalEuro - eur(dette), 269_489.11, 100, "② equity/SHL"); // item 9b : −1 450 €
 
     // ③ Production (P50 an1 = 4 950 · P90 = 4 603,5) — exact
     expectClose(at(1).productionP50Mwh, 4_950, 0.01, "③ prod P50 an1");
@@ -202,16 +207,19 @@ describe("calibration Digoin — SAISIE PURE, chaîne calée à l'euro (base fon
     // ⚠️ row.interets = intérêts DETTE + intérêts SHL ; l'intérêt dette pur = interets − ccaInterets.
     const ds = at(1).debtServiceSculptedKeuro ?? at(1).debtServiceKeuro;
     const debtInterest = at(1).interets - at(1).ccaInteretsKeuro;
+    // Service an1 INCHANGÉ (DSCR × CFADS P90 an1, IS_P90 an1 = 0) ; item 9b : la dette totale monte
+    // de +1 450 € → intérêt an1 +61 € (dette × 4,2 %) et principal an1 −61 € (ventilation).
     expectClose(eur(ds), 241_118.95, 1, "service dette an1");
-    expectClose(eur(debtInterest), 131_477.43, 1, "intérêts dette an1");
-    expectClose(eur(ds - debtInterest), 109_641.52, 1, "principal dette an1");
+    expectClose(eur(debtInterest), 131_538.41, 1, "intérêts dette an1");
+    expectClose(eur(ds - debtInterest), 109_580.54, 1, "principal dette an1");
 
     // ④ Flux actionnaire an1 (FCF after debt service) = 63 832,15 € — exact (inchangé item 8)
     expectClose(eur(at(1).fluxActionnaire), 63_832.15, 1, "④ flux actionnaire an1");
 
-    // ④ TRI investisseur = 19,24 % (mise 270 939 relevée par l'IS de sizing item 8, fort levier).
-    // Résiduel démantèlement an25-29 (G7) non modélisé (identique au résiduel Sigoulès, cf CALIBRATION.md).
-    expectClose(metrics.investorIrr, 19.24, 0.05, "④ TRI investisseur");
+    // ④ TRI investisseur = 19,29 % (mise 269 489 abaissée de −1 450 € par le seed P90 item 9b →
+    // levier accru ; item 8 : mise relevée par l'IS de sizing). Résiduel démantèlement an25-29 (G7)
+    // non modélisé (identique au résiduel Sigoulès, cf CALIBRATION.md).
+    expectClose(metrics.investorIrr, 19.29, 0.05, "④ TRI investisseur");
   });
 });
 
