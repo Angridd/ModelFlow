@@ -90,6 +90,9 @@ export function buildFinanceInput(
     demantelementEuroMWc: scenario.demantelementEuroMWc,
     demantelementTiming: scenario.demantelementTiming,
     mraProfil: scenario.mraProfil,
+    // Méthode engagements (tranche 2) : an1 k€ × 1,02^(y−1) quand la série routée est absente.
+    // null → comportement actuel inchangé (0) — pas de défaut imposé (an1/MWc trop variable).
+    engagementsKeuroAn1: scenario.engagementsKeuroAn1,
     margeFactFigeeKeuro: scenario.margeFactFigeeKeuro,
     // Marge facturable amortissable (item 7) : base D&A Type 2 uniquement. null → inchangé.
     margeFactAmortissableKeuro: scenario.margeFactAmortissableKeuro,

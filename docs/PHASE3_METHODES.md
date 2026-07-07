@@ -19,6 +19,18 @@
 > **385/414**, an9-11 = **560/414**, an19+ = **455/414** (les % du §4.2 étaient des arrondis).
 > **Non-régression : calibrate_all = 25/25 VERT** (le routing garde la priorité) ; build +
 > 55 tests vitest verts (Digoin : `mraProfil="plat"` figé — son banc BP applique la MRA plate).
+>
+> **AVANCEMENT 2026-07-07 — tranche 2 FAITE : engagements (§4.3).** Migration
+> `add_phase3_methode_engagements` (colonne Scenario `engagementsKeuroAn1` Float?), méthode
+> `an1 × 1,02^(y−1)` câblée dans la boucle annuelle (P50 + P90), exposée aux formulaires new/edit
+> (input optionnel sous la grille an-par-an). **PAS de défaut imposé** : l'an1/MWc des 25 BP varie
+> de **369 à 9 586 €/MWc** (médiane ≈ 2 626, ratio ×26) — null → comportement actuel inchangé (0).
+> Validation (scripts/_audit_phase3_engagements.ts) : la méthode ne reproduit le BP au centime sur
+> **aucun** des 21 projets à engagements (Δ total −79 % à +384 %) — **attendu et documenté §4.3** :
+> les séries r199 sont des échéanciers contractuels lumpy (an1 = pic, puis niveau récurrent plus
+> bas + pointes périodiques), pas des séries indexées. La méthode reste le bon défaut déclaratif
+> pour un projet neuf ; les existants gardent le routing. **Non-régression : 25/25 VERT**, build +
+> 55 tests verts.
 
 ## 1. Principe directeur — les deux usages cohabitent
 
@@ -53,8 +65,8 @@ généralise aux projets neufs.
 
 1. ✅ **Démantèlement** (FAIT 2026-07-07)
 2. ✅ **MRA paliers** (FAIT 2026-07-07)
-3. **Engagements** (🟡 moyen) ← PROCHAIN
-4. **TF/CFE** (🔴 base fragile — le vrai morceau)
+3. ✅ **Engagements** (FAIT 2026-07-07)
+4. **TF/CFE** (🔴 base fragile — le vrai morceau) ← PROCHAIN
 
 ---
 
@@ -96,10 +108,29 @@ manque que le **niveau moyen**.
 - **Fallback** : `mraKeuroByYear` (série routée r189) présente → l'utiliser ; sinon méthode.
 - **Validation** : débrancher r189 → ligne MRA ≈ BP sur les projets « Input ».
 
-### 4.3 Engagements (provisions/charges récurrentes)
-- **Input** : `engagementsKeuroAn1` — montant de l'**année 1** (ou défaut), **indexé 2 %/an**.
+### 4.3 Engagements (provisions/charges récurrentes) ✅ FAIT (2026-07-07)
+> Implémenté tel que spécifié, avec une décision de défaut : **input optionnel SANS défaut
+> imposé**. Audit des 25 BP (scripts/_audit_phase3_engagements.ts, série r199) :
+> - **an1/MWc trop variable pour un défaut sensé** : 369 → 9 586 €/MWc (ratio ×26), médiane
+>   2 626 €/MWc, sur les 21 projets à engagements non nuls (Digoin an1 = 0, 3 Villeherviers
+>   sans série). → `engagementsKeuroAn1` null → comportement actuel inchangé (0) ; l'ordre de
+>   grandeur (≈ 370-9 590 €/MWc, médiane ≈ 2 630) est documenté dans l'UI plutôt qu'imposé.
+> - **Méthode vs BP (série routée débranchée, an1 pris de r199)** : au centime sur **0/21**
+>   projets — ATTENDU. Les séries BP sont des **échéanciers contractuels lumpy** (an1 = pic
+>   souvent, puis niveau récurrent plus bas + pointes périodiques), pas des séries indexées :
+>   Δ total 35 ans de **−79 %** (Avermes, an1 anormalement bas vs suite) à **+384 %** (Sigoulès,
+>   an1-2 chargés puis chute à 12 % de l'an1) ; les plus proches : Baugé +9,4 %, Salbris +15,8 %,
+>   Ychoux +30,2 %, Orval +33,4 %. La méthode reste le bon défaut DÉCLARATIF pour un projet
+>   neuf (hypothèse simple de l'utilisateur) ; l'exactitude BP passe par la grille an-par-an.
+> - Câblage : colonne `Scenario.engagementsKeuroAn1` (Float?, migration
+>   `add_phase3_methode_engagements`), fallback dans la boucle annuelle (P50 ET P90), input
+>   sous la grille an-par-an des formulaires new/edit, create/update/clone. **Priorité :**
+>   `opexEngagementsKeuroByYear` (grille/r199) > méthode (an1 non null) > 0.
+> - **Non-régression : calibrate_all 25/25 VERT** (routing prioritaire), build + 55 tests verts.
+
+- **Input** : `engagementsKeuroAn1` — montant de l'**année 1** (SANS défaut), **indexé 2 %/an**.
 - **Formule** : `engagements(y) = base_an1 × 1,02^(y-1)`.
-- **Fallback** : série routée (r199) présente → l'utiliser ; sinon méthode.
+- **Fallback** : série routée (r199) présente → l'utiliser ; sinon méthode si an1 saisi ; sinon 0.
 - **Note** : l'indexation naïve avait régressé des projets **existants** par compensation
   (Phase 1) — mais pour un projet **neuf**, c'est l'hypothèse de l'utilisateur, donc pas de
   souci. Les projets existants gardent le routing.
@@ -139,7 +170,7 @@ Salbris était une **édition manuelle du fichier BP**, gérée par l'override `
 |---|---|---|---|
 | Démantèlement | €/MWc + timing (défaut an25-29) | ✅ FAIT (0,0000 € vs BP, 25/25) | faible |
 | MRA | moyenne €/kWc × forme paliers universelle | ✅ FAIT (0,0000 € vs BP + « plat » Mur-de-Sologne) | faible |
-| Engagements | base an1 × 1,02/an | 🟡 moyenne | moyen |
+| Engagements | base an1 × 1,02/an (SANS défaut — an1/MWc ×26 entre BP) | ✅ FAIT (0/21 au centime, ATTENDU : séries BP lumpy — méthode = défaut déclaratif) | moyen |
 | TF/CFE (taux) | Σ des taux saisis (défauts nationaux) | 🟢 haute | faible |
 | TF/CFE (base) | sélecteur achat terrain → 2 méthodes | 🔴 basse | élevé |
 | Financing fees | ×0,95 (déjà correct) | ✅ — | — |

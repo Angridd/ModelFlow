@@ -174,6 +174,11 @@ model Scenario {
   demantelementEuroMWc       Float?
   demantelementTiming        String?
   mraProfil                  String?
+  // • engagementsKeuroAn1  : MÉTHODE engagements (tranche 2) — montant année 1 en k€, indexé
+  //   2 %/an : engagements(y) = an1 × 1,02^(y-1). Fallback quand opexEngagementsKeuroByYear est
+  //   absente (la série routée r199 garde la priorité). PAS de défaut imposé : l'an1/MWc des
+  //   25 BP varie de 369 à 9 586 €/MWc (médiane ≈ 2 626) → null → comportement actuel (0).
+  engagementsKeuroAn1        Float?
   dscr                     Float
   npv                      Float
   irr                      Float

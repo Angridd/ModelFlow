@@ -353,6 +353,9 @@ function readScenarioAssumptions(formData: FormData) {
     tauxGEMAPICfe: readOptionalNumber(formData, "tauxGEMAPICfe"),
     aleasOpexRate: readOptionalNumber(formData, "aleasOpexRate"),
     opexEngagementsKeuroByYear: readOpexEngagements(formData),
+    // Méthode engagements Phase 3 (tranche 2) : an1 k€ × 1,02^(y−1), fallback quand la grille
+    // an-par-an est vide. Absent → null → comportement actuel inchangé (pas de défaut imposé).
+    engagementsKeuroAn1: readOptionalNumber(formData, "engagementsKeuroAn1"),
   };
 }
 
@@ -740,10 +743,12 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
       balancingCost: scenario.balancingCost,
       omFixedEuroKwc: scenario.omFixedEuroKwc,
       mraEuroKwc: scenario.mraEuroKwc,
-      // Méthodes Phase 3 (démantèlement €/MWc + timing, profil MRA) — champs formulaire.
+      // Méthodes Phase 3 (démantèlement €/MWc + timing, profil MRA, engagements an1) — champs
+      // formulaire.
       mraProfil: scenario.mraProfil,
       demantelementEuroMWc: scenario.demantelementEuroMWc,
       demantelementTiming: scenario.demantelementTiming,
+      engagementsKeuroAn1: scenario.engagementsKeuroAn1,
       backOfficeKeuro: scenario.backOfficeKeuro,
       diversOpexKeuro: scenario.diversOpexKeuro,
       loyerMode: scenario.loyerMode,

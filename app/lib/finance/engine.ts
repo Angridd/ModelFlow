@@ -51,6 +51,9 @@ function mraPalierRatio(year: number): number {
   }
   return 1;
 }
+// Engagements (tranche 2, §4.3) : indexation fixe de la méthode « base an1 × 1,02^(y−1) »
+// (hypothèse utilisateur pour un projet neuf — les BP existants routent leur série r199).
+const ENGAGEMENTS_INDEXATION_RATE = 0.02;
 const INFLATION_BACK_OFFICE_FALLBACK = 2;
 const INFLATION_DIVERS_FALLBACK = 2;
 const METHODE_TAXES_FALLBACK = "appreciation_directe";
@@ -218,6 +221,13 @@ export type FinanceEngineInput = FinancialAssumptions & {
   //     an19+ = 455/414) — identiques au ratio près de 1e-9 sur les 17 projets à paliers.
   //   • "plat"             : ancienne formule scalaire plate (rares sites type Mur-de-Sologne).
   mraProfil?: string | null;
+  // Engagements — MÉTHODE (tranche 2) quand opexEngagementsKeuroByYear est absente : montant de
+  // l'année 1 en k€, indexé 2 %/an → engagements(y) = engagementsKeuroAn1 × 1,02^(y−1).
+  // ⚠️ PAS de défaut imposé (contrairement au démantèlement/MRA) : l'an1/MWc des 25 BP varie de
+  // 369 à 9 586 €/MWc (médiane ≈ 2 626 — audit scripts/_audit_phase3_engagements.ts) et leurs
+  // séries r199 sont des échéanciers contractuels lumpy (0/21 purement indexés) → null →
+  // comportement actuel inchangé (0, rétrocompat stricte). La série routée garde la PRIORITÉ.
+  engagementsKeuroAn1?: number | null;
   // Marge facturable FIGÉE par le BP (feuille Inp_Opération, ligne « Dont Marge facturable »),
   // en k€. Non-null → désactive la boucle endogène `ajusteMargeFacturable` et impose cette valeur
   // (les k€ correspondants sont déjà inclus dans le CAPEX via `indemnitesImmoKeuro`, d'où 0 pour
@@ -1855,8 +1865,14 @@ function buildPreRows(
     // OPEX « engagements » du BP (Inp_Opération / « Total Engagements ») : montants réels
     // datés à l'année projet, NON ré-indexés (déjà en euros courants du BP). Additifs, en P50
     // ET en P90 (le BP les intègre dans « Total operational expenses PV » C_P90 r196-204).
-    // Absent → 0 → comportement inchangé (rétrocompat stricte).
-    const engagementsKeuro = input.opexEngagementsKeuroByYear?.[year - 1] ?? 0;
+    // Série routée présente → PRIORITÉ ABSOLUE (années au-delà de la série trimée → 0).
+    // Série absente → MÉTHODE Phase 3 (tranche 2) si engagementsKeuroAn1 est saisi :
+    // engagements(y) = an1 × 1,02^(y−1). null → 0 → comportement inchangé (rétrocompat stricte).
+    const engagementsKeuro = input.opexEngagementsKeuroByYear?.length
+      ? input.opexEngagementsKeuroByYear[year - 1] ?? 0
+      : input.engagementsKeuroAn1 != null
+        ? input.engagementsKeuroAn1 * (1 + ENGAGEMENTS_INDEXATION_RATE) ** (year - 1)
+        : 0;
     const annualOpex = opexDetailsP50.opexTotalKeuro + engagementsKeuro;
 
     // Equity cash-flow (P50) kEUR = revenue P50 - OPEX (project NPV/IRR base).

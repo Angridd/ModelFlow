@@ -852,6 +852,26 @@ export default async function EditScenarioPage({
             years={scenario.projectLifeYears}
             initialValue={parseEngagements(scenario.opexEngagementsKeuroByYear)}
           />
+          <div className="grid gap-5 sm:grid-cols-2" style={{ marginTop: "0.75rem" }}>
+            <label className="grid gap-1.5 text-sm font-medium text-zinc-700">
+              Engagements année 1 (k€) — méthode indexée 2 %/an
+              <input
+                name="engagementsKeuroAn1"
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue={scenario.engagementsKeuroAn1 ?? ""}
+                placeholder="optionnel"
+                title="Méthode pour projet neuf : engagements(y) = an1 × 1,02^(y-1). Utilisée UNIQUEMENT si la grille an-par-an ci-dessus est vide (la grille garde la priorité). Vide → aucun engagement. Ordre de grandeur des BP existants : an1 ≈ 370 à 9 590 €/MWc (médiane ≈ 2 630) — trop variable pour un défaut imposé."
+                className="h-10 px-3"
+              />
+            </label>
+          </div>
+          <p className="text-xs text-zinc-400" style={{ marginTop: "0.25rem" }}>
+            Alternative à la grille pour un projet neuf : montant an1 indexé 2 %/an. Ignoré si la
+            grille an-par-an est renseignée. Pas de défaut : les BP existants vont de ≈ 370 à
+            ≈ 9 590 €/MWc en an1 (médiane ≈ 2 630 €/MWc).
+          </p>
         </section>
 
         <div className="grid gap-2">
