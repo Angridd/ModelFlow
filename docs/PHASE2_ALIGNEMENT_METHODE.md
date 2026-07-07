@@ -1,5 +1,16 @@
 # Phase 2 — Aligner la MÉTHODE de calcul MF sur les BP (en cours)
 
+> **AVANCEMENT 2026-07-07 (bis) — item 1 FAIT (queue merchant P90 du sizing).** Le blend
+> Debt Sizing Curve est désormais LU du BP (« Inp_Curve price » r47 central / r48 low, col H,
+> `buildGroundTruthBySlug`) au lieu du 0,7/0,3 codé en dur. **Salbris = 1,0/0,0 (central pur)**
+> — **2e édition manuelle de son fichier après le financing fee 0,8** (item 11) ; les 24 autres
+> BP = 0,7/0,3 exact (round6) → strictement inchangés (calibrate_all bit-à-bit identique,
+> Sigoulès/Baugé témoins). Salbris : dette Δ−0,49 → **−0,11 %**, TRI inv Δ−0,57 → **−0,11 pp**,
+> Revenus P90 (sizing) an21+ −4,7/−6,4 % → **0,00 %** → VERT franc (plus besoin du plancher de
+> bruit). Compteur 25/25 conservé. Fix d'EXTRACTION seul (read_bp_matrix → seed_bp_reel →
+> colonnes `Project.debtSizingCentralW/LowW` existantes) — engine.ts intouché. Investor curve
+> (r55/r56) lue en défensif (log si ≠ 1/0) mais non routée : 1,0/0 partout, P50 déjà juste.
+>
 > **AVANCEMENT 2026-07-07 — 🎯 25/25 calés, 0 rouge.** Item **11** (financing fees = valeur
 > RÉELLEMENT APPLIQUÉE, Inp_Assumption r548) fait : **Salbris ROUGE→VERT** (CAPEX Δ+0,59 % →
 > **0,00 %**, TRI inv Δ−1,22 → **−0,57 pp**, dans la bande de bruit 0,7 pp). Le BP de Salbris a
@@ -72,7 +83,19 @@
 Diagnostic issu du comparateur + 4 agents Fable sur les 25 projets. Fréquence = nb de projets
 où l'écart apparaît (sur les échantillons Fable).
 
-### 1. Tarif merchant an21+ (7/7) — index de courbe
+### 1. Tarif merchant an21+ (7/7) — index de courbe ✅ FAIT (blend de sizing routé)
+> **Résolu comme fix d'extraction, pas de courbe.** Le prix P50 opérationnel (Investor curve,
+> 1,0/flat 0) était déjà juste partout ; le résidu an21+ ne touchait que le **P90 de sizing** de
+> Salbris, dont le BP applique un blend Debt Sizing **1,0/0,0 (central pur)** — édition manuelle
+> du fichier (la 2e après le financing fee 0,8, item 11), unique sur les 25. Fix : lire
+> « Inp_Curve price » (⚠️ espace final dans le nom de feuille) r47/r48 col H dans
+> `buildGroundTruthBySlug` (round6 → 0,7/0,3 exact sur les 24 standards) → engineOnly →
+> seed_bp_reel → colonnes `Project.debtSizingCentralW/LowW` (préexistantes, consommées par
+> `resolveMerchantPrices` — engine.ts intouché). Fallback 0,7/0,3 sans data/N.xlsm. Investor
+> curve r55/r56 lue en défensif (log si ≠ 1/0), non routée. **Salbris dette −0,49 → −0,11 %,
+> TRI inv −0,57 → −0,11 pp, Revenus P90 sizing an21+ → 0,00 % ; les 24 autres bit-à-bit
+> identiques ; 25/25 conservé.**
+
 - **Symptôme** : identique an1-20, puis divergence à partir de l'an21 (bascule merchant).
   De −12 à −19 % à la bascule (surtout MES lointaine, ex. Salbris MES 2030 −21 % an21) jusqu'à
   +13 à +19 % en fin de vie. Le BP extrapole ~+0,44 %/an lisse ; MF applique la courbe Aurora
@@ -262,9 +285,9 @@ où l'écart apparaît (sur les échantillons Fable).
 >   dette −0,49 % (résidu = queue merchant P90, item 1). CAPEX ~0,00 % sur les 25 (les petits
 >   Δ 0,1 % Montcuq/Sigoulès/Aérodrome absorbés). Sigoulès −0,02 pp, Baugé −0,08 pp inchangé.
 
-## Les rouges — état 2026-07-07 (après item 11) : 🎯 25/25 — plus aucun rouge
-- **Salbris** : ✅ VERT (item 11). CAPEX 0,00 %, TRI inv Δ−0,57 pp (bande 0,7), dette −0,49 %
-  (résidu queue merchant P90 an21+, item 1 — optionnel).
+## Les rouges — état 2026-07-07 (après items 11 puis 1) : 🎯 25/25 — plus aucun rouge
+- **Salbris** : ✅ VERT franc (items 11 + 1). CAPEX 0,00 %, dette Δ−0,11 %, TRI inv Δ−0,11 pp —
+  sorti du plancher de bruit (blend Debt Sizing 1,0/0,0 routé, Revenus P90 sizing an21+ 0,00 %).
 
 ## Les rouges — état 2026-07-06 soir (après items 2/3/6) : 24/25
 - **Selles-sur-Cher 1** : ✅ VERT (items 4 + 5). Dette 0,0 %, TF/CFE ligne-à-ligne. La régression
@@ -283,7 +306,7 @@ où l'écart apparaît (sur les échantillons Fable).
 7-8 (~45 min), 9-10 (cascade IS/SHL) = la partie incertaine, plusieurs passes (~1-2,5 h).
 Committer à chaque correction (progrès banké).
 
-## Reprendre (au 2026-07-07 — 🎯 25/25, items 2/3/4/5/6/7/8/11 faits)
+## Reprendre (au 2026-07-07 — 🎯 25/25, items 1/2/3/4/5/6/7/8/11 faits)
 0. Pipeline de mesure après TOUTE modif d'extraction/moteur (l'ordre compte) :
    `npx tsx scripts/read_bp_matrix.ts` (régénère data/cibles/) → `DATABASE_URL="file:./prisma/dev.db"
    npx tsx scripts/seed_bp_reel.ts` (réécrit la DB) → `npx tsx scripts/calibrate_all.ts` (compteur).
@@ -292,6 +315,6 @@ Committer à chaque correction (progrès banké).
 1. `npx tsx scripts/calibrate_all.ts` → **25/25 VERT, 0 rouge** (Salbris calé par l'item 11 —
    financing fees appliqués r548). Le compteur est ATTEINT : toute suite est du raffinement
    ligne-à-ligne, plus du débogage de compteur — ne jamais redescendre sous 25.
-2. Optionnel (ligne-à-ligne) : **item 1** (queue merchant P90 an21+ — résidu dette Salbris
-   −0,49 % / TRI −0,57 pp, Revenus P90 −4 à −7 % an21+), puis **9** (timing IS P50) et **10**
-   (waterfall SHL, affichage/VAN equity). Commit à chaque correction.
+2. ~~Item 1~~ ✅ FAIT (blend Debt Sizing routé — Salbris dette −0,11 %, TRI −0,11 pp).
+   Reste optionnel (ligne-à-ligne) : **9** (timing IS P50) et **10** (waterfall SHL,
+   affichage/VAN equity). Commit à chaque correction.

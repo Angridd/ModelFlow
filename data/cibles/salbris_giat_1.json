@@ -96,8 +96,8 @@
     "capacityMw": 20.93,
     "commissioningYear": 2030,
     "investorCurveW": 1,
-    "debtSizingCentralW": 0.7,
-    "debtSizingLowW": 0.3,
+    "debtSizingCentralW": 1,
+    "debtSizingLowW": 0,
     "unavailability": 0.01,
     "indemnitesImmoKeuro": 161.99999999999997,
     "financingFeesKeuro": 610.4328735027464,
@@ -329,6 +329,7 @@
     "Engagements = BP single-project C_P50 r199 (série appliquée, indexée 2%/an)",
     "TF/CFE = BP single-project C_P50 r191/r192 (série appliquée)",
     "Démantèlement = BP single-project C_P50 r195 (an25-29, non indexé)",
-    "MRA = BP single-project C_P50 r189 (paliers onduleurs, série appliquée)"
+    "MRA = BP single-project C_P50 r189 (paliers onduleurs, série appliquée)",
+    "Blend Debt Sizing = BP Inp_Curve price r47/r48 (1/0)"
   ]
 }

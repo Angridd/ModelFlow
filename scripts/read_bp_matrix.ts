@@ -151,6 +151,10 @@ export type BpGroundTruth = {
   // MRA appliquée (C_P50 r189) : courbe en PALIERS (garantie onduleurs), déjà indexée 2 %/an,
   // flag exploitation inclus (item 6). Mur-de-Sologne : r189 = plat → inchangé.
   mraKeuroByYear: number[];
+  // Poids de blend Debt Sizing Curve appliqués (item 1) : « Inp_Curve price » r47 (central) /
+  // r48 (low), col H. Salbris = 1,0/0,0 (édition manuelle du fichier) ; les 24 autres = 0,7/0,3.
+  debtSizingCentralW: number;
+  debtSizingLowW: number;
 };
 
 export function buildGroundTruthBySlug(): Map<string, BpGroundTruth> {
@@ -160,7 +164,13 @@ export function buildGroundTruthBySlug(): Map<string, BpGroundTruth> {
     const file = path.resolve(process.cwd(), `data/${n}.xlsm`);
     let wb: XLSX.WorkBook;
     try {
-      wb = XLSX.read(readFileSync(file), { type: "buffer", sheets: ["C_P50"], bookVBA: false });
+      wb = XLSX.read(readFileSync(file), {
+        type: "buffer",
+        // ⚠ « Inp_Curve price » a un ESPACE FINAL dans le nom réel de la feuille — on demande
+        // les deux graphies (les noms absents sont ignorés par XLSX.read).
+        sheets: ["C_P50", "Inp_Curve price ", "Inp_Curve price"],
+        bookVBA: false,
+      });
     } catch {
       continue; // fichier absent → pas de ground truth (fallback : série vide)
     }
@@ -200,6 +210,34 @@ export function buildGroundTruthBySlug(): Map<string, BpGroundTruth> {
       return s;
     };
 
+    // Poids de blend Debt Sizing Curve RÉELLEMENT APPLIQUÉS (item 1) : « Inp_Curve price »
+    // r47 (central) / r48 (low), col H (index 7). round6 : Excel peut rendre
+    // 0.30000000000000004 → 0,3 exact (garantit un no-op bit-à-bit sur les BP standard).
+    // Feuille absente ou cellule non numérique → fallback 0,7 / 0,3.
+    const curveWs = wb.Sheets["Inp_Curve price "] ?? wb.Sheets["Inp_Curve price"];
+    const curve = (r1: number, c0: number): number | null => {
+      if (!curveWs) return null;
+      const x = curveWs[XLSX.utils.encode_cell({ r: r1 - 1, c: c0 })] as
+        | XLSX.CellObject
+        | undefined;
+      if (!x || x.t === "e") return null;
+      return typeof x.v === "number" && Number.isFinite(x.v) ? x.v : null;
+    };
+    const wCentral = curve(47, 7);
+    const wLow = curve(48, 7);
+    // Défensif : Investor curve (r55 central / r56 discount flat) — attendue 1/0 partout.
+    // On LOGGE si divergent mais on ne route PAS (le P50 opérationnel est déjà juste).
+    const wInvCentral = curve(55, 7);
+    const wInvDisc = curve(56, 7);
+    if (
+      (wInvCentral !== null && Math.abs(wInvCentral - 1) > 1e-9) ||
+      (wInvDisc !== null && Math.abs(wInvDisc) > 1e-9)
+    ) {
+      console.warn(
+        `⚠ ${name} : Investor curve BP ≠ 1/0 (central ${wInvCentral}, discount ${wInvDisc}) — non routée`,
+      );
+    }
+
     map.set(slugify(name), {
       engagements,
       appliedTariffAn1: g(73, an1),
@@ -207,6 +245,8 @@ export function buildGroundTruthBySlug(): Map<string, BpGroundTruth> {
       cfeKeuroByYear: readTax(192),
       demantelementKeuroByYear: readTax(195),
       mraKeuroByYear: readTax(189),
+      debtSizingCentralW: wCentral !== null ? round6(wCentral) : 0.7,
+      debtSizingLowW: wLow !== null ? round6(wLow) : 0.3,
     });
   }
   return map;
@@ -559,12 +599,23 @@ export function buildProject(
   const margeFactAmortissableKeuro =
     margeFacturableEuro > 0 ? margeFacturableEuro / 1000 : null;
 
+  // Poids Debt Sizing Curve RÉELLEMENT APPLIQUÉS (item 1) : Inp_Curve price r47/r48 col H du
+  // single-project. Salbris = 1,0/0,0 (édition manuelle, comme son financing fee 0,8) ; les 24
+  // autres = 0,7/0,3 → strictement inchangés. Sans data/N.xlsm → fallback 0,7/0,3.
+  const debtSizingCentralW = groundTruth?.debtSizingCentralW ?? 0.7;
+  const debtSizingLowW = groundTruth?.debtSizingLowW ?? 0.3;
+  if (Math.abs(debtSizingCentralW - 0.7) > 1e-9 || Math.abs(debtSizingLowW - 0.3) > 1e-9) {
+    flags.push(
+      `Blend Debt Sizing = BP Inp_Curve price r47/r48 (${debtSizingCentralW}/${debtSizingLowW})`,
+    );
+  }
+
   const engineOnly = {
     capacityMw,
     commissioningYear: mes,
     investorCurveW: 1,
-    debtSizingCentralW: 0.7,
-    debtSizingLowW: 0.3,
+    debtSizingCentralW,
+    debtSizingLowW,
     ...persistedEngineInputs,
     opexEngagementsKeuroByYear,
     tfKeuroByYear,

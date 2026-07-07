@@ -94,8 +94,10 @@ async function main() {
         caseType: "Base",
         tariff: b.scenario.tariff as number,
         commissioningYear: b.commissioningYear,
-        debtSizingCentralW: 0.7,
-        debtSizingLowW: 0.3,
+        // Blend Debt Sizing Curve appliqué par le BP (item 1) : Inp_Curve price r47/r48 col H,
+        // routé par read_bp_matrix (Salbris 1,0/0,0 ; les 24 autres 0,7/0,3).
+        debtSizingCentralW: (b.engineOnly.debtSizingCentralW as number | undefined) ?? 0.7,
+        debtSizingLowW: (b.engineOnly.debtSizingLowW as number | undefined) ?? 0.3,
         investorCurveW: 1,
       };
       let projectId: string;
