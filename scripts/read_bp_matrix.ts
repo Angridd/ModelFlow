@@ -358,6 +358,21 @@ export function buildProject(
     );
   }
 
+  // Financing fees RÉELLEMENT APPLIQUÉS par le BP (item 11) : r548 « Financing fees » (€ → k€),
+  // valeur an0 routée par projet (même patron « valeur appliquée » que TF/CFE r191/r192, MRA r189,
+  // engagements r199). Le moteur les porte dans le CAPEX total (poste No D&A) et NEUTRALISE le
+  // recalcul par taux 7 composants (calculateFinancingFees) — certains BP éditent les fees à la
+  // main (Salbris : facteur 0,8 codé en dur → 610,4 k€ appliqués vs 720,2 k€ recalculés ×0,95).
+  // r548 absent/nul → null → recalcul par taux inchangé (rétrocompat stricte).
+  const financingFeesAppliedEuro = num(cell, 548, col) ?? 0;
+  const financingFeesKeuro =
+    financingFeesAppliedEuro > 0 ? financingFeesAppliedEuro / 1000 : null;
+  if (financingFeesKeuro != null) {
+    flags.push(
+      `Financing fees = valeur appliquée BP r548 (${financingFeesKeuro.toFixed(1)} k€, recalcul par taux neutralisé)`,
+    );
+  }
+
   // Démantèlement (item 2) : r294 = TOTAL € (étalé par le BP sur an25-29, constant non indexé).
   // La série RÉELLEMENT APPLIQUÉE (C_P50 r195, ground truth) est routée plus bas
   // (demantelementKeuroByYear) ; le flag « non modélisé » ne subsiste que sans data/N.xlsm.
@@ -456,6 +471,9 @@ export function buildProject(
   const persistedEngineInputs = {
     unavailability: num(cell, 116, col) ?? 0,
     indemnitesImmoKeuro,
+    // Financing fees appliqués (r548, k€) — cf bloc ci-dessus. Persisté (Scenario.financingFeesKeuro)
+    // et injecté au moteur ; les 7 taux template (shared) restent en fallback si null.
+    financingFeesKeuro,
     // Aléas = r298 « Aléas % » = 0,5 % × revenu (poste réel du BP, cf CALIBRATION.md Baugé
     // aléas 3177,80 = 0,5 % × 635,56 k). ⚠️ NE PAS lire r301 « Opex hazard % » (=0, poste
     // distinct) : c'était le bug qui annulait l'aléas sur tout le portefeuille (CFADS P90 trop

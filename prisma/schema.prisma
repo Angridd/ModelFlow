@@ -160,6 +160,10 @@ model Scenario {
   // PALIERS (renouvellement onduleurs), déjà indexée 2 %/an. Prime sur le scalaire mraEuroKwc
   // quand présente ; null → formule scalaire plate (rétrocompat stricte).
   mraKeuroByYear             String?
+  // Financing fees RÉELLEMENT APPLIQUÉS par le BP (Inp_Assumption r548, € → k€) : valeur an0
+  // routée dans le CAPEX (calculateCapexDetails) qui NEUTRALISE le recalcul par taux
+  // (calculateFinancingFees). null → recalcul par taux 7 composants (rétrocompat stricte).
+  financingFeesKeuro         Float?
   dscr                     Float
   npv                      Float
   irr                      Float

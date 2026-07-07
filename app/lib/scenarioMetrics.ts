@@ -170,6 +170,9 @@ export function buildFinanceInput(
     ccaRemunRate: scenario.ccaRemunRate,
     unavailability: scenario.unavailability,
     indemnitesImmoKeuro: scenario.indemnitesImmoKeuro,
+    // Financing fees appliqués (item 11, Inp_Assumption r548 k€) : portés dans le CAPEX total et
+    // NEUTRALISENT le recalcul par taux 7 composants. null → recalcul par taux inchangé.
+    financingFeesKeuro: scenario.financingFeesKeuro,
     aleasOpexRate: scenario.aleasOpexRate,
     tauxTSECfe: scenario.tauxTSECfe,
     tauxGEMAPICfe: scenario.tauxGEMAPICfe,

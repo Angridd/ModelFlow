@@ -73,6 +73,7 @@
     "commitmentFeesRate": 0.1,
     "unavailability": 0.01,
     "indemnitesImmoKeuro": 127,
+    "financingFeesKeuro": 613.3245590934674,
     "aleasOpexRate": 0.5,
     "tauxTSECfe": 0,
     "tauxGEMAPICfe": 0.00521,
@@ -99,6 +100,7 @@
     "debtSizingLowW": 0.3,
     "unavailability": 0.01,
     "indemnitesImmoKeuro": 127,
+    "financingFeesKeuro": 613.3245590934674,
     "aleasOpexRate": 0.5,
     "tauxTSECfe": 0,
     "tauxGEMAPICfe": 0.00521,
@@ -251,6 +253,7 @@
     "equityRequiredKeuro": 2340.2283498007973
   },
   "flags": [
+    "Financing fees = valeur appliquée BP r548 (613.3 k€, recalcul par taux neutralisé)",
     "Engagements = BP single-project C_P50 r199 (série appliquée, indexée 2%/an)",
     "Aucun engagement (série vide → OPEX inchangé)",
     "TF/CFE = BP single-project C_P50 r191/r192 (série appliquée)",

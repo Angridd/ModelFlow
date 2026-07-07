@@ -73,6 +73,7 @@
     "commitmentFeesRate": 0.1,
     "unavailability": 0.01,
     "indemnitesImmoKeuro": 159,
+    "financingFeesKeuro": 466.5265684563899,
     "aleasOpexRate": 0.5,
     "tauxTSECfe": 0,
     "tauxGEMAPICfe": 0.00521,
@@ -99,6 +100,7 @@
     "debtSizingLowW": 0.3,
     "unavailability": 0.01,
     "indemnitesImmoKeuro": 159,
+    "financingFeesKeuro": 466.5265684563899,
     "aleasOpexRate": 0.5,
     "tauxTSECfe": 0,
     "tauxGEMAPICfe": 0.00521,
@@ -323,6 +325,7 @@
     "equityRequiredKeuro": 2032.5755244412162
   },
   "flags": [
+    "Financing fees = valeur appliquée BP r548 (466.5 k€, recalcul par taux neutralisé)",
     "Tarif PPA an1 indexé BP 80.93 €/MWh (portefeuille 77.00)",
     "Engagements = BP single-project C_P50 r199 (série appliquée, indexée 2%/an)",
     "TF/CFE = BP single-project C_P50 r191/r192 (série appliquée)",

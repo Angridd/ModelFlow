@@ -56,6 +56,8 @@ async function main() {
     const margeFactAmortissableKeuro =
       b.engineOnly.margeFactAmortissableKeuro as number | null | undefined;
     const scenario: Record<string, unknown> = {
+      // ...b.scenario porte aussi financingFeesKeuro (item 11, Inp_Assumption r548 € → k€,
+      // persistedEngineInputs de read_bp_matrix) → colonne Scenario.financingFeesKeuro (Float?).
       ...b.scenario,
       opexEngagementsKeuroByYear:
         engagements && engagements.length > 0 ? JSON.stringify(engagements) : null,

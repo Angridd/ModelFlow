@@ -178,14 +178,22 @@ export default async function ProjectDetailPage({
         )
       : null;
   const sizing = cashFlowMetrics?.sizing ?? null;
-  const capexInitialKeuro = cashFlowScenario
-    ? (cashFlowCapexDetails?.capexTotalKeuro ?? cashFlowScenario.capex * project.capacityMw)
-    : 0;
+  // Frais de financement APPLIQUÉS (item 11, override Scenario.financingFeesKeuro) : ils sont
+  // portés DANS capexDetails.capexTotalKeuro (poste No D&A) et neutralisent le recalcul par taux
+  // (metrics.financingFeesKeuro = 0). Pour l'affichage on les re-sépare : « CAPEX initial » reste
+  // HORS fees et la ligne « Frais de financement » porte l'override OU le recalcul par taux —
+  // exactement UN des deux est non nul ; le total (capexTotalWithFinancingFees) est inchangé.
+  const appliedFinancingFeesKeuro = cashFlowCapexDetails?.financingFeesKeuro ?? 0;
+  const capexInitialKeuro =
+    (cashFlowScenario
+      ? (cashFlowCapexDetails?.capexTotalKeuro ?? cashFlowScenario.capex * project.capacityMw)
+      : 0) - appliedFinancingFeesKeuro;
   const capexBeforeContingencyKeuro =
     cashFlowCapexDetails?.capexBeforeContingencyKeuro ?? capexInitialKeuro;
   const contingencyKeuro = cashFlowMetrics?.contingencyKeuro ?? 0;
   const taxesFoncieresKeuro = cashFlowCapexDetails?.taxesFoncieresKeuro ?? 0;
-  const financingFeesKeuro = cashFlowMetrics?.financingFeesKeuro ?? 0;
+  const financingFeesKeuro =
+    (cashFlowMetrics?.financingFeesKeuro ?? 0) + appliedFinancingFeesKeuro;
   const estimatedPltKeuro = cashFlowMetrics?.estimatedPltKeuro ?? 0;
   const financingFeesDetail = cashFlowMetrics?.financingFeesDetail ?? null;
   const capexTotalWithFinancingFeesKeuro = capexInitialKeuro + financingFeesKeuro;

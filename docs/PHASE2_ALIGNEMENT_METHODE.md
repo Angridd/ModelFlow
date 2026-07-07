@@ -1,5 +1,16 @@
 # Phase 2 — Aligner la MÉTHODE de calcul MF sur les BP (en cours)
 
+> **AVANCEMENT 2026-07-07 — 🎯 25/25 calés, 0 rouge.** Item **11** (financing fees = valeur
+> RÉELLEMENT APPLIQUÉE, Inp_Assumption r548) fait : **Salbris ROUGE→VERT** (CAPEX Δ+0,59 % →
+> **0,00 %**, TRI inv Δ−1,22 → **−0,57 pp**, dans la bande de bruit 0,7 pp). Le BP de Salbris a
+> un facteur **0,8 codé en dur** dans sa formule de fees (édition manuelle, unique sur les 34
+> fichiers) → 610,4 k€ appliqués vs 720,2 k€ recalculés par la formule template ×0,95 (qui reste
+> correcte ailleurs → on route la valeur appliquée par projet au lieu de toucher
+> `calculateFinancingFees`). Témoins : Sigoulès Δ−0,04 → −0,02 pp, Baugé inchangé (−0,08 pp) ;
+> aucun projet dégradé (le CAPEX passe à ~0,00 % sur les 25). L'item **1** (queue merchant P90
+> an21+, dette Salbris −0,49 %/TRI −0,57 pp résiduels) reste OPTIONNEL pour le ligne-à-ligne
+> dette — plus nécessaire au compteur.
+>
 > Rédigé le 2026-07-05. État de départ : **22/25 projets calés** (dette/CAPEX/TRI) après
 > Phase 1 (corrections d'extraction, commit `61a0969`). Objectif Phase 2 : que MF reproduise
 > le BP **ligne à ligne, année par année**, sur les 25 projets — ce qui calera aussi la VAN
@@ -227,6 +238,34 @@ où l'écart apparaît (sur les échantillons Fable).
   service (déjà calé). Le waterfall SHL affecte surtout l'AFFICHAGE et la VAN equity — vérifier
   que corriger le SHL ne casse pas le TRI investisseur déjà calé.
 
+### 11. Financing fees — valeur appliquée BP (Inp_Assumption r548) ✅ FAIT → 25/25
+> **Dernier rouge (Salbris) résolu.** Cause n°1 de son Δ TRI (−0,79 pp sur −1,22) : le BP de
+> Salbris applique **610,4 k€** de financing fees (r548) alors que MF en recalculait **720,2 k€**
+> (formule template 7 composants ×0,95). Son fichier BP a un facteur **0,8 codé en dur** (édition
+> manuelle unique sur les 34) → non reconstituable par formule. **Fix** (stratégie « valeur
+> appliquée », comme TF/CFE r191-192, MRA r189, engagements r199) : route r548 (€ → k€) par
+> projet → colonne `Scenario.financingFeesKeuro` (Float?, migration
+> `add_financing_fees_override`) → input moteur `financingFeesKeuro`.
+> - **Moteur** : l'override est porté dans le CAPEX total (`calculateCapexDetails`, poste
+>   **No D&A** — canal input préexistant, celui des bancs Baugé/Sigoulès) et NEUTRALISE le
+>   recalcul par taux (`calculateFinancingFees` → 0 quand l'override est non nul, sinon double
+>   comptage dans `initialInvestment`). La formule ×0,95 (engine.ts) est INCHANGÉE (correcte sur
+>   les 25 autres BP) ; null → recalcul par taux inchangé (rétrocompat stricte, 55 tests verts
+>   SANS retouche d'ancre). Effet limité à l'équity an0/CAPEX : D&A (mapping par composants),
+>   base foncière (composants + TF/CFE routées) et OPEX intouchés ; la dette sculptée (DSCR,
+>   gearing Salbris 90,1 % < 95 %) ne bouge que de −19 k€ (via intérêts SHL P90 ↔ IS de sizing).
+> - **Câblage** : read_bp_matrix (r548 → persistedEngineInputs + flag) → seed_bp_reel (colonne)
+>   → scenarioMetrics/calibrate_all (input). Affichage : page projet et analysisServer re-séparent
+>   « CAPEX initial (hors fees) » / « frais de financement » (exactement UN des deux canaux —
+>   override capexDetails OU recalcul metrics — est non nul).
+> - **Résultat** : **25/25 VERT**. Salbris CAPEX 18 557 = BP (0,00 %), TRI Δ−0,57 pp (bande 0,7),
+>   dette −0,49 % (résidu = queue merchant P90, item 1). CAPEX ~0,00 % sur les 25 (les petits
+>   Δ 0,1 % Montcuq/Sigoulès/Aérodrome absorbés). Sigoulès −0,02 pp, Baugé −0,08 pp inchangé.
+
+## Les rouges — état 2026-07-07 (après item 11) : 🎯 25/25 — plus aucun rouge
+- **Salbris** : ✅ VERT (item 11). CAPEX 0,00 %, TRI inv Δ−0,57 pp (bande 0,7), dette −0,49 %
+  (résidu queue merchant P90 an21+, item 1 — optionnel).
+
 ## Les rouges — état 2026-07-06 soir (après items 2/3/6) : 24/25
 - **Selles-sur-Cher 1** : ✅ VERT (items 4 + 5). Dette 0,0 %, TF/CFE ligne-à-ligne. La régression
   par compensation redoutée avec l'item 6 n'a PAS eu lieu.
@@ -244,16 +283,15 @@ où l'écart apparaît (sur les échantillons Fable).
 7-8 (~45 min), 9-10 (cascade IS/SHL) = la partie incertaine, plusieurs passes (~1-2,5 h).
 Committer à chaque correction (progrès banké).
 
-## Reprendre (au 2026-07-06 soir — 24/25, items 2/3/4/5/6/7/8 faits)
+## Reprendre (au 2026-07-07 — 🎯 25/25, items 2/3/4/5/6/7/8/11 faits)
 0. Pipeline de mesure après TOUTE modif d'extraction/moteur (l'ordre compte) :
    `npx tsx scripts/read_bp_matrix.ts` (régénère data/cibles/) → `DATABASE_URL="file:./prisma/dev.db"
    npx tsx scripts/seed_bp_reel.ts` (réécrit la DB) → `npx tsx scripts/calibrate_all.ts` (compteur).
    ⚠️ calibrate_all lit data/cibles/*.json ; le comparateur lit la DB (Prisma). Régénérer LES DEUX.
    Après un changement de schéma Prisma : `npx prisma generate` (explicite) avant de re-seed/build.
-1. `npx tsx scripts/calibrate_all.ts` → 24/25. Seul rouge : **Salbris** TRI Δ−1,22 pp. Tous les
-   postes OPEX (O&M/MRA/TF/CFE/engagements/démantèlement) + D&A sont désormais EXACTS chez lui —
-   le résidu = timing IS P50 (item 9), SHL/CCA (item 10) et CAPEX +0,59 % pré-existant, amplifiés
-   par le gearing 90,6 % (équity fine).
-2. **Attaquer l'item 9 (timing IS P50)** puis **10 (waterfall SHL)** — dernières cascades communes.
-   Reste aussi l'item 1 (tarif merchant an21+) pour le ligne-à-ligne « Tarif appliqué » (sans
-   effet compteur à ce stade). Commit à chaque correction.
+1. `npx tsx scripts/calibrate_all.ts` → **25/25 VERT, 0 rouge** (Salbris calé par l'item 11 —
+   financing fees appliqués r548). Le compteur est ATTEINT : toute suite est du raffinement
+   ligne-à-ligne, plus du débogage de compteur — ne jamais redescendre sous 25.
+2. Optionnel (ligne-à-ligne) : **item 1** (queue merchant P90 an21+ — résidu dette Salbris
+   −0,49 % / TRI −0,57 pp, Revenus P90 −4 à −7 % an21+), puis **9** (timing IS P50) et **10**
+   (waterfall SHL, affichage/VAN equity). Commit à chaque correction.

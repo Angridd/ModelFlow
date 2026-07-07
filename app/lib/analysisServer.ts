@@ -94,8 +94,9 @@ export function buildProjectBundle(
         foncier: capex.taxesFoncieresKeuro + capex.indemnitesImmoKeuro,
         contingency: capex.contingencyKeuro,
         apport: capex.apportAffaireKeuro,
-        // Frais de financement RÉELS (dérivés arranger/participant/… — pas l'override input).
-        financing: finance.metrics.financingFeesKeuro,
+        // Frais de financement RÉELS : override « valeur appliquée BP » (item 11, porté par
+        // capexDetails) OU recalcul par taux (metrics) — exactement UN des deux est non nul.
+        financing: capex.financingFeesKeuro + finance.metrics.financingFeesKeuro,
       },
       opex: {
         om: opex1?.omKeuro ?? 0,

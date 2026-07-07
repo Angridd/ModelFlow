@@ -128,6 +128,13 @@ export type FinanceEngineInput = FinancialAssumptions & {
   balancingCost?: number | null;
   surfaceHa?: number | null;
   indemnitesImmoKeuro?: number | null;
+  // Financing fees RÉELLEMENT APPLIQUÉS par le BP (Inp_Assumption r548, k€) — valeur an0 routée
+  // par projet (Phase 2, même stratégie « valeur appliquée » que TF/CFE, MRA, engagements). Portés
+  // dans le CAPEX total (calculateCapexDetails, poste No D&A, hors base foncière/OPEX) et, quand
+  // présents, NEUTRALISENT le recalcul par taux 7 composants (calculateFinancingFees → 0, sinon
+  // double comptage : la formule standard ×0,95 diverge des fees édités à la main dans certains
+  // BP, ex. Salbris ×0,8 → 610,4 k€ appliqués vs 720,2 k€ recalculés). null → recalcul par taux
+  // inchangé (rétrocompat stricte). Persisté : colonne Scenario.financingFeesKeuro (Float?).
   financingFeesKeuro?: number | null;
   prixModuleUSDWc?: number | null;
   tauxEURUSD?: number | null;
@@ -351,6 +358,7 @@ type FinancingFeesInput = Pick<
   | "bankFeesPLTKEuroPerMW"
   | "interimFinancingRate"
   | "commitmentFeesRate"
+  | "financingFeesKeuro"
 > & { capexTotalKeuro: number };
 
 export type OpexDetails = {
@@ -844,6 +852,11 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
   const legacyCapexTotal = input.capex * input.capacityMw;
 
   if (!hasDetailedCapex) {
+    // L'override « valeur appliquée BP » est porté dans le CAPEX total AUSSI en mode legacy :
+    // il neutralise calculateFinancingFees → sans cet ajout, les fees disparaîtraient du CAPEX.
+    // null → 0 → total legacy strictement inchangé (rétrocompat).
+    const legacyFinancingFeesKeuro = input.financingFeesKeuro ?? 0;
+    const legacyTotalKeuro = legacyCapexTotal + legacyFinancingFeesKeuro;
     return {
       hasDetailedCapex,
       modulesKeuro: 0,
@@ -861,9 +874,9 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
       taxeArcheoKeuro: 0,
       taxesFoncieresKeuro: 0,
       indemnitesImmoKeuro: 0,
-      financingFeesKeuro: 0,
-      capexTotalKeuro: legacyCapexTotal,
-      capexPerMwKeuro: input.capacityMw > 0 ? legacyCapexTotal / input.capacityMw : 0,
+      financingFeesKeuro: legacyFinancingFeesKeuro,
+      capexTotalKeuro: legacyTotalKeuro,
+      capexPerMwKeuro: input.capacityMw > 0 ? legacyTotalKeuro / input.capacityMw : 0,
     };
   }
 
@@ -951,7 +964,11 @@ function hasFinancingFeesInput(input: FinancingFeesInput) {
 export function calculateFinancingFees(
   input: FinancingFeesInput,
 ): FinancingFeesResult {
-  if (!hasFinancingFeesInput(input)) {
+  // Override « valeur appliquée BP » (input.financingFeesKeuro, Inp_Assumption r548) : les fees
+  // sont DÉJÀ portés dans le CAPEX total (calculateCapexDetails, poste No D&A) → le recalcul par
+  // taux 7 composants est NEUTRALISÉ ici (sinon double comptage dans initialInvestment =
+  // capexTotalKeuro + financingFeesKeuro). null → recalcul par taux inchangé (rétrocompat stricte).
+  if (input.financingFeesKeuro != null || !hasFinancingFeesInput(input)) {
     return {
       financingFeesKeuro: 0,
       estimatedPltKeuro: 0,
