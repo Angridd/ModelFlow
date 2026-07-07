@@ -18,6 +18,7 @@ import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "../app/generated/prisma/client";
 import { calculateCapexDetails, calculateScenarioMetrics } from "../app/lib/finance/engine";
 import type { FinanceEngineInput } from "../app/lib/finance/engine";
+import { computeVanBruteNetteKeuro } from "../app/lib/scenarioMetrics";
 import { CAPACITY_PRICE_CURVE, merchantCurveForTechnology } from "../app/lib/finance/merchantCurves";
 import type { DscrTranche } from "../app/lib/finance/types";
 import { slugify } from "./read_bp_matrix";
@@ -284,7 +285,9 @@ async function main() {
     const capexTotalMF =
       calculateCapexDetails(input).capexTotalKeuro + m.financingFeesKeuro;
     const triInvMF = m.investorIrr;
-    const vanNetteMF = m.npv;
+    // VAN nette investisseur (levier), MÊME repère que la cible BP (tt.vanNetteKeuro).
+    // m.npv = VAN projet NON-levier → faux repère (artefact de mesure, cf diagnostic VAN nette).
+    const vanNetteMF = computeVanBruteNetteKeuro(m, input).vanNetteKeuro;
 
     const tt = c.targets;
     const capexBP = tt.capexTotalKeuro;
