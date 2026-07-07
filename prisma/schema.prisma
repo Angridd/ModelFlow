@@ -179,6 +179,18 @@ model Scenario {
   //   absente (la série routée r199 garde la priorité). PAS de défaut imposé : l'an1/MWc des
   //   25 BP varie de 369 à 9 586 €/MWc (médiane ≈ 2 626) → null → comportement actuel (0).
   engagementsKeuroAn1        Float?
+  // MÉTHODE TF/CFE Phase 3 (tranche 4, docs/PHASE3_METHODES.md §4.4) — sélecteur d'assiette
+  // AUTO + override (§7.2) et taux département (§7.3). La série routée tfKeuroByYear/
+  // cfeKeuroByYear garde la PRIORITÉ ABSOLUE.
+  // • prixAchatTerrainEuro : prix d'achat du terrain en € (template J298). NON-null → active le
+  //   sélecteur Phase 3 : > 0 → assiette « comptable » ; sinon « appréciation directe » template.
+  //   null (et methodeAssiette null) → branche taxes legacy STRICTEMENT inchangée (rétrocompat).
+  // • methodeAssiette : override manuel "comptable" | "appreciation_directe" ; null → AUTO
+  //   (dérivé du prix d'achat — rattrape les erreurs de saisie type Digoin).
+  // • tauxTFDepartement : taux TFPB département, compté EN PLUS du communal si ≠ 0 (décimal).
+  prixAchatTerrainEuro       Float?
+  methodeAssiette            String?
+  tauxTFDepartement          Float?
   dscr                     Float
   npv                      Float
   irr                      Float

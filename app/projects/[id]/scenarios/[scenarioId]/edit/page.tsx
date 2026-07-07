@@ -697,6 +697,11 @@ export default async function EditScenarioPage({
               scenario.inflationDivers ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationDivers,
             methodeTaxes:
               scenario.methodeTaxes ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.methodeTaxes,
+            // Méthode TF/CFE Phase 3 : PAS de défaut ici (scénario existant → null → branche
+            // taxes legacy strictement inchangée tant que l'utilisateur ne renseigne pas).
+            prixAchatTerrainEuro: scenario.prixAchatTerrainEuro,
+            methodeAssiette: scenario.methodeAssiette,
+            tauxTFDepartement: scenario.tauxTFDepartement,
             tauxTFCommune: scenario.tauxTFCommune,
             tauxTFEPCI: scenario.tauxTFEPCI,
             tauxTSE: scenario.tauxTSE,

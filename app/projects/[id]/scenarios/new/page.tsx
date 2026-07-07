@@ -608,6 +608,9 @@ export default async function NewScenarioPage({
             inflationBackOffice: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationBackOffice,
             inflationDivers: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationDivers,
             methodeTaxes: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.methodeTaxes,
+            // Méthode TF/CFE Phase 3 : projet NEUF → sélecteur AUTO actif d'emblée
+            // (prix d'achat terrain 0 → appréciation directe template ; > 0 → comptable).
+            prixAchatTerrainEuro: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.prixAchatTerrainEuro,
             prixTerrainHa: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.prixTerrainHa,
             abattTerrain: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.abattTerrain,
             inflationTaxes: DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.inflationTaxes,

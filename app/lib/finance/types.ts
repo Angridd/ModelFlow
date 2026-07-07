@@ -44,6 +44,10 @@ export const DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS = {
   inflationBackOffice: 2,
   inflationDivers: 2,
   methodeTaxes: "appreciation_directe",
+  // Méthode TF/CFE Phase 3 (tranche 4) : prix d'achat terrain 0 par défaut pour un projet
+  // NEUF → sélecteur d'assiette AUTO actif (0 → appréciation directe template ; > 0 →
+  // comptable). Les scénarios existants (colonne null) restent sur la branche legacy.
+  prixAchatTerrainEuro: 0,
   prixTerrainHa: 5000,
   abattTerrain: 0,
   inflationTaxes: 2,

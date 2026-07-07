@@ -124,6 +124,12 @@ export function buildFinanceInput(
     inflationBackOffice: scenario.inflationBackOffice,
     inflationDivers: scenario.inflationDivers,
     methodeTaxes: scenario.methodeTaxes,
+    // Méthode TF/CFE Phase 3 (tranche 4) : sélecteur d'assiette AUTO (prix d'achat terrain) +
+    // override + taux département. null partout → branche taxes legacy inchangée ; la série
+    // routée tfKeuroByYear/cfeKeuroByYear garde de toute façon la priorité absolue.
+    prixAchatTerrainEuro: scenario.prixAchatTerrainEuro,
+    methodeAssiette: scenario.methodeAssiette,
+    tauxTFDepartement: scenario.tauxTFDepartement,
     tauxTFCommune: scenario.tauxTFCommune,
     tauxTFEPCI: scenario.tauxTFEPCI,
     tauxTSE: scenario.tauxTSE,

@@ -31,6 +31,23 @@
 > bas + pointes périodiques), pas des séries indexées. La méthode reste le bon défaut déclaratif
 > pour un projet neuf ; les existants gardent le routing. **Non-régression : 25/25 VERT**, build +
 > 55 tests verts.
+>
+> **AVANCEMENT 2026-07-07 — tranche 4 FAITE : TF/CFE (§4.4) → PHASE 3 COMPLÈTE (4/4).**
+> Migration `add_phase3_taxes` (3 colonnes Scenario : `prixAchatTerrainEuro`, `methodeAssiette`,
+> `tauxTFDepartement`). Sélecteur d'assiette **AUTO + override** (§7.2) câblé dans
+> `calculateTaxesFoncieres` (nouvelle branche `calculateTaxesMethodeAssiette`, active dès qu'un
+> des 2 nouveaux champs est non-null — sinon branche legacy STRICTEMENT inchangée) ; formules
+> template décodées au centime (assiette directe J354 avec terrain à **4 %**, assiette comptable
+> J302/J304/J323, frais 3 %/9 %/**8 % TEOM**, frais CFE comptable **134,8827 € en dur** J331).
+> **Validation « méthode vs BP » (scripts/_audit_phase3_taxes.ts, série routée débranchée, taux
+> lus de chaque xlsm) : 23/25 AU CENTIME sur an1-35 en AUTO** (max|Δ| = 0,0000 €), dont Baugé
+> (TF an1 7 474,84 €), Sigoulès (7 185,14 €) en directe et Selles (TF 9 084,52 € / CFE
+> 4 927,35 €) en comptable. Les 2 écarts AUTO tombent à **0,0000 € avec l'override** aligné sur
+> le choix du BP : **Digoin** (MISMATCH ATTENDU — BP en directe par ERREUR malgré terrain acheté
+> 545 970 € ; en AUTO, MF est PLUS correct que l'Excel) et **Salbris** (cas inverse découvert par
+> l'audit : I266 forcé « Comptable seule si achat » alors que prix d'achat = 0 → l'override
+> `methodeAssiette="comptable"` couvre ce choix). **Non-régression : calibrate_all = 25/25 VERT**
+> (routing r191/r192 prioritaire), build + 37 tests vitest finance verts.
 
 ## 1. Principe directeur — les deux usages cohabitent
 
@@ -66,7 +83,9 @@ généralise aux projets neufs.
 1. ✅ **Démantèlement** (FAIT 2026-07-07)
 2. ✅ **MRA paliers** (FAIT 2026-07-07)
 3. ✅ **Engagements** (FAIT 2026-07-07)
-4. **TF/CFE** (🔴 base fragile — le vrai morceau) ← PROCHAIN
+4. ✅ **TF/CFE** (FAIT 2026-07-07 — assiette décodée au centime, sélecteur AUTO + override)
+
+**→ PHASE 3 COMPLÈTE (4/4).**
 
 ---
 
@@ -135,7 +154,47 @@ manque que le **niveau moyen**.
   (Phase 1) — mais pour un projet **neuf**, c'est l'hypothèse de l'utilisateur, donc pas de
   souci. Les projets existants gardent le routing.
 
-### 4.4 TF / CFE (taxes foncières & d'entreprise) — le morceau dur
+### 4.4 TF / CFE (taxes foncières & d'entreprise) ✅ FAIT (2026-07-07)
+> **Implémenté** (migration `add_phase3_taxes`) : colonnes Scenario `prixAchatTerrainEuro`
+> (Float?), `methodeAssiette` (String? — override "comptable" | "appreciation_directe",
+> null → AUTO) et `tauxTFDepartement` (Float? — compté EN PLUS du communal si ≠ 0). Nouvelle
+> branche moteur `calculateTaxesMethodeAssiette` (engine.ts), déclenchée dès que
+> `methodeAssiette` OU `prixAchatTerrainEuro` est non-null — sinon les branches taxes legacy
+> (ancres Baugé/Sigoulès de calibration) restent STRICTEMENT inchangées. Formulaires new/edit :
+> section « Taxes locales » (prix d'achat terrain — défaut 0 sur un projet NEUF → sélecteur
+> AUTO actif d'emblée —, sélecteur AUTO/directe/comptable, taux département ; l'ancien select
+> `methodeTaxes` devient un champ caché de rétrocompat). `read_bp_matrix`/`seed_bp_reel`
+> INCHANGÉS (le routing r191/r192 garde la priorité absolue).
+>
+> **Décodage confirmé à l'implémentation (au centime)** :
+> - Frais de gestion TF par composante (J312/J362) : **3 %** principales (commune + département
+>   + EPCI + GEMAPI), **9 %** TSE, **8 % TEOM** (vérifié sur Selles/Sigoulès, TEOM 14 %/11,35 %).
+> - Directe : terrain forfaitaire à **4 %** (taux LF simple, J349) × 0,256066 × 50 % — la branche
+>   legacy (millésime Sigoulès antérieur, ancre 614,56 €) reste à 8 %, d'où la branche distincte.
+> - CFE directe : s'applique sur la MÊME assiette que la TF (J354), frais 3 %/9 % (J394).
+> - CFE comptable : assiette J323 = base × 4 % × (1−30 %), **SANS frais proportionnels**,
+>   + **134,8827 € EN DUR** (J331, artefact template identique dans les 25 BP — reproduit,
+>   appliqué seulement si Σ taux CFE > 0).
+> - Base comptable J302 = prix d'achat + biens passibles hors terrain (J342 = les MÊMES
+>   composants immos/MOD que la directe) — cohérence vérifiée sur les 25 fichiers par l'audit.
+> - Indexation **2 %/an** dès l'an 2 (`inflationTaxes ?? 2` dans la branche méthode ; le défaut
+>   legacy 0,4 est conservé sur la branche legacy).
+>
+> **Validation (scripts/_audit_phase3_taxes.ts — série routée débranchée, taux lus de chaque
+> xlsm, comparaison C_P50 r191/r192 an1-35)** : **23/25 AU CENTIME en AUTO** (max|Δ| 0,0000 €),
+> dont **Baugé** TF an1 = 7 474,84 € / CFE 4 005,11 € (directe), **Sigoulès** 7 185,14 € /
+> 3 574,96 € (directe), **Selles** 9 084,52 € / 4 927,35 € (comptable). Les 2 écarts AUTO
+> tombent à **0,0000 € avec l'override** aligné sur le choix du BP :
+> - **Digoin** : MISMATCH ATTENDU (documenté ci-dessous) — BP resté en « Appréciation Directe »
+>   malgré l'achat du terrain (545 970 €). En AUTO, MF choisit comptable = PLUS correct que
+>   l'Excel. Son routing r191/r192 (qui reflète l'erreur) reste prioritaire en production.
+> - **Salbris** (découvert par l'audit) : cas INVERSE — I266 forcé « Comptable seule si achat »
+>   alors que prix d'achat = 0 (choix ou erreur du BP). L'override `methodeAssiette="comptable"`
+>   reproduit son BP au centime. La « classification réelle » du § ci-dessous devient donc :
+>   **3 BP en comptable** (Aérodrome, Selles = achat > 0 → AUTO correct ; Salbris = comptable
+>   sans achat → override), 22 en directe.
+> **Non-régression : calibrate_all 25/25 VERT** (routing prioritaire), build + tests verts.
+
 Deux briques de difficulté **très différentes** :
 
 **a) Les taux → facile (saisie utilisateur, défauts nationaux).**
@@ -194,8 +253,8 @@ Salbris était une **édition manuelle du fichier BP**, gérée par l'override `
 | Démantèlement | €/MWc + timing (défaut an25-29) | ✅ FAIT (0,0000 € vs BP, 25/25) | faible |
 | MRA | moyenne €/kWc × forme paliers universelle | ✅ FAIT (0,0000 € vs BP + « plat » Mur-de-Sologne) | faible |
 | Engagements | base an1 × 1,02/an (SANS défaut — an1/MWc ×26 entre BP) | ✅ FAIT (0/21 au centime, ATTENDU : séries BP lumpy — méthode = défaut déclaratif) | moyen |
-| TF/CFE (taux) | Σ des taux saisis (défauts nationaux) | 🟢 haute | faible |
-| TF/CFE (base) | **auto** depuis prix d'achat terrain (+override) → directe/comptable (assiette décodée au centime Baugé/Selles/Digoin) | 🟡 moyenne | élevé |
+| TF/CFE (taux) | Σ(taux saisis × frais 3 %/9 %/8 % TEOM) + taux département | ✅ FAIT (au centime — placeholders UI, pas de défaut national imposé) | faible |
+| TF/CFE (base) | **auto** depuis prix d'achat terrain (+override) → directe/comptable | ✅ FAIT (23/25 au centime an1-35 en AUTO ; 25/25 avec override — Digoin/Salbris = choix BP hors règle) | élevé |
 | Financing fees | ×0,95 (déjà correct) | ✅ — | — |
 
 ## 7. Points de décision restants (à trancher à l'implémentation)
@@ -205,12 +264,19 @@ Salbris était une **édition manuelle du fichier BP**, gérée par l'override `
    scénarios existants sans série routée basculent sur la méthode (plus juste) ; l'opt-out
    existe par scénario via `mraProfil="plat"` / `demantelementEuroMWc=0`. Tests ancres
    restés verts (seul le banc Digoin fige explicitement `mraProfil="plat"`, = son BP).
-2. ✅ **TRANCHÉ (TF/CFE)** — **méthode d'assiette = AUTO depuis le prix d'achat terrain + override** :
-   `prixAchatTerrainEuro > 0` → comptable ; sinon appréciation directe ; l'utilisateur peut forcer via
-   `methodeAssiette`. MF rattrape ainsi les erreurs de saisie type Digoin (BP en directe malgré achat).
-3. **Taux TF/CFE** : saisie utilisateur par commune ; défauts = simples **placeholders** (pas de
-   dérivation « nationale » factice, cf leçon engagements). Valeurs de départ à définir avec l'utilisateur.
-4. **UI** : où placer les nouveaux inputs dans les formulaires new/edit (regroupés par poste).
+2. ✅ **TRANCHÉ + IMPLÉMENTÉ (tranche 4)** — **méthode d'assiette = AUTO depuis le prix d'achat
+   terrain + override** : `prixAchatTerrainEuro > 0` → comptable ; sinon appréciation directe ;
+   l'utilisateur peut forcer via `methodeAssiette`. MF rattrape ainsi les erreurs de saisie type
+   Digoin (BP en directe malgré achat). L'audit a montré le cas inverse (Salbris : comptable
+   forcé SANS achat) → l'override couvre les deux sens. Déclenchement : un des deux champs
+   non-null ; tous null → branche taxes legacy strictement inchangée (ancres de calibration).
+3. ✅ **TRANCHÉ + IMPLÉMENTÉ (tranche 4)** — **Taux TF/CFE en saisie utilisateur** (taux existants
+   + nouveau `tauxTFDepartement`), défauts = simples **placeholders** UI (ex. 0,28) — taux null →
+   la composante ne contribue pas, AUCUNE dérivation « nationale » factice (leçon engagements).
+4. ✅ **TRANCHÉ (tranche 4)** — **UI** : les nouveaux inputs vivent dans la section « Taxes
+   locales (TF & CFE) » d'OpexDetailFields (prix d'achat terrain + sélecteur AUTO/directe/
+   comptable en tête, taux département dans la grille TFPB) ; l'ancien select `methodeTaxes`
+   est conservé en champ caché (rétrocompat des scénarios legacy).
 
 ## 8. Rétrocompat & non-régression
 - Aucun retrait de routing → **25/25 préservé** (à revérifier via `calibrate_all` à chaque étape).

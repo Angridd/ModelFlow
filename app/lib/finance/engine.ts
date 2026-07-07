@@ -78,6 +78,15 @@ const VALEUR_VENALE_HA_AD = 5000;
 // gestion CALCULÉS de Baugé, gelés en dur → violation du principe générique).
 const FRAIS_GESTION_PRINCIPALES = 0.03;
 const FRAIS_GESTION_TSE_CCI = 0.09;
+// ─── MÉTHODE TF/CFE Phase 3 (tranche 4 — docs/PHASE3_METHODES.md §4.4) ───────────────────────
+// Frais de gestion TEOM = 8 % : formule template J312/J362 = « 3%×principales + 9%×TSE +
+// 8%×TEOM », vérifiée AU CENTIME sur data/4 (Baugé), data/20 (Selles) et data/21 (Sigoulès) —
+// la branche legacy (ancres Baugé/Sigoulès, TEOM=0) groupait le TEOM à 3 %, on ne la touche pas.
+const FRAIS_GESTION_TEOM = 0.08;
+// Frais de gestion CFE « comptable » : le template n'applique AUCUN frais proportionnel en
+// comptable — il additionne la valeur EN DUR J331 = 134,8827…€ (artefact template, identique
+// dans les 25 data/<N>.xlsm), reproduite pour le centime (Selles), seulement si Σ taux CFE > 0.
+const CFE_COMPTABLE_FRAIS_GESTION_EURO = 134.88273159428238;
 
 export type FinanceEngineInput = FinancialAssumptions & {
   capacityMw: number;
@@ -249,6 +258,21 @@ export type FinanceEngineInput = FinancialAssumptions & {
   inflationBackOffice?: number | null;
   inflationDivers?: number | null;
   methodeTaxes?: string | null;
+  // ─── MÉTHODE TF/CFE Phase 3 (tranche 4, §4.4 — sélecteur d'assiette AUTO + override §7.2) ──
+  // prixAchatTerrainEuro (template J298) : prix d'achat du terrain en €. NON-null → active le
+  // sélecteur Phase 3 : > 0 → assiette « comptable » ; sinon « appréciation directe » template
+  // (terrain forfaitaire à 4 % — data/<N>.xlsm — là où la branche legacy, calée sur l'ancre
+  // Sigoulès d'un millésime antérieur, reste à 8 %). null ET methodeAssiette null → branche
+  // legacy STRICTEMENT inchangée (rétrocompat). La série routée tfKeuroByYear/cfeKeuroByYear
+  // garde la PRIORITÉ ABSOLUE dans calculateOpexDetails.
+  prixAchatTerrainEuro?: number | null;
+  // Override manuel du sélecteur : "comptable" | "appreciation_directe" ; null → AUTO (règle
+  // métier : achat de terrain → comptable). Rattrape les erreurs de saisie type Digoin
+  // (terrain acheté 545 970 € mais BP resté en « Appréciation Directe »).
+  methodeAssiette?: string | null;
+  // Taux TFPB du département — compté EN PLUS du communal si ≠ 0 (libellé template r252),
+  // frais de gestion 3 % comme les autres taxes principales. Décimal (0,05 = 5 %).
+  tauxTFDepartement?: number | null;
   tauxTFCommune?: number | null;
   tauxTFEPCI?: number | null;
   tauxTSE?: number | null;
@@ -752,6 +776,9 @@ function hasDetailedOpexInput(input: FinanceEngineInput) {
     input.inflationBackOffice != null ||
     input.inflationDivers != null ||
     input.methodeTaxes != null ||
+    input.prixAchatTerrainEuro != null ||
+    input.methodeAssiette != null ||
+    input.tauxTFDepartement != null ||
     input.tauxTFCommune != null ||
     input.tauxTFEPCI != null ||
     input.tauxTSE != null ||
@@ -814,13 +841,124 @@ function computeBaseFonciereEuro(input: FinanceEngineInput): number {
   return immoSoumisesEuro + modRetraiteEuro;
 }
 
+/**
+ * MÉTHODE TF/CFE Phase 3 (tranche 4 — docs/PHASE3_METHODES.md §4.4). Formules du template BP
+ * (feuille Inp_Matrice_O&M_Taxes) vérifiées AU CENTIME sur data/4 (Baugé, directe), data/21
+ * (Sigoulès, directe) et data/20 (Selles, comptable) — scripts/_audit_phase3_taxes.ts :
+ *   • SÉLECTEUR (§7.2) : override `methodeAssiette` s'il est non-null ; sinon AUTO — règle
+ *     métier « achat de terrain → comptable » : prixAchatTerrainEuro > 0 → « comptable »,
+ *     sinon « appréciation directe ». (Le BP de Digoin viole cette règle par ERREUR de saisie
+ *     → mismatch ATTENDU sur sa validation ; son routing r191/r192 reste prioritaire.)
+ *   • Assiette DIRECTE (J354) = biens passibles hors terrain (J342) × 8 % × (1−50 %)
+ *     + valeur vénale terrain (ha × 5 000 €, J348) × 4 % × 0,256066 × (1−50 %).
+ *     ⚠️ terrain au taux LF SIMPLE 4 % (J349) — la branche legacy (ancre Sigoulès, millésime
+ *     de template antérieur) reste à 8 % : c'est pour ça que cette branche est distincte.
+ *   • Assiette COMPTABLE : base (J302) = prix d'achat terrain + immos non exonérées + MOD
+ *     retraité (les MÊMES composants « biens passibles » que la directe) ;
+ *     assiette TF (J304) = base × 4 % × (1−50 %) ; assiette CFE (J323) = base × 4 % × (1−30 %).
+ *   • TF = assiette_TF × Σ(taux_i × (1+frais_i)) — frais 3 % principales (commune + département
+ *     + EPCI + GEMAPI), 9 % TSE, 8 % TEOM (formule J312/J362).
+ *   • CFE directe : s'applique sur la MÊME assiette que la TF (J354), frais 3 % principales /
+ *     9 % TSE+CCI (J394). CFE comptable : assiette CFE × Σ taux SANS frais proportionnels
+ *     + 134,8827 € EN DUR (J331, artefact template — appliqué seulement si Σ taux CFE > 0).
+ *   • Indexation 2 %/an dès l'an 2 (inflationTaxes ?? 2 — le défaut BP, pas le 0,4 legacy).
+ * Taux en DÉCIMAL (0,3835 = 38,35 %). Taux null → la composante ne contribue pas (§7.3 :
+ * placeholders UI par défaut, PAS de dérivation « nationale » imposée).
+ */
+function calculateTaxesMethodeAssiette(
+  input: FinanceEngineInput,
+  capexTotalEuro: number,
+  year: number,
+): TaxesFoncieresOpexResult {
+  const methode =
+    input.methodeAssiette ??
+    ((input.prixAchatTerrainEuro ?? 0) > 0 ? "comptable" : "appreciation_directe");
+  const inflationFactor = (1 + asRate(input.inflationTaxes ?? 2)) ** (year - 1);
+
+  // Biens passibles HORS terrain (€) — même résolution que la branche directe Phase 2 :
+  // override baseFonciereKeuro, sinon calcul €/Wc (Fix 2), sinon fallback 2,93 % du CAPEX.
+  const baseFonciereEuro =
+    input.baseFonciereKeuro != null
+      ? input.baseFonciereKeuro * 1000
+      : input.fonciereBienEuroWc != null || input.batimentsFonciersKeuro != null
+        ? computeBaseFonciereEuro(input)
+        : capexTotalEuro * RATIO_PART_FONC_AD;
+
+  let assietteTfEuro: number;
+  let assietteCfeEuro: number;
+  if (methode === "comptable") {
+    const baseComptableEuro = (input.prixAchatTerrainEuro ?? 0) + baseFonciereEuro; // J302
+    assietteTfEuro = baseComptableEuro * TAUX_LF_COMPTA * (1 - ABATT_AD); // J304
+    assietteCfeEuro = baseComptableEuro * TAUX_LF_COMPTA * (1 - ABATT_IMMO); // J323
+  } else {
+    const valeurTerrainEuro =
+      input.valeurTerrainKeuro != null
+        ? input.valeurTerrainKeuro * 1000
+        : (input.surfaceHa ?? 0) * (input.prixTerrainHa ?? VALEUR_VENALE_HA_AD); // J348
+    assietteTfEuro =
+      baseFonciereEuro * TAUX_LF_AD * (1 - ABATT_AD) + // J344
+      valeurTerrainEuro * TAUX_LF_COMPTA * COEF_NEUTRAL_AD * (1 - ABATT_AD); // J352 (4 % !)
+    // ⚠️ La CFE directe s'applique sur la MÊME assiette que la TF (J354) — le template calcule
+    // une assiette CFE dédiée (J386) mais ne l'utilise pas (cf CALIBRATION.md Règle 6, acquis 2).
+    assietteCfeEuro = assietteTfEuro;
+  }
+
+  const tauxTfPrincipales =
+    (input.tauxTFCommune ?? 0) +
+    (input.tauxTFDepartement ?? 0) +
+    (input.tauxTFEPCI ?? 0) +
+    (input.tauxGEMAPI ?? 0);
+  const tfEuro =
+    assietteTfEuro *
+    (tauxTfPrincipales * (1 + FRAIS_GESTION_PRINCIPALES) +
+      (input.tauxTSE ?? 0) * (1 + FRAIS_GESTION_TSE_CCI) +
+      (input.tauxTEOM ?? 0) * (1 + FRAIS_GESTION_TEOM));
+
+  let cfeEuro: number;
+  if (methode === "comptable") {
+    const sommeTauxCfe =
+      (input.tauxCFECommune ?? 0) +
+      (input.tauxCFEEPCI ?? 0) +
+      (input.tauxTSECfe ?? 0) +
+      (input.tauxGEMAPICfe ?? 0) +
+      (input.tauxCCI ?? 0);
+    cfeEuro =
+      assietteCfeEuro * sommeTauxCfe +
+      (sommeTauxCfe > 0 ? CFE_COMPTABLE_FRAIS_GESTION_EURO : 0);
+  } else {
+    cfeEuro =
+      assietteCfeEuro *
+      (((input.tauxCFECommune ?? 0) + (input.tauxCFEEPCI ?? 0) + (input.tauxGEMAPICfe ?? 0)) *
+        (1 + FRAIS_GESTION_PRINCIPALES) +
+        ((input.tauxTSECfe ?? 0) + (input.tauxCCI ?? 0)) * (1 + FRAIS_GESTION_TSE_CCI));
+  }
+
+  const tfAnnuelleKeuro = tfEuro / 1000;
+  const cfeAnnuelleKeuro = cfeEuro / 1000;
+  return {
+    baseTaxesKeuro: assietteTfEuro / 1000,
+    tfAnnuelleKeuro,
+    cfeAnnuelleKeuro,
+    tfKeuro: tfAnnuelleKeuro * inflationFactor,
+    cfeKeuro: cfeAnnuelleKeuro * inflationFactor,
+  };
+}
+
 export function calculateTaxesFoncieres(
   input: FinanceEngineInput,
   capexTotalKeuro: number,
   year = 1,
 ): TaxesFoncieresOpexResult {
-  const methode = input.methodeTaxes ?? METHODE_TAXES_FALLBACK;
   const capexTotalEuro = capexTotalKeuro * 1000;
+
+  // MÉTHODE Phase 3 (tranche 4) : dès qu'un des nouveaux champs est renseigné (prix d'achat
+  // terrain, même à 0, ou override de méthode), le sélecteur d'assiette AUTO + les formules
+  // template prennent le relais. Tous null → branches legacy STRICTEMENT inchangées.
+  if (input.methodeAssiette != null || input.prixAchatTerrainEuro != null) {
+    return calculateTaxesMethodeAssiette(input, capexTotalEuro, year);
+  }
+
+  const methode = input.methodeTaxes ?? METHODE_TAXES_FALLBACK;
   const inflationFactor = (1 + asRate(input.inflationTaxes ?? 0.4)) ** (year - 1);
 
   if (methode === "appreciation_directe") {

@@ -296,6 +296,11 @@ function readScenarioAssumptions(formData: FormData) {
     inflationBackOffice: readOptionalNumber(formData, "inflationBackOffice"),
     inflationDivers: readOptionalNumber(formData, "inflationDivers"),
     methodeTaxes: readOptionalText(formData, "methodeTaxes"),
+    // Méthode TF/CFE Phase 3 (tranche 4) : prix d'achat terrain (AUTO : > 0 → comptable),
+    // override de méthode d'assiette (vide → AUTO) et taux TFPB département.
+    prixAchatTerrainEuro: readOptionalNumber(formData, "prixAchatTerrainEuro"),
+    methodeAssiette: readOptionalText(formData, "methodeAssiette"),
+    tauxTFDepartement: readOptionalNumber(formData, "tauxTFDepartement"),
     tauxTFCommune: readOptionalNumber(formData, "tauxTFCommune"),
     tauxTFEPCI: readOptionalNumber(formData, "tauxTFEPCI"),
     tauxTSE: readOptionalNumber(formData, "tauxTSE"),
@@ -759,6 +764,10 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
       inflationBackOffice: scenario.inflationBackOffice,
       inflationDivers: scenario.inflationDivers,
       methodeTaxes: scenario.methodeTaxes,
+      // Méthode TF/CFE Phase 3 (tranche 4) — champs formulaire.
+      prixAchatTerrainEuro: scenario.prixAchatTerrainEuro,
+      methodeAssiette: scenario.methodeAssiette,
+      tauxTFDepartement: scenario.tauxTFDepartement,
       tauxTFCommune: scenario.tauxTFCommune,
       tauxTFEPCI: scenario.tauxTFEPCI,
       tauxTSE: scenario.tauxTSE,

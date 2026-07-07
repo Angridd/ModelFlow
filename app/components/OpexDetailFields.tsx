@@ -30,6 +30,11 @@ type OpexDetailInitialValue = {
   inflationBackOffice?: number | null;
   inflationDivers?: number | null;
   methodeTaxes?: string | null;
+  // Méthode TF/CFE Phase 3 (tranche 4) : prix d'achat du terrain (AUTO : > 0 → assiette
+  // comptable), override de méthode (null → AUTO) et taux TFPB département.
+  prixAchatTerrainEuro?: number | null;
+  methodeAssiette?: string | null;
+  tauxTFDepartement?: number | null;
   tauxTFCommune?: number | null;
   tauxTFEPCI?: number | null;
   tauxTSE?: number | null;
@@ -156,8 +161,15 @@ export function OpexDetailFields({
   const [inflationDivers, setInflationDivers] = useState(
     initialNumber(initialValue.inflationDivers, "2"),
   );
-  const [methodeTaxes, setMethodeTaxes] = useState(
-    initialValue.methodeTaxes ?? "appreciation_directe",
+  // methodeTaxes (legacy) est conservé en champ CACHÉ (rétrocompat des scénarios existants) ;
+  // le sélecteur visible est désormais methodeAssiette (Phase 3 : AUTO | directe | comptable).
+  const methodeTaxes = initialValue.methodeTaxes ?? "appreciation_directe";
+  const [methodeAssiette, setMethodeAssiette] = useState(initialValue.methodeAssiette ?? "");
+  const [prixAchatTerrainEuro, setPrixAchatTerrainEuro] = useState(
+    initialNumber(initialValue.prixAchatTerrainEuro),
+  );
+  const [tauxTFDepartement, setTauxTFDepartement] = useState(
+    initialNumber(initialValue.tauxTFDepartement),
   );
   const [tauxTFCommune, setTauxTFCommune] = useState(
     initialNumber(initialValue.tauxTFCommune, "0.28"),
@@ -225,6 +237,7 @@ export function OpexDetailFields({
       : 0;
   const revenueP50Keuro = productionP50Mwh * annualTariff / 1000;
   const hasLocalTaxRate = [
+    tauxTFDepartement,
     tauxTFCommune,
     tauxTFEPCI,
     tauxTSE,
@@ -274,6 +287,9 @@ export function OpexDetailFields({
           inflationBackOffice: parseNumber(inflationBackOffice),
           inflationDivers: parseNumber(inflationDivers),
           methodeTaxes,
+          prixAchatTerrainEuro: parseNumber(prixAchatTerrainEuro),
+          methodeAssiette: methodeAssiette === "" ? null : methodeAssiette,
+          tauxTFDepartement: parseNumber(tauxTFDepartement),
           tauxTFCommune: parseNumber(tauxTFCommune),
           tauxTFEPCI: parseNumber(tauxTFEPCI),
           tauxTSE: parseNumber(tauxTSE),
@@ -317,6 +333,9 @@ export function OpexDetailFields({
       loyerMode,
       loyerValeur,
       methodeTaxes,
+      methodeAssiette,
+      prixAchatTerrainEuro,
+      tauxTFDepartement,
       mraEuroKwc,
       mraProfil,
       demantelementEuroMWc,
@@ -516,19 +535,39 @@ export function OpexDetailFields({
       </div>
       <div className="grid gap-4 border-t border-zinc-200 pt-4">
         <h3 className="text-sm font-semibold text-zinc-950">Taxes locales (TF &amp; CFE)</h3>
-        <label className="grid gap-2 text-sm font-medium text-zinc-700">
-          <span>Méthode de calcul <span className="badge-default">Défaut</span></span>
-          <select
-            name="methodeTaxes"
-            value={methodeTaxes}
-            onChange={(event) => setMethodeTaxes(event.target.value)}
-            title="Appréciation directe : base sur valeur vénale terrain + immo (8%). Comptable : base sur valeur comptable immo (4%). LF 2021."
-            className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-zinc-950 outline-none focus:border-zinc-900"
-          >
-            <option value="appreciation_directe">Appréciation directe</option>
-            <option value="comptable">Méthode comptable</option>
-          </select>
-        </label>
+        {/* methodeTaxes (legacy) : conservé tel quel en champ caché — le sélecteur Phase 3
+            ci-dessous (methodeAssiette + prix d'achat terrain) pilote désormais la méthode. */}
+        <input type="hidden" name="methodeTaxes" value={methodeTaxes} />
+        <div className="grid gap-5 sm:grid-cols-2">
+          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            <span>Prix d&apos;achat du terrain (EUR) <span className="badge-default">Défaut</span></span>
+            <input
+              name="prixAchatTerrainEuro"
+              type="number"
+              min="0"
+              step="1000"
+              value={prixAchatTerrainEuro}
+              onChange={(event) => setPrixAchatTerrainEuro(event.target.value)}
+              placeholder="ex. 0"
+              title="Prix d'achat du terrain en euros. > 0 → méthode d'assiette COMPTABLE automatique (règle métier : achat de terrain → comptable) ; 0 → appréciation directe. Vide → calcul taxes legacy inchangé."
+              className={defaultInputClass(prixAchatTerrainEuro, "0")}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            <span>Méthode d&apos;assiette <span className="badge-default">Défaut</span></span>
+            <select
+              name="methodeAssiette"
+              value={methodeAssiette}
+              onChange={(event) => setMethodeAssiette(event.target.value)}
+              title="AUTO : dérivée du prix d'achat du terrain (> 0 → comptable, sinon appréciation directe). L'override force la méthode (cas exceptionnels)."
+              className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-zinc-950 outline-none focus:border-zinc-900"
+            >
+              <option value="">AUTO (selon prix d&apos;achat terrain)</option>
+              <option value="appreciation_directe">Appréciation directe (forcée)</option>
+              <option value="comptable">Comptable (forcée)</option>
+            </select>
+          </label>
+        </div>
         <div className="grid gap-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
             TAUX COMMUNAUX TFPB — consulter avis TF de la commune (format décimal : 28% → 0,28)
@@ -537,6 +576,10 @@ export function OpexDetailFields({
             <label className="grid gap-2 text-sm font-medium text-zinc-700">
               Taux commune
               <input name="tauxTFCommune" type="number" min="0" step="0.01" value={tauxTFCommune} onChange={(event) => setTauxTFCommune(event.target.value)} placeholder="ex. 0.28" className={defaultInputClass(tauxTFCommune, "0.28")} />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-zinc-700">
+              Taux département
+              <input name="tauxTFDepartement" type="number" min="0" step="0.001" value={tauxTFDepartement} onChange={(event) => setTauxTFDepartement(event.target.value)} placeholder="ex. 0" title="Taux TFPB du département — compté EN PLUS du taux communal s'il est différent de 0." className={numberInputClass} />
             </label>
             <label className="grid gap-2 text-sm font-medium text-zinc-700">
               Taux EPCI
