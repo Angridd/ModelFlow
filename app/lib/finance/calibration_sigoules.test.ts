@@ -13,9 +13,10 @@ import type { FinanceEngineInput } from "@/app/lib/finance/engine";
 // Le 1er `it` ASSERTE (CAPEX/taxes/dette/D&A/IS/flux/TRI à tolérances serrées) ; le 2nd
 // AFFICHE le flux actionnaire (= FCF after debt service, C_P50!r296) an1-35 vs banc §3.1.
 //
-// ⚠️ Les valeurs an24-29 portent des RÉSIDUELS DOCUMENTÉS, non forcés (cf CALIBRATION.md
-// "CHANTIER TRI CLOS") : IS an24 +1,9 k€ (index merchant P50 / D&A). L'assertion IS an24
-// fige donc l'ÉTAT MF actuel (134 900 €), pas la cible BP (133 006 €) — résiduel intentionnel.
+// ⚠️ Phase 2 item 9 (SEED du cumEBT à l'intérêt SHL capitalisé an0) : l'ancien résiduel IS an24
+// +1,9 k€ (état no-seed 134 900 €) a été RÉSORBÉ — MF converge maintenant vers la cible BP
+// 133 006 € (Δ < 10 €). L'assertion IS an24 fige donc la CIBLE BP. Ground truth exact :
+// data/21.xlsm (compare_bp_project 21 → IS/déficit/résultat cumulés à l'euro).
 // Phase 3 : le démantèlement an25-29 (ex-G7) est désormais appliqué PAR DÉFAUT par la méthode
 // (10 000 €/MWc × 12 MWc → 24 k€/an an25-29, non indexé = le BP, 24,68 k€/an sur 12,34 MWc
 // réels). Toutes les ancres (IS an24, flux an1/21/35, TRI ±0,05) restent vertes SANS retouche.
@@ -218,11 +219,13 @@ describe("calibration Sigoulès — assertions permanentes (CAPEX/dette/taxes/TR
     // Dotation D&A an1 (§2.5, dégressif Type1 coef 2,25 + linéaire Type2) — 1 009 565 €
     expectClose(eur(at(1).amort), 1_009_565, 1, "D&A an1");
 
-    // Report déficitaire intégral (§2.6) : premier IS = an24 ; IS an24 = 134 900 € (état MF,
-    // résiduel +1,9 k€ vs BP 133 006 documenté — l'assertion fige MF, pas la cible BP).
+    // Report déficitaire intégral (§2.6) : premier IS = an24. IS an24 = 133 006 € (cible BP).
+    // Phase 2 item 9 (SEED du cumEBT à l'intérêt SHL capitalisé an0) : l'ancien MF surestimait de
+    // +1,9 k€ (134 900, no-seed) ; le seed fait CONVERGER MF vers la cible BP 133 006 (Δ < 10 €) —
+    // il REFUTE l'ancienne note « no-seed » G5. Ground truth exact : data/21.xlsm (cf compare_bp_project).
     const firstIsYear = ops.find((r) => r.is > 0)?.year ?? -1;
     expect(firstIsYear, "premier IS doit tomber an24").toBe(24);
-    expectClose(eur(at(24).is), 134_900, 100, "IS an24");
+    expectClose(eur(at(24).is), 133_006, 100, "IS an24");
 
     // Flux actionnaire = FCF after debt service (banc §3.1) — an1/an21/an35
     expectClose(eur(at(1).fluxActionnaire), 197_340, 5, "flux an1");

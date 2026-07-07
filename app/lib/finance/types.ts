@@ -121,6 +121,7 @@ export type AnnualCashFlowWaterfallFields = {
   dsraDepotKeuro: number;
   dsraRetraitKeuro: number;
   cashBloqueKeuro: number;
+  cashPoolingKeuro: number;
 };
 
 export type FinanceEngineInputDsraDevFees = {

@@ -302,9 +302,16 @@ Le `GO start year` (21) et le `prix_GO_base` (1 €/MWh) sont des inputs modulab
 > **2 — Mécanismes template implémentés (commits).**
 > - **G4** — D&A dégressif coef 2,25 + mapping 3 classes (Type 1 dégressif / Type 2 linéaire / No D&A).
 > - **G3** — `IS = 25 % × MIN(EBT, cumEBT)`, report déficitaire intégral (§2.6).
-> - **G5** — intérêts SHL capitalisés pendant la construction, **SANS seed du cumEBT an0** : le seed
->   initial (intérêt de construction dans le cumul) est **prouvé faux par le banc** (IS an24 =
->   25 % × cumEBT 532 022 colle au no-seed, pas au with-seed) → retiré.
+> - **G5** — intérêts SHL capitalisés pendant la construction. ⚠️ **CORRIGÉ Phase 2 item 9 (2026-07-07)
+>   — le seed du cumEBT an0 EST correct, l'ancienne note « no-seed » est RÉFUTÉE.** Le BP cumule le
+>   cumEBT DEPUIS l'an0 (construction) où le seul poste est l'intérêt SHL capitalisé : `EBT(an0) =
+>   −(ccaPrincipal − ccaDrawdown)`. Vérifié à l'euro sur les **25 fichiers** `data/<N>.xlsm` : C_P50
+>   r243(an1) − r242(an1) = r243(an0) = −r289(an0). L'ancien banc « no-seed » était un MILLÉSIME
+>   antérieur (mise SHL 2 827 258, cumEBT 532 022 ≠ portefeuille) confondu par une cascade SHL alors
+>   fausse. Le seed fait CONVERGER le banc-fiche vers sa cible BP (IS an24 : 134 900 no-seed → **133 006
+>   BP**, Δ < 10 €) ET cale data/21.xlsm à l'euro (déficit fiscal cumulé an1 = 770,7 = BP). Câblé
+>   dans `applyWaterfall` (`seedP50 = −Math.max(0, ccaPrincipal − ccaDrawdown)` → `cumEbtP50` +
+>   `retainedEarnings`) ; pendant le sizing ccaPrincipal P50 = 0 → seed nul → dette inchangée.
 > - **G6** — DSRF dynamique `1,4 % × (6/12 × service dette)` + agent fee `1 000 × 1,02^(y−1)` an1-24,
 >   retirés du flux equity ET de l'EBT — **clôt l'audit #7**.
 > - **G2** — flux actionnaire = FCF after debt service (commit `6d8b061`).

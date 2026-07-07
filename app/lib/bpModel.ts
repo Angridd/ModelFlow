@@ -258,14 +258,6 @@ export function buildBpModel(project: BpProjectFields, scenario: Scenario): BpMo
       ],
     },
     {
-      title: "Réserve de service de la dette (DSRA)",
-      lines: [
-        line("DSRA solde", "kEUR", serie((r) => r.dsraSoldeKeuro)),
-        line("DSRA dépôt", "kEUR", serie((r) => r.dsraDepotKeuro)),
-        line("DSRA retrait", "kEUR", serie((r) => r.dsraRetraitKeuro)),
-      ],
-    },
-    {
       title: "Waterfall SHL (CCA)",
       lines: [
         line("SHL solde d'ouverture (BoP)", "kEUR", serie((r) => r.ccaBoPKeuro)),
@@ -280,7 +272,7 @@ export function buildBpModel(project: BpProjectFields, scenario: Scenario): BpMo
       title: "Distribution actionnaire",
       lines: [
         line("Dividende", "kEUR", serie((r) => r.dividende)),
-        line("Cash bloqué", "kEUR", serie((r) => r.cashBloqueKeuro)),
+        line("Cash pooling", "kEUR", serie((r) => r.cashPoolingKeuro)),
         line("Flux actionnaire (FCF after DS)", "kEUR", serie((r) => r.fluxActionnaire), {
           emphasis: true,
         }),

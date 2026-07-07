@@ -190,6 +190,7 @@ const MAPPINGS: Mapping[] = [
   { mfSection: "Waterfall SHL (CCA)", mfLabel: "SHL solde de clôture (EoP)", sheet: "C_P50", rows: [291], sign: 1 },
   // ── Distribution actionnaire ────────────────────────────────────────────────────────────────
   { mfSection: "Distribution actionnaire", mfLabel: "Dividende", sheet: "C_P50", rows: [313], sign: -1 },
+  { mfSection: "Distribution actionnaire", mfLabel: "Cash pooling", sheet: "C_P50", rows: [319], sign: -1 },
   { mfSection: "Distribution actionnaire", mfLabel: "Flux actionnaire (FCF after DS)", sheet: "C_P50", rows: [268], sign: 1 },
 ];
 

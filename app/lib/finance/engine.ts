@@ -381,6 +381,10 @@ export type AnnualCashFlow = {
   dsraDepotKeuro: number;
   dsraRetraitKeuro: number;
   cashBloqueKeuro: number;
+  // Cash pooling (C_P50 r319) : cash equity résiduel après SHL NON distribuable (bénéfices cumulés
+  // ≤ 0) — reste en trésorerie de la SPV (ni SHL, ni dividende). Item 10. = cashBloqueKeuro depuis
+  // le retrait de la DSRA (le BP ne finance aucune réserve).
+  cashPoolingKeuro: number;
   dscr: number | null;
   dscrRealized: number | null;
   dscrTargetAtYear: number | null;
@@ -2118,16 +2122,25 @@ function applyWaterfall(
   // en construction. Sert au P&L P90 (intérêts SHL r233) qui pilote l'IS de sizing (item 8). Séparé
   // de ccaPrincipalKeuro (cascade P50) : pendant le sizing on passe 0 côté P50 et le vrai CCA ici.
   ccaP90PrincipalKeuro: number = 0,
+  // Drawdown SHL P50 (avant capitalisation an0) — sert au SEED du cumEBT (item 9). Séparé du
+  // principal capitalisé (ccaPrincipalKeuro = drawdown × (1+r)^construction) : leur différence est
+  // l'intérêt SHL capitalisé an0.
+  ccaDrawdownKeuro: number = 0,
 ): Array<AnnualCashFlow & { cfadsP90AfterTaxKeuro: number }> {
   let ccaOutstanding = Math.max(0, ccaPrincipalKeuro);
-  // Report déficitaire : le cumEBT démarre à 0. Le BP ne seede PAS l'intérêt SHL capitalisé an0
-  // dans son cumul — vérifié G6 : IS an24 = 25% × cumEBT 532 022 colle au no-seed (Σ EBT an1-24
-  // = 539,6), pas au with-seed (398,2). L'intérêt de construction est déjà porté par le principal
-  // SHL capitalisé (ccaPrincipalKeuro), donc les intérêts SHL an1+ en tiennent compte. Cf CALIBRATION.md.
-  let cumEbtP50 = 0;
+  // SEED du report déficitaire (item 9). Le BP cumule le cumEBT DEPUIS l'an0 (construction), où le
+  // seul poste est l'intérêt SHL capitalisé : EBT(an0) = −(ccaPrincipal − ccaDrawdown). Vérifié à
+  // l'euro sur les 25 fichiers : C_P50 r243(an1) − r242(an1) = r243(an0) = −r289(an0). Le cumEBT
+  // démarre donc négatif → l'IS bascule un an plus tard (bascule BP exacte). Pendant le sizing la
+  // cascade P50 reçoit ccaPrincipal = ccaDrawdown = 0 → seed nul → dette inchangée. Cf CALIBRATION.md.
+  const seedP50 = -Math.max(0, ccaPrincipalKeuro - ccaDrawdownKeuro);
+  let cumEbtP50 = seedP50;
   let cumEbtP90 = 0;
-  let resultatCumule = 0;
-  let dsraSolde = 0;
+  // resultatCumule = résultat net cumulé PUR (C_P50 r247), seedé au net income an0 (= EBT an0).
+  let resultatCumule = seedP50;
+  // retainedEarnings = bénéfices distribuables (C_P50 r311/r334), NETS des dividendes déjà versés —
+  // gate des dividendes (item 10). Séparé de resultatCumule (r247, non réduit par les dividendes).
+  let retainedEarnings = seedP50;
   // Cascade SHL du cas P90 (indépendante de la cascade P50) : le SHL est servi par le cash P90
   // résiduel après service dette ; ce qui n'est pas couvert est capitalisé (solde croissant). Chez
   // les projets à fort gearing (peu de CCA) il s'éteint vite → intérêts SHL → 0 → EBT P90 taxable ;
@@ -2138,11 +2151,6 @@ function applyWaterfall(
     const scheduleItem = scheduleByYear.get(pre.year) ?? null;
     const sculptedService =
       scheduleItem !== null ? scheduleItem.principal + scheduleItem.interest : null;
-    const nextScheduleItem = scheduleByYear.get(pre.year + 1) ?? null;
-    const nextSculptedService =
-      nextScheduleItem !== null
-        ? nextScheduleItem.principal + nextScheduleItem.interest
-        : null;
     const debtInterest = scheduleItem?.interest ?? pre.standardDebtInterestKeuro;
     const ccaBop = ccaOutstanding;
     const ccaInterets = ccaOutstanding * ccaRemunRate;
@@ -2171,6 +2179,7 @@ function applyWaterfall(
     const is = computeIS(ebt, cumEbtP50, input.tauxIS);
     const resultatNet = ebt - is;
     resultatCumule += resultatNet;
+    retainedEarnings += resultatNet;
     const cfadsAfterTax = pre.cashFlowKeuro - is;
     // P&L du cas de dimensionnement (P90, C_P90) : EBT_P90 = EBITDA_P90 − D&A − intérêts dette
     // sizée − intérêts SHL P90 (r233, sur solde SHL P90 courant) − DSRF − agent fee. IS_P90 =
@@ -2188,40 +2197,27 @@ function applyWaterfall(
     const shlP90IntPaid = Math.min(cashForShlP90, intSHLP90);
     const shlP90Repay = Math.min(shlP90Outstanding, cashForShlP90 - shlP90IntPaid);
     shlP90Outstanding = Math.max(0, shlP90Outstanding + (intSHLP90 - shlP90IntPaid) - shlP90Repay);
-    const nextDebtService =
-      nextSculptedService ??
-      (pre.year + 1 <= preRows.length
-        ? (preRows[pre.year]?.debtServiceKeuro ?? 0)
-        : 0);
-    const dsraTarget =
-      pre.year < effectiveTenor ? nextDebtService * (input.dsraMonths ?? 0) / 12 : 0;
-    let cashAvailable = Math.max(0, cfadsAfterTax - debtService);
-    let dsraRetrait = 0;
-
-    if (pre.year === effectiveTenor && dsraSolde > 0) {
-      dsraRetrait = dsraSolde;
-      dsraSolde = 0;
-      cashAvailable += dsraRetrait;
-    } else if (dsraSolde > dsraTarget) {
-      dsraRetrait = dsraSolde - dsraTarget;
-      dsraSolde = dsraTarget;
-      cashAvailable += dsraRetrait;
-    }
-
-    const dsraDepot = Math.min(cashAvailable, Math.max(0, dsraTarget - dsraSolde));
-    dsraSolde += dsraDepot;
-    cashAvailable -= dsraDepot;
-
-    // BUG B : DSRF + agent fee sortent aussi du flux equity avant la cascade SHL/dividendes
-    // (mêmes montants déjà déduits de l'EBT ci-dessus pour l'IS). Cf CALIBRATION.md BUG B.
-    cashAvailable = Math.max(0, cashAvailable - dsrfDeduction - agentFeeDeduction);
-
-    const cashAfterCcaInterest = Math.max(0, cashAvailable - ccaInterets);
-    const ccaRemboursement = Math.min(ccaOutstanding, cashAfterCcaInterest);
-    ccaOutstanding -= ccaRemboursement;
-    const residualAfterCca = Math.max(0, cashAfterCcaInterest - ccaRemboursement);
-    const dividende = resultatCumule > 0 ? residualAfterCca : 0;
-    const cashBloque = dsraSolde + (resultatCumule > 0 ? 0 : residualAfterCca);
+    // ── Cascade SHL / dividendes P50 (C_P50 r296-r319) — item 10 ────────────────────────────────
+    // PAS de DSRA : le BP ne finance aucune réserve de service de la dette (vérifié à l'euro sur les
+    // 25 fichiers : r296 « Cash flow available for SHL » == r268 « FCF after debt service »). Le cash
+    // equity disponible = CFADS après IS − service dette − DSRF − agent fee (les fees sortent aussi
+    // du flux, cf BUG B, mais sans réserve DSRA qui gonflait/lissait l'ancien cash).
+    const cashEquity = Math.max(0, cfadsAfterTax - debtService - dsrfDeduction - agentFeeDeduction);
+    // Intérêts SHL payés en priorité (r297) ; le NON couvert par le cash est CAPITALISÉ (r289 an1+
+    // ≠ 0 → solde SHL croissant chez les projets cash-tight : Orval, Mur-de-Sologne, Panzoult…).
+    const ccaInteretsPaid = Math.min(cashEquity, ccaInterets);
+    const ccaCapitalise = ccaInterets - ccaInteretsPaid;
+    const cashApresInterets = cashEquity - ccaInteretsPaid;
+    // Remboursement (r298) = résidu, jusqu'à extinction du principal (intérêts capitalisés inclus).
+    const ccaRemboursement = Math.min(ccaOutstanding + ccaCapitalise, cashApresInterets);
+    ccaOutstanding = Math.max(0, ccaOutstanding + ccaCapitalise - ccaRemboursement);
+    const residualAfterCca = cashApresInterets - ccaRemboursement;
+    // Dividendes (r313) plafonnés aux bénéfices distribuables cumulés (retained earnings r311) ;
+    // l'excédent part en cash pooling (r319) et reste en trésorerie SPV.
+    const distribuable = Math.max(0, retainedEarnings);
+    const dividende = Math.min(residualAfterCca, distribuable);
+    retainedEarnings -= dividende;
+    const cashPooling = residualAfterCca - dividende;
     // Flux actionnaire = FCF after debt service (template BP C_P50!r296, §2.7) :
     //   EBITDA_P50 − IS − principal − intérêts dette − DSRF − agent fee
     //   = cfadsAfterTax (EBITDA−IS) − service dette appliqué − DSRF − agent fee.
@@ -2267,14 +2263,16 @@ function applyWaterfall(
       ccaOutstandingKeuro: ccaOutstanding,
       ccaBoPKeuro: ccaBop,
       ccaDrawdownKeuro: 0,
-      ccaCapitalizedInterestKeuro: 0,
+      ccaCapitalizedInterestKeuro: ccaCapitalise,
       ccaEoPKeuro: ccaOutstanding,
       deficitCumuleKeuro: Math.max(0, -cumEbtP50),
       resultatCumuleKeuro: resultatCumule,
-      dsraSoldeKeuro: dsraSolde,
-      dsraDepotKeuro: dsraDepot,
-      dsraRetraitKeuro: dsraRetrait,
-      cashBloqueKeuro: cashBloque,
+      // DSRA supprimée (item 10) : le BP ne finance aucune réserve → soldes/dépôts/retraits = 0.
+      dsraSoldeKeuro: 0,
+      dsraDepotKeuro: 0,
+      dsraRetraitKeuro: 0,
+      cashBloqueKeuro: cashPooling,
+      cashPoolingKeuro: cashPooling,
       cfadsP90AfterTaxKeuro: pre.cfadsP90Keuro - isP90,
       // Standard DSCR: CFADS P90 de sizing (net de l'IS P90, item 8) / constant-annuity service.
       dscr:
@@ -2340,6 +2338,7 @@ function zeroAnnualCashFlow(year: number): AnnualCashFlow {
     dsraDepotKeuro: 0,
     dsraRetraitKeuro: 0,
     cashBloqueKeuro: 0,
+    cashPoolingKeuro: 0,
     dscr: null,
     dscrRealized: null,
     dscrTargetAtYear: null,
@@ -2406,6 +2405,7 @@ function calculateFinancing(input: FinanceEngineInput): SizingComputation {
       ccaPrincipalKeuro,
       ccaRemunRate,
       ccaPrincipalKeuro,
+      ccaDrawdownKeuro,
     );
 
     return {
@@ -2463,6 +2463,7 @@ function calculateFinancing(input: FinanceEngineInput): SizingComputation {
     ccaPrincipalKeuro,
     ccaRemunRate,
     ccaPrincipalKeuro,
+    ccaDrawdownKeuro,
   );
 
   return {

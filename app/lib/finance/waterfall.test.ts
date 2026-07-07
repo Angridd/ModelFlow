@@ -84,7 +84,11 @@ describe("waterfall fiscal, DSRA, CCA et double TRI", () => {
     expect(laterTax).toBeDefined();
   });
 
-  it("DSRA depose pour atteindre 6 mois de service dette suivant", () => {
+  // Item 10 (Phase 2) : la DSRA a été RETIRÉE de la cascade P50 — le BP ne finance aucune réserve
+  // de service de la dette (r296 « Cash flow available for SHL » == r268 « FCF after debt service »
+  // à l'euro sur les 25 fichiers). Les champs dsra* sont désormais toujours 0 dans les flux P50 ;
+  // seul dsraInitialKeuro (calculé à part) alimente encore le double-TRI. Voir PHASE2 item 10.
+  it("DSRA supprimee de la cascade P50 : soldes/depots/retraits nuls", () => {
     const rows = calculateAnnualCashFlows(
       baseInput({
         debtMaturityYears: 5,
@@ -93,28 +97,31 @@ describe("waterfall fiscal, DSRA, CCA et double TRI", () => {
       }),
     );
 
-    const firstYear = operatingRow(rows, 1);
-    const secondYear = operatingRow(rows, 2);
-
-    expect(firstYear.dsraDepotKeuro).toBeGreaterThan(0);
-    expect(firstYear.dsraSoldeKeuro).toBeLessThanOrEqual(secondYear.debtServiceKeuro * 0.5);
+    const operatingRows = rows.filter((row) => row.year >= 1);
+    expect(operatingRows.every((row) => row.dsraSoldeKeuro === 0)).toBe(true);
+    expect(operatingRows.every((row) => row.dsraDepotKeuro === 0)).toBe(true);
+    expect(operatingRows.every((row) => row.dsraRetraitKeuro === 0)).toBe(true);
   });
 
-  it("DSRA est liberee au tenor de dette", () => {
+  it("dividende plafonne aux benefices cumules : aucun versement tant que le cumul est negatif", () => {
     const rows = calculateAnnualCashFlows(
       baseInput({
-        debtMaturityYears: 3,
-        tariff: 220,
-        dsraMonths: 6,
+        capex: 3000,
+        tariff: 10,
+        tariffInflationRate: 300,
+        tauxIS: 25,
+        ccaRemunRate: 6,
       }),
     );
+    const operating = rows.filter((row) => row.year >= 1);
 
-    const operatingRows = rows.filter((row) => row.year >= 1);
-    const thirdYear = operatingRow(rows, 3);
-
-    expect(operatingRows.slice(0, 2).some((row) => row.dsraSoldeKeuro > 0)).toBe(true);
-    expect(thirdYear.dsraRetraitKeuro).toBeGreaterThan(0);
-    expect(thirdYear.dsraSoldeKeuro).toBe(0);
+    // Invariants universels : dividende et cash pooling ≥ 0 partout.
+    expect(operating.every((row) => row.dividende >= 0)).toBe(true);
+    expect(operating.every((row) => row.cashPoolingKeuro >= 0)).toBe(true);
+    // Gate (r311) : aucun dividende tant que le résultat cumulé est ≤ 0 (report déficitaire seedé).
+    const lossYears = operating.filter((row) => row.resultatCumuleKeuro <= 0);
+    expect(lossYears.length).toBeGreaterThan(0);
+    expect(lossYears.every((row) => row.dividende === 0)).toBe(true);
   });
 
   it("CCA est calcule depuis capexEffectif - detteRetenue", () => {
