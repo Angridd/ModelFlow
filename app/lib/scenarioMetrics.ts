@@ -84,6 +84,12 @@ export function buildFinanceInput(
     demantelementKeuroByYear: parseEngagements(scenario.demantelementKeuroByYear),
     // MRA appliquée (item 6) : JSON k€ an-par-an (paliers onduleurs). null → scalaire mraEuroKwc.
     mraKeuroByYear: parseEngagements(scenario.mraKeuroByYear),
+    // Méthodes Phase 3 (fallback projets neufs — la série routée garde la priorité) :
+    // démantèlement €/MWc + timing, profil MRA. null → défauts moteur (10 000 €/MWc,
+    // « fin_de_vie », « paliers »).
+    demantelementEuroMWc: scenario.demantelementEuroMWc,
+    demantelementTiming: scenario.demantelementTiming,
+    mraProfil: scenario.mraProfil,
     margeFactFigeeKeuro: scenario.margeFactFigeeKeuro,
     // Marge facturable amortissable (item 7) : base D&A Type 2 uniquement. null → inchangé.
     margeFactAmortissableKeuro: scenario.margeFactAmortissableKeuro,

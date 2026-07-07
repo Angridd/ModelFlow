@@ -164,6 +164,16 @@ model Scenario {
   // routée dans le CAPEX (calculateCapexDetails) qui NEUTRALISE le recalcul par taux
   // (calculateFinancingFees). null → recalcul par taux 7 composants (rétrocompat stricte).
   financingFeesKeuro         Float?
+  // MÉTHODES Phase 3 (projets neufs sans série routée — la série routée garde la priorité) :
+  // • demantelementEuroMWc : coût de démantèlement en €/MWc (null → défaut moteur 10 000, =
+  //   les 25 BP au centime : total r195 / MWc = 10 000 exactement partout).
+  // • demantelementTiming  : "fin_de_vie" (défaut : total étalé an25-29, non indexé) |
+  //   "construction" (provisionné en année 0, poste CAPEX No D&A).
+  // • mraProfil            : "paliers" (défaut : forme universelle 6/11/16/13 dérivée des BP
+  //   « Input ») | "plat" (rares sites type Mur-de-Sologne).
+  demantelementEuroMWc       Float?
+  demantelementTiming        String?
+  mraProfil                  String?
   dscr                     Float
   npv                      Float
   irr                      Float

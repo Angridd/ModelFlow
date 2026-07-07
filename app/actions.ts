@@ -281,6 +281,11 @@ function readScenarioAssumptions(formData: FormData) {
     balancingCost: readOptionalNumber(formData, "balancingCost"),
     omFixedEuroKwc: readOptionalNumber(formData, "omFixedEuroKwc"),
     mraEuroKwc: readOptionalNumber(formData, "mraEuroKwc"),
+    // Méthodes Phase 3 (démantèlement €/MWc + timing, profil MRA). Absents → null → défauts
+    // moteur (10 000 €/MWc, « fin_de_vie », « paliers »).
+    mraProfil: readOptionalText(formData, "mraProfil"),
+    demantelementEuroMWc: readOptionalNumber(formData, "demantelementEuroMWc"),
+    demantelementTiming: readOptionalText(formData, "demantelementTiming"),
     backOfficeKeuro: readOptionalNumber(formData, "backOfficeKeuro"),
     diversOpexKeuro: readOptionalNumber(formData, "diversOpexKeuro"),
     loyerMode: readOptionalText(formData, "loyerMode"),
@@ -735,6 +740,10 @@ export async function cloneScenario(projectId: string, scenarioId: string) {
       balancingCost: scenario.balancingCost,
       omFixedEuroKwc: scenario.omFixedEuroKwc,
       mraEuroKwc: scenario.mraEuroKwc,
+      // Méthodes Phase 3 (démantèlement €/MWc + timing, profil MRA) — champs formulaire.
+      mraProfil: scenario.mraProfil,
+      demantelementEuroMWc: scenario.demantelementEuroMWc,
+      demantelementTiming: scenario.demantelementTiming,
       backOfficeKeuro: scenario.backOfficeKeuro,
       diversOpexKeuro: scenario.diversOpexKeuro,
       loyerMode: scenario.loyerMode,

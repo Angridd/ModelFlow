@@ -15,6 +15,11 @@ type OpexDetailInitialValue = {
   balancingCost?: number | null;
   omFixedEuroKwc?: number | null;
   mraEuroKwc?: number | null;
+  // Méthodes Phase 3 : profil MRA (« paliers » défaut | « plat ») + démantèlement (€/MWc,
+  // défaut 10 000 ; timing « fin_de_vie » défaut | « construction »).
+  mraProfil?: string | null;
+  demantelementEuroMWc?: number | null;
+  demantelementTiming?: string | null;
   backOfficeKeuro?: number | null;
   diversOpexKeuro?: number | null;
   loyerMode?: string | null;
@@ -120,6 +125,13 @@ export function OpexDetailFields({
   );
   const [mraEuroKwc, setMraEuroKwc] = useState(
     initialNumber(initialValue.mraEuroKwc, "1.1"),
+  );
+  const [mraProfil, setMraProfil] = useState(initialValue.mraProfil ?? "paliers");
+  const [demantelementEuroMWc, setDemantelementEuroMWc] = useState(
+    initialNumber(initialValue.demantelementEuroMWc, "10000"),
+  );
+  const [demantelementTiming, setDemantelementTiming] = useState(
+    initialValue.demantelementTiming ?? "fin_de_vie",
   );
   const [backOfficeKeuro, setBackOfficeKeuro] = useState(
     initialNumber(initialValue.backOfficeKeuro, "22"),
@@ -249,6 +261,9 @@ export function OpexDetailFields({
           balancingCost,
           omFixedEuroKwc: parseNumber(omFixedEuroKwc),
           mraEuroKwc: parseNumber(mraEuroKwc),
+          mraProfil,
+          demantelementEuroMWc: parseNumber(demantelementEuroMWc),
+          demantelementTiming,
           backOfficeKeuro: parseNumber(backOfficeKeuro),
           diversOpexKeuro: parseNumber(diversOpexKeuro),
           loyerMode,
@@ -303,6 +318,9 @@ export function OpexDetailFields({
       loyerValeur,
       methodeTaxes,
       mraEuroKwc,
+      mraProfil,
+      demantelementEuroMWc,
+      demantelementTiming,
       omFixedEuroKwc,
       prixTerrainHa,
       productionP50Mwh,
@@ -357,6 +375,19 @@ export function OpexDetailFields({
             title="Major Replacement Allowance - provision remplacement onduleurs etc."
             className={defaultInputClass(mraEuroKwc, "1.1")}
           />
+        </label>
+        <label className="grid gap-2 text-sm font-medium text-zinc-700">
+          <span>Profil MRA <span className="badge-default">Défaut</span></span>
+          <select
+            name="mraProfil"
+            value={mraProfil}
+            onChange={(event) => setMraProfil(event.target.value)}
+            title="Paliers : profil de renouvellement onduleurs des BP (an1-4 ≈ 51%, an5-8 ≈ 93%, an9-11 ≈ 135%, an12-18 ≈ 93%, an19+ ≈ 110% de la moyenne). Plat : niveau constant indexé."
+            className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-zinc-950 outline-none focus:border-zinc-900"
+          >
+            <option value="paliers">Paliers onduleurs (BP)</option>
+            <option value="plat">Plat (niveau constant)</option>
+          </select>
         </label>
         <label className="grid gap-2 text-sm font-medium text-zinc-700">
           <span>Back-office (kEUR/an) <span className="badge-default">Défaut</span></span>
@@ -602,6 +633,38 @@ export function OpexDetailFields({
               placeholder="ex. 8.5"
               className={defaultInputClass(iferRate2, "8.5")}
             />
+          </label>
+        </div>
+      </div>
+      <div className="grid gap-4 border-t border-zinc-200 pt-4">
+        <h3 className="text-sm font-semibold text-zinc-950">Démantèlement</h3>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            <span>Coût (EUR/MWc) <span className="badge-default">Défaut</span></span>
+            <input
+              name="demantelementEuroMWc"
+              type="number"
+              min="0"
+              step="100"
+              value={demantelementEuroMWc}
+              onChange={(event) => setDemantelementEuroMWc(event.target.value)}
+              placeholder="ex. 10000"
+              title="Coût total de démantèlement en fin de vie (10 000 EUR/MWc dans les BP). Étalé également sur les années 25-29, non indexé."
+              className={defaultInputClass(demantelementEuroMWc, "10000")}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-zinc-700">
+            <span>Timing <span className="badge-default">Défaut</span></span>
+            <select
+              name="demantelementTiming"
+              value={demantelementTiming}
+              onChange={(event) => setDemantelementTiming(event.target.value)}
+              title="Fin de vie : coût étalé en OPEX sur les années 25-29 (comme les BP). Construction : provision en année 0 (CAPEX, non amorti)."
+              className="h-10 rounded-md border border-zinc-300 bg-white px-3 text-zinc-950 outline-none focus:border-zinc-900"
+            >
+              <option value="fin_de_vie">Fin de vie (an 25-29)</option>
+              <option value="construction">Construction (année 0)</option>
+            </select>
           </label>
         </div>
       </div>

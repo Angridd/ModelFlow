@@ -14,9 +14,11 @@ import type { FinanceEngineInput } from "@/app/lib/finance/engine";
 // AFFICHE le flux actionnaire (= FCF after debt service, C_P50!r296) an1-35 vs banc §3.1.
 //
 // ⚠️ Les valeurs an24-29 portent des RÉSIDUELS DOCUMENTÉS, non forcés (cf CALIBRATION.md
-// "CHANTIER TRI CLOS") : IS an24 +1,9 k€ (index merchant P50 / D&A) et démantèlement
-// an25-29 (G7, 24 k€/an) NON implémenté. L'assertion IS an24 fige donc l'ÉTAT MF actuel
-// (134 900 €), pas la cible BP (133 006 €) — le résiduel est intentionnel.
+// "CHANTIER TRI CLOS") : IS an24 +1,9 k€ (index merchant P50 / D&A). L'assertion IS an24
+// fige donc l'ÉTAT MF actuel (134 900 €), pas la cible BP (133 006 €) — résiduel intentionnel.
+// Phase 3 : le démantèlement an25-29 (ex-G7) est désormais appliqué PAR DÉFAUT par la méthode
+// (10 000 €/MWc × 12 MWc → 24 k€/an an25-29, non indexé = le BP, 24,68 k€/an sur 12,34 MWc
+// réels). Toutes les ancres (IS an24, flux an1/21/35, TRI ±0,05) restent vertes SANS retouche.
 // ---------------------------------------------------------------------------
 
 // |MF − attendu| ≤ tol ; messages parlants en cas de dérive.

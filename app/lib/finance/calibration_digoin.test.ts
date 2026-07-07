@@ -78,6 +78,10 @@ function digoinInput(baseMode: "wc" | "override"): FinanceEngineInput {
     // OPEX
     omFixedEuroKwc: 5.615907,
     mraEuroKwc: 1.157127, // ⚠️ premier projet avec MRA onduleurs ≠ 0
+    // Phase 3 : le défaut moteur est désormais le profil PALIERS (méthode BP universelle).
+    // Le BP xlsm du 12/06/2026 de CE banc applique une MRA PLATE indexée (chaîne calée à
+    // l'euro ci-dessous avec la formule plate) → on fige explicitement le profil « plat ».
+    mraProfil: "plat",
     inflationMRA: 2,
     backOfficeKeuro: 22.5,
     assuranceRate: 1.5,
@@ -237,8 +241,8 @@ describe("calibration Digoin — DIAGNOSTIC des gaps génériques restants (cand
     console.log(`  TRI projet (irr)  MF ${metrics.irr}%   cible brut 8,24% / net 6,77%`);
     console.log(`  doubleIRR.irrInvest MF ${metrics.doubleIRR?.irrInvest}%   (projet EBITDA−IS)`);
     console.log(`  npv MF ${metrics.npv} k€ · investorNpv ${metrics.investorNpv} k€ · cible VAN 876,1 / 436,1 k€`);
-    console.log(`  Cause : (1) démantèlement 40 000 €/an an25-29 (G7) non modélisé → flux tardifs`);
-    console.log(`  surestimés (TRI projet ↑) ; (2) VAN brute/nette BP = flux projet + réintégrations`);
-    console.log(`  additives D/E/F (marge MOD, coût dev) non implémentées (SPEC §2.8). Gaps GÉNÉRIQUES.`);
+    console.log(`  Cause : (1) démantèlement an25-29 désormais modélisé PAR DÉFAUT (Phase 3 :`);
+    console.log(`  10 000 €/MWc × 4 MWc → 8 k€/an an25-29) ; (2) VAN brute/nette BP = flux projet +`);
+    console.log(`  réintégrations additives D/E/F (marge MOD, coût dev) non implémentées (SPEC §2.8).`);
   });
 });

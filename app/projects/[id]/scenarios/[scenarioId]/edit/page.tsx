@@ -674,6 +674,10 @@ export default async function EditScenarioPage({
             omFixedEuroKwc:
               scenario.omFixedEuroKwc ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.omFixedEuroKwc,
             mraEuroKwc: scenario.mraEuroKwc ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.mraEuroKwc,
+            // Méthodes Phase 3 — null → défauts du composant (« paliers », 10 000, « fin_de_vie »).
+            mraProfil: scenario.mraProfil,
+            demantelementEuroMWc: scenario.demantelementEuroMWc,
+            demantelementTiming: scenario.demantelementTiming,
             backOfficeKeuro:
               scenario.backOfficeKeuro ?? DEFAULT_SCENARIO_EXTRA_ASSUMPTIONS.backOfficeKeuro,
             diversOpexKeuro:

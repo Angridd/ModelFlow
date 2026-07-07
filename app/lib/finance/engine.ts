@@ -25,6 +25,32 @@ const LOYER_INFLATION_FALLBACK = 0.4;
 const INFLATION_OM_FALLBACK = 2;
 const DSRF_FEE_RATE_FALLBACK = 1.4;
 const INFLATION_MRA_FALLBACK = 2;
+// ─── Méthodes Phase 3 (fallback projets neufs, cf docs/PHASE3_METHODES.md §4.1/§4.2) ─────────
+// Démantèlement : 10 000 €/MWc = la valeur EXACTE des 25 BP (total C_P50 r195 / MWc), étalée
+// également sur an25-29 (non indexée) en timing « fin_de_vie ».
+const DEMANTELEMENT_EURO_MWC_FALLBACK = 10_000;
+const DEMANTELEMENT_YEAR_FROM = 25;
+const DEMANTELEMENT_YEAR_TO = 29;
+// MRA en paliers (renouvellement onduleurs / garantie constructeur) : ratios EXACTS dérivés des
+// séries C_P50 r189 dé-indexées (÷1,02^(y−1)) ÷ moyenne — identiques (à 1e-9 près) sur les 17
+// BP « Input » à paliers. Les niveaux des paliers sont proportionnels à 6 / 11 / 16 / 13 ;
+// normalisés pour que la moyenne sur 35 ans vaille 1 (poids 4×6 + 11×11 + 3×16 + 17×13 = 414) :
+//   an1-4 = 6×35/414 = 210/414 ≈ 50,72 % · an5-8 & an12-18 = 11×35/414 = 385/414 ≈ 93,00 %
+//   an9-11 = 16×35/414 = 560/414 ≈ 135,27 % · an19+ = 13×35/414 = 455/414 ≈ 109,90 %
+const MRA_PALIER_RATIOS: ReadonlyArray<{ yearTo: number; ratio: number }> = [
+  { yearTo: 4, ratio: 210 / 414 },
+  { yearTo: 8, ratio: 385 / 414 },
+  { yearTo: 11, ratio: 560 / 414 },
+  { yearTo: 18, ratio: 385 / 414 },
+  { yearTo: Number.POSITIVE_INFINITY, ratio: 455 / 414 },
+];
+
+function mraPalierRatio(year: number): number {
+  for (const { yearTo, ratio } of MRA_PALIER_RATIOS) {
+    if (year <= yearTo) return ratio;
+  }
+  return 1;
+}
 const INFLATION_BACK_OFFICE_FALLBACK = 2;
 const INFLATION_DIVERS_FALLBACK = 2;
 const METHODE_TAXES_FALLBACK = "appreciation_directe";
@@ -174,6 +200,24 @@ export type FinanceEngineInput = FinancialAssumptions & {
   // Absent/[] → formule scalaire (rétrocompat stricte). Persistée : colonne
   // Scenario.mraKeuroByYear (String? JSON, comme tfKeuroByYear).
   mraKeuroByYear?: number[] | null;
+  // ─── MÉTHODES Phase 3 (fallback pour projets NEUFS, sans data/<N>.xlsm) ───────────────────
+  // La série routée (demantelementKeuroByYear / mraKeuroByYear) garde la PRIORITÉ ABSOLUE.
+  // Quand elle est absente, la MÉTHODE remplace l'ancien fallback plat/zéro (voulu — c'est le
+  // nouveau défaut des scénarios sans série routée, cf docs/PHASE3_METHODES.md §1 et §7.1).
+  //
+  // Démantèlement — coût total = demantelementEuroMWc × MWc (défaut 10 000 €/MWc, vérifié
+  // EXACT sur les 25 BP : total r195 / MWc = 10 000,00 partout). Timing :
+  //   • "fin_de_vie" (défaut) : étalé également sur an25-29, NON indexé (= le BP).
+  //   • "construction"        : provisionné en année 0 (poste CAPEX No D&A, non amorti).
+  demantelementEuroMWc?: number | null;
+  demantelementTiming?: string | null;
+  // MRA — profil de la méthode quand mraKeuroByYear est absente :
+  //   • "paliers" (défaut) : mraEuroKwc (moyenne 35 ans) × kWc × ratio_palier(y) × 1,02^(y−1).
+  //     Ratios UNIVERSELS dérivés des BP « Input » (niveaux ∝ 6/11/16/13, normalisés sur 35
+  //     ans : an1-4 = 210/414, an5-8 = 385/414, an9-11 = 560/414, an12-18 = 385/414,
+  //     an19+ = 455/414) — identiques au ratio près de 1e-9 sur les 17 projets à paliers.
+  //   • "plat"             : ancienne formule scalaire plate (rares sites type Mur-de-Sologne).
+  mraProfil?: string | null;
   // Marge facturable FIGÉE par le BP (feuille Inp_Opération, ligne « Dont Marge facturable »),
   // en k€. Non-null → désactive la boucle endogène `ajusteMargeFacturable` et impose cette valeur
   // (les k€ correspondants sont déjà inclus dans le CAPEX via `indemnitesImmoKeuro`, d'où 0 pour
@@ -326,6 +370,10 @@ export type CapexDetails = {
   taxesFoncieresKeuro: number;
   indemnitesImmoKeuro: number;
   financingFeesKeuro: number;
+  // Provision de démantèlement en année 0 (méthode Phase 3, timing « construction » UNIQUEMENT :
+  // demantelementEuroMWc × MWc, poste No D&A). 0 en timing « fin_de_vie » (défaut) ou quand la
+  // série routée r195 est présente (le BP porte alors le démantèlement en OPEX an25-29).
+  demantelementProvisionKeuro: number;
   capexTotalKeuro: number;
   capexPerMwKeuro: number;
 };
@@ -683,6 +731,7 @@ function hasDetailedOpexInput(input: FinanceEngineInput) {
     input.omFixedEuroKwc != null ||
     input.mraEuroKwc != null ||
     input.mraKeuroByYear != null ||
+    input.mraProfil != null ||
     input.backOfficeKeuro != null ||
     input.diversOpexKeuro != null ||
     input.loyerMode != null ||
@@ -850,13 +899,24 @@ export function calculateTaxesFoncieres(
 export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
   const hasDetailedCapex = hasDetailedCapexInput(input);
   const legacyCapexTotal = input.capex * input.capacityMw;
+  // Méthode Phase 3, timing « construction » : le démantèlement est provisionné en année 0
+  // (poste No D&A du CAPEX, non amorti — comme financingFeesKeuro/indemnitesImmoKeuro) au lieu
+  // d'être étalé en OPEX an25-29. Inactif (0) en timing « fin_de_vie » (défaut) ou quand la
+  // série routée r195 existe (rétrocompat stricte : aucun scénario existant n'a ce timing).
+  const demantelementProvisionKeuro =
+    (input.demantelementTiming ?? "fin_de_vie") === "construction" &&
+    !input.demantelementKeuroByYear?.length
+      ? ((input.demantelementEuroMWc ?? DEMANTELEMENT_EURO_MWC_FALLBACK) * input.capacityMw) /
+        1000
+      : 0;
 
   if (!hasDetailedCapex) {
     // L'override « valeur appliquée BP » est porté dans le CAPEX total AUSSI en mode legacy :
     // il neutralise calculateFinancingFees → sans cet ajout, les fees disparaîtraient du CAPEX.
     // null → 0 → total legacy strictement inchangé (rétrocompat).
     const legacyFinancingFeesKeuro = input.financingFeesKeuro ?? 0;
-    const legacyTotalKeuro = legacyCapexTotal + legacyFinancingFeesKeuro;
+    const legacyTotalKeuro =
+      legacyCapexTotal + legacyFinancingFeesKeuro + demantelementProvisionKeuro;
     return {
       hasDetailedCapex,
       modulesKeuro: 0,
@@ -875,6 +935,7 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
       taxesFoncieresKeuro: 0,
       indemnitesImmoKeuro: 0,
       financingFeesKeuro: legacyFinancingFeesKeuro,
+      demantelementProvisionKeuro,
       capexTotalKeuro: legacyTotalKeuro,
       capexPerMwKeuro: input.capacityMw > 0 ? legacyTotalKeuro / input.capacityMw : 0,
     };
@@ -918,7 +979,7 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
   const financingFeesKeuro = input.financingFeesKeuro ?? 0;
   const capexTotalKeuro =
     capexBeforeContingencyKeuro + contingencyKeuro + taxesFoncieresKeuro
-    + indemnitesImmoKeuro + financingFeesKeuro;
+    + indemnitesImmoKeuro + financingFeesKeuro + demantelementProvisionKeuro;
 
   return {
     hasDetailedCapex,
@@ -938,6 +999,7 @@ export function calculateCapexDetails(input: FinanceEngineInput): CapexDetails {
     taxesFoncieresKeuro,
     indemnitesImmoKeuro,
     financingFeesKeuro,
+    demantelementProvisionKeuro,
     capexTotalKeuro,
     capexPerMwKeuro: input.capacityMw > 0 ? capexTotalKeuro / input.capacityMw : 0,
   };
@@ -1007,6 +1069,30 @@ export function calculateFinancingFees(
   };
 }
 
+/**
+ * MÉTHODE démantèlement (Phase 3, fallback quand la série routée r195 est absente) : coût total
+ * = demantelementEuroMWc (défaut 10 000 €/MWc — valeur exacte des 25 BP) × MWc.
+ *   • timing « fin_de_vie » (défaut) : étalé également sur an25-29, NON indexé — reproduit r195
+ *     au centime (validé scripts/_audit_phase3_methode.ts sur les 25 projets).
+ *   • timing « construction » : provisionné en année 0 (poste CAPEX No D&A, cf
+ *     calculateCapexDetails) → 0 en OPEX d'exploitation ici.
+ * Le flag exploitation est implicite (la fonction n'est appelée que pour year ∈ [1, vie]).
+ */
+function resolveDemantelementMethodeKeuro(
+  input: Pick<
+    FinanceEngineInput,
+    "capacityMw" | "demantelementEuroMWc" | "demantelementTiming"
+  >,
+  year: number,
+): number {
+  const timing = input.demantelementTiming ?? "fin_de_vie";
+  if (timing !== "fin_de_vie") return 0;
+  if (year < DEMANTELEMENT_YEAR_FROM || year > DEMANTELEMENT_YEAR_TO) return 0;
+  const totalKeuro =
+    ((input.demantelementEuroMWc ?? DEMANTELEMENT_EURO_MWC_FALLBACK) * input.capacityMw) / 1000;
+  return totalKeuro / (DEMANTELEMENT_YEAR_TO - DEMANTELEMENT_YEAR_FROM + 1);
+}
+
 export function calculateOpexDetails(
   input: FinanceEngineInput,
   year: number,
@@ -1057,8 +1143,11 @@ export function calculateOpexDetails(
       : asRate(input.aleasOpexRate ?? 0.5) * revenueP50Keuro;
 
   // Item 2 : démantèlement appliqué par le BP (C_P50/C_P90 r195) — an25-29 uniquement, constant
-  // non indexé. Piloté par la série (0 hors an25-29). Absent → 0 (rétrocompat stricte).
-  const demantelementKeuro = input.demantelementKeuroByYear?.[year - 1] ?? 0;
+  // non indexé. Piloté par la série (0 hors an25-29). Série absente → MÉTHODE Phase 3
+  // (demantelementEuroMWc × MWc étalé an25-29, cf resolveDemantelementMethodeKeuro).
+  const demantelementKeuro = input.demantelementKeuroByYear?.length
+    ? input.demantelementKeuroByYear[year - 1] ?? 0
+    : resolveDemantelementMethodeKeuro(input, year);
 
   if (!hasDetailedOpex) {
     const legacyOpexKeuro =
@@ -1098,11 +1187,15 @@ export function calculateOpexDetails(
     input.capacityMw *
     (1 + asRate(input.inflationOM ?? INFLATION_OM_FALLBACK)) ** (year - 1);
   // Item 6 : MRA appliquée par le BP (C_P50 r189, paliers onduleurs déjà indexés 2 %/an) quand
-  // routée par projet ; sinon formule scalaire plate mraEuroKwc (rétrocompat stricte).
-  const mraKeuro =
-    input.mraKeuroByYear?.[year - 1] ??
-    (input.mraEuroKwc ?? MRA_EURO_KWC_FALLBACK) *
+  // routée par projet ; sinon MÉTHODE Phase 3 : mraEuroKwc (moyenne 35 ans) × kWc ×
+  // ratio_palier(y) × 1,02^(y−1) — profil « paliers » par défaut (forme universelle des BP),
+  // « plat » (ratio 1) pour les rares sites type Mur-de-Sologne. Le flag exploitation est
+  // implicite (year ∈ [1, vie]).
+  const mraKeuro = input.mraKeuroByYear?.length
+    ? input.mraKeuroByYear[year - 1] ?? 0
+    : (input.mraEuroKwc ?? MRA_EURO_KWC_FALLBACK) *
       input.capacityMw *
+      ((input.mraProfil ?? "paliers") === "plat" ? 1 : mraPalierRatio(year)) *
       (1 + asRate(input.inflationMRA ?? INFLATION_MRA_FALLBACK)) ** (year - 1);
   const backOfficeKeuro =
     (input.backOfficeKeuro ?? BACK_OFFICE_KEURO_FALLBACK) *
