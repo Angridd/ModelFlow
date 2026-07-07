@@ -145,17 +145,40 @@ Deux briques de difficulté **très différentes** :
 - Chaque taux = input optionnel avec **défaut national**, remplaçable par la valeur réelle
   de la commune.
 
-**b) La base (assiette) → le vrai travail.**
-- **Input décisif** : booléen `achatTerrain` (oui/non) → sélectionne la méthode d'assiette :
-  - `non` → **« appréciation directe »** (déjà calée sur Baugé/Sigoulès en Phase 2).
-  - `oui` → **« comptable »** (×~2,5 ; base jugée *fragile* à reconstruire en Phase 2 —
-    à implémenter proprement : bâtiments PTR/PDL, dénominateur MOD, taux terrain 0,04 vs 0,08).
-- **Fallback** : `tfKeuroByYear` / `cfeKeuroByYear` (routées r191/r192) présentes → les
-  utiliser ; sinon méthode (base × Σ taux).
-- **Validation** : débrancher r191/r192 → TF/CFE ≈ BP (sites « comptable » = les plus durs).
-- **Scraping des taux** : hors scope Phase 3. Amélioration future possible (open data
-  collectivités), mais taux **annuels et par commune** → fragile ; on privilégie
-  saisie + défauts.
+**b) La base (assiette) → le vrai travail. Décodée au centime (Baugé/Selles/Digoin, agent 2026-07-07).**
+
+Localisation dans le BP : feuille `Inp_Matrice_O&M_Taxes` (libellés col. D, valeurs col. J).
+Assiette appliquée = `J354` (directe) ou `J304` (comptable) ; montant final en `C_P50` r191 (TF) /
+r192 (CFE). Sélecteur = **texte `Inp_Assumption!I266`** (« Appréciation Directe » | « Comptable seule
+si achat »), routé par XLOOKUP vers les candidats J401/J402 (TF) et J405/J406 (CFE).
+
+- **Règle métier (confirmée utilisateur) : achat de terrain → méthode COMPTABLE.** MF dérive donc
+  la méthode du **prix d'achat du terrain** : `prixAchatTerrainEuro > 0` → `comptable` ; sinon →
+  `appreciation_directe`. ⚠️ Le BP de **Digoin** est une **ERREUR de saisie** (terrain acheté
+  545 970 € mais `Inp_Assumption!I266` laissé sur « Appréciation Directe ») → en dérivant de l'achat,
+  **MF serait PLUS correct que l'Excel** (il éviterait ce bug). **Villognon** = terrain 0 € → directe,
+  correct (pas un contre-exemple). Option d'override manuel `methodeAssiette` à décider (§7) pour
+  d'éventuels cas exceptionnels.
+- **Formule d'assiette = biens passibles × taux d'intérêt LF × abattement 50 %.** Deux méthodes :
+  - `appreciation_directe` (**déjà calée Baugé/Sigoulès en Phase 2**) — `J354` = biens passibles
+    (BOS + terrassement + bâtiments PTR/PDL + MOD retraité, `J342`) × **8 %** (taux LF **doublé**)
+    × 50 % + terrain forfaitaire (ha × 5 000 €) × 4 % × 0,2561 × 50 %.
+  - `comptable` (**à implémenter**) — `J304` = (**prix d'achat terrain** + immos non exonérées +
+    MOD retraité, `J302`) × **4 %** (taux LF simple) × 50 %. Le prix d'achat pèse ~80 % de la base
+    → assiette **×~2,5** vs directe.
+- **Puis** `TFPB = assiette × Σ(taux TFPB)`. ⚠️ **En directe, la CFE s'applique sur la MÊME assiette
+  TF (`J354`)** — le classeur calcule une assiette CFE dédiée mais ne l'utilise pas.
+- **Classification réelle** : dans les BP existants, **seul Selles applique le comptable** ; **Digoin
+  DEVRAIT l'être** (erreur Excel, cf ci-dessus) ; Baugé/Villognon = directe (pas d'achat). **À recenser
+  sur les 25 selon le PRIX D'ACHAT du terrain (la règle), pas selon `I266`** (qui peut être erroné).
+  ⚠️ Validation : la « méthode vs BP » de Digoin **mismatchera** (son BP calcule en directe par erreur)
+  — c'est ATTENDU ; son routing r191/r192 reflète l'erreur et reste prioritaire pour ce projet existant.
+- **Piège** : `J331` (frais de gestion CFE comptable) = **valeur en dur 134,88 €** (artefact template),
+  à reproduire pour le centime en comptable.
+- **Fallback** : `tfKeuroByYear` / `cfeKeuroByYear` (routées r191/r192) présentes → les utiliser ;
+  sinon méthode (assiette × Σ taux).
+- **Validation** : débrancher r191/r192 → TF/CFE ≈ BP.
+- **Scraping des taux** : hors scope Phase 3 (taux annuels et par commune → fragile) ; saisie + défauts.
 
 ---
 
@@ -172,7 +195,7 @@ Salbris était une **édition manuelle du fichier BP**, gérée par l'override `
 | MRA | moyenne €/kWc × forme paliers universelle | ✅ FAIT (0,0000 € vs BP + « plat » Mur-de-Sologne) | faible |
 | Engagements | base an1 × 1,02/an (SANS défaut — an1/MWc ×26 entre BP) | ✅ FAIT (0/21 au centime, ATTENDU : séries BP lumpy — méthode = défaut déclaratif) | moyen |
 | TF/CFE (taux) | Σ des taux saisis (défauts nationaux) | 🟢 haute | faible |
-| TF/CFE (base) | sélecteur achat terrain → 2 méthodes | 🔴 basse | élevé |
+| TF/CFE (base) | **auto** depuis prix d'achat terrain (+override) → directe/comptable (assiette décodée au centime Baugé/Selles/Digoin) | 🟡 moyenne | élevé |
 | Financing fees | ×0,95 (déjà correct) | ✅ — | — |
 
 ## 7. Points de décision restants (à trancher à l'implémentation)
@@ -182,8 +205,12 @@ Salbris était une **édition manuelle du fichier BP**, gérée par l'override `
    scénarios existants sans série routée basculent sur la méthode (plus juste) ; l'opt-out
    existe par scénario via `mraProfil="plat"` / `demantelementEuroMWc=0`. Tests ancres
    restés verts (seul le banc Digoin fige explicitement `mraProfil="plat"`, = son BP).
-2. **Défauts nationaux des taux** : quelles valeurs par défaut retenir (TFPB/CFE moyens) ?
-3. **UI** : où placer les nouveaux inputs dans les formulaires new/edit (regroupés par poste).
+2. ✅ **TRANCHÉ (TF/CFE)** — **méthode d'assiette = AUTO depuis le prix d'achat terrain + override** :
+   `prixAchatTerrainEuro > 0` → comptable ; sinon appréciation directe ; l'utilisateur peut forcer via
+   `methodeAssiette`. MF rattrape ainsi les erreurs de saisie type Digoin (BP en directe malgré achat).
+3. **Taux TF/CFE** : saisie utilisateur par commune ; défauts = simples **placeholders** (pas de
+   dérivation « nationale » factice, cf leçon engagements). Valeurs de départ à définir avec l'utilisateur.
+4. **UI** : où placer les nouveaux inputs dans les formulaires new/edit (regroupés par poste).
 
 ## 8. Rétrocompat & non-régression
 - Aucun retrait de routing → **25/25 préservé** (à revérifier via `calibrate_all` à chaque étape).
