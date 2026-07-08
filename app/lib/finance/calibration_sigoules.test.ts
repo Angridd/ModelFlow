@@ -51,6 +51,7 @@ function sigoulesInput(): FinanceEngineInput {
     commissioningYear: 2029,
     gearingMax: 95,
     gearingMaxPct: 95,
+    debtRate: 77.4, // gearing de repli — non lu ici (dette sculptée), requis par le type
     dscrSchedule: [
       { yearFrom: 1, yearTo: 20, dscrValue: 1.15 },
       { yearFrom: 21, yearTo: 24, dscrValue: 1.4 },

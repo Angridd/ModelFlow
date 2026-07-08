@@ -31,6 +31,7 @@ function baugeInput(): FinanceEngineInput {
     ],
     discountRate: 7.5,
     debtInterestRate: 4.2,
+    debtRate: 88.5, // gearing de repli — non lu ici (dette sculptée), requis par le type
     debtMaturityYears: 24,
     debtTenorYears: 24,
     // "Taxes P&L" BP : seul IS injecté dans le repayment, uniquement an24 (dernière année du
