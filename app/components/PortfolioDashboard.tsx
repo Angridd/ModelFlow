@@ -245,6 +245,17 @@ export function PortfolioDashboard({ rows }: { rows: DashboardRow[] }) {
       equitySum > 0
         ? filtered.reduce((s, r) => s + r.investorIrr * Math.max(0, r.equityCcaKeuro), 0) / equitySum
         : null;
+    // TRI PROJET (non-levier) : médiane + min/max + moyenne pondérée par la puissance (MWc).
+    const projIrrs = filtered.map((r) => r.projectIrr).filter((v) => Number.isFinite(v));
+    const projIrrMedian = median(projIrrs);
+    const projIrrMin = projIrrs.length ? Math.min(...projIrrs) : null;
+    const projIrrMax = projIrrs.length ? Math.max(...projIrrs) : null;
+    const projIrrWeighted =
+      totalMw > 0
+        ? filtered.reduce((s, r) => s + r.projectIrr * Math.max(0, r.capacityMw), 0) / totalMw
+        : null;
+    // VAN brute portefeuille rapportée à la puissance totale (k€/MWc).
+    const vanBruteParMw = totalMw > 0 ? totalVanBrute / totalMw : null;
     const green = filtered.filter((r) => r.calibration === "green").length;
     const withTarget = filtered.filter((r) => r.calibration === "green" || r.calibration === "red").length;
     return {
@@ -259,6 +270,11 @@ export function PortfolioDashboard({ rows }: { rows: DashboardRow[] }) {
       irrMin,
       irrMax,
       irrWeighted,
+      projIrrMedian,
+      projIrrMin,
+      projIrrMax,
+      projIrrWeighted,
+      vanBruteParMw,
       green,
       withTarget,
     };
@@ -352,6 +368,18 @@ export function PortfolioDashboard({ rows }: { rows: DashboardRow[] }) {
           value={fmtPct(agg.irrMedian)}
           sub={`min ${fmtPct(agg.irrMin)} · max ${fmtPct(agg.irrMax)} · pondéré equity ${fmtPct(agg.irrWeighted)}`}
           tone="positive"
+        />
+        <KpiCard
+          label="TRI projet médian"
+          value={fmtPct(agg.projIrrMedian)}
+          sub={`min ${fmtPct(agg.projIrrMin)} · max ${fmtPct(agg.projIrrMax)} · pondéré puissance ${fmtPct(agg.projIrrWeighted)}`}
+          tone="positive"
+        />
+        <KpiCard
+          label="VAN brute / MWc"
+          value={agg.vanBruteParMw == null ? "—" : `${fmtNum(agg.vanBruteParMw, 1)} k€/MWc`}
+          sub="portefeuille · VAN brute ÷ puissance"
+          tone={(agg.vanBruteParMw ?? 0) < 0 ? "negative" : "positive"}
         />
       </section>
 
