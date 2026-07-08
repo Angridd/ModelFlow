@@ -235,7 +235,12 @@ export function computeVanBruteNetteKeuro(
     input.modRetraitementKeuro ?? (input.devFeesKEuroPerMW ?? 0) * input.capacityMw;
   const margeMODKeuro = modKeuro * isFactor; // D — marge MOD réintégrée (brute)
   const devFeesKeuro = modKeuro * isFactor; // E — coût de dev retiré (nette)
-  const vanBruteKeuro = Math.round((metrics.investorNpv + margeMODKeuro) * 100) / 100;
+  // F — marge facturable réintégrée à l'an0, nette d'IS (elle revient au développeur et réduit
+  // sa mise nette). BP: C_P50 r412 = margeFact × (1−IS). Null chez 24/25 projets (→ 0, inchangés) ;
+  // seul Ychoux la porte (193,136 × 0,75 = 144,85 k€) → referme son résidu VAN.
+  const margeFactNetKeuro = (input.margeFactAmortissableKeuro ?? 0) * isFactor;
+  const vanBruteKeuro =
+    Math.round((metrics.investorNpv + margeMODKeuro + margeFactNetKeuro) * 100) / 100;
   const vanNetteKeuro = Math.round((vanBruteKeuro - devFeesKeuro) * 100) / 100;
   return { vanBruteKeuro, vanNetteKeuro };
 }
