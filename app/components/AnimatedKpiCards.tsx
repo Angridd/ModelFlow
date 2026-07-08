@@ -23,6 +23,10 @@ function formatAnimatedNumber(value: number, decimals: number) {
 }
 
 function displayLabel(label: string) {
+  // Indicateurs éco additionnels (calés BP) : libellés passés tels quels, AVANT les règles génériques
+  // VAN/TRI ci-dessous (qui réécriraient "VAN brute/MWc" et "TRI projet brut").
+  if (label.startsWith("VAN brute/MWc")) return "VAN brute/MWc";
+  if (label.startsWith("TRI projet")) return label;
   if (label.startsWith("VAN")) return label.includes("Meilleure") ? "Meilleure VAN" : "VAN nette reference";
   if (label.startsWith("TRI")) return label.includes("Meilleur ") ? "Meilleur TRI" : "TRI investisseur";
   if (label.startsWith("DSCR")) return label.includes("minimum") ? "DSCR minimum" : "DSCR reference";
@@ -34,6 +38,7 @@ function displayLabel(label: string) {
 function displaySuffix(suffix: string | undefined) {
   if (!suffix) return "";
   if (suffix.includes("MWh")) return " EUR/MWh";
+  if (suffix.includes("MWc")) return " kEUR/MWc"; // AVANT le test générique "M" (MWc contient "M")
   if (suffix.includes("M")) return " MEUR";
 
   return suffix;

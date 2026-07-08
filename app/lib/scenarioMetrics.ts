@@ -254,6 +254,16 @@ export type ProjectFinance = {
   vanBruteKeuro: number;
   /** VAN NETTE (secondaire, cible BP `vanNetteKeuro`) = VAN brute − dev fees. */
   vanNetteKeuro: number;
+  /**
+   * VAN brute rapportée à la puissance installée (k€/MWc) = vanBruteKeuro / capacityMw.
+   * Indicateur de densité économique comparable entre projets. null si capacité ≤ 0.
+   */
+  vanBruteParMWcKeuro: number | null;
+  /**
+   * TRI projet BRUT (non-levier / unlevered), calé sur le BP (cible `trIProjetBrutPct`,
+   * C_P50 r383 → Inp_Assumption r53). Repris tel quel de metrics.projectIrr. En %.
+   */
+  projectIrr: number;
 };
 
 /**
@@ -283,6 +293,8 @@ export function computeFinanceFromInput(input: FinanceEngineInput): ProjectFinan
   const gearingPct =
     metrics.sizing?.gearingActuel != null ? metrics.sizing.gearingActuel * 100 : null;
   const { vanBruteKeuro, vanNetteKeuro } = computeVanBruteNetteKeuro(metrics, input);
+  const vanBruteParMWcKeuro =
+    input.capacityMw > 0 ? Math.round((vanBruteKeuro / input.capacityMw) * 100) / 100 : null;
   return {
     metrics,
     capexCalibKeuro,
@@ -292,6 +304,8 @@ export function computeFinanceFromInput(input: FinanceEngineInput): ProjectFinan
     gearingPct,
     vanBruteKeuro,
     vanNetteKeuro,
+    vanBruteParMWcKeuro,
+    projectIrr: metrics.projectIrr,
   };
 }
 

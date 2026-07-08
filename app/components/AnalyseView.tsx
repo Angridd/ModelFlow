@@ -272,7 +272,7 @@ function PipelineTab({ projects }: { projects: ProjectAnalysis[] }) {
       </div>
 
       <div className="overflow-x-auto" style={{ borderRadius: "var(--radius-card)", boxShadow: "var(--shadow-card)", background: "white" }}>
-        <table className="ps-table" style={{ minWidth: "1000px" }}>
+        <table className="ps-table" style={{ minWidth: "1150px" }}>
           <thead>
             <tr>
               <th className="col-left">Projet</th>
@@ -281,7 +281,9 @@ function PipelineTab({ projects }: { projects: ProjectAnalysis[] }) {
               <th>Techno</th>
               <th>MW</th>
               <th>TRI inv.</th>
+              <th>TRI projet</th>
               <th>VAN brute</th>
+              <th>VAN/MWc</th>
               <th>Dette</th>
               <th>Gearing</th>
               <th>DSCR</th>
@@ -299,7 +301,11 @@ function PipelineTab({ projects }: { projects: ProjectAnalysis[] }) {
                 <td>{r.technology}</td>
                 <td>{fmtNum(r.capacityMw, 1)}</td>
                 <td className={r.investorIrr < 7.5 ? "val-neg" : "val-pos"}>{fmtPct(r.investorIrr)}</td>
+                <td className={r.projectIrr >= 0 ? "val-pos" : "val-neg"}>{fmtPct(r.projectIrr)}</td>
                 <td className={r.vanBruteKeuro >= 0 ? "val-pos" : "val-neg"}>{fmtKeuro(r.vanBruteKeuro)}</td>
+                <td className={(r.vanBruteParMWcKeuro ?? 0) >= 0 ? "val-pos" : "val-neg"}>
+                  {r.vanBruteParMWcKeuro == null ? "—" : `${fmtNum(r.vanBruteParMWcKeuro, 1)} k€/MWc`}
+                </td>
                 <td>{fmtKeuro(r.debtKeuro)}</td>
                 <td>{fmtPct(r.gearingPct)}</td>
                 <td>{fmtNum(r.dscr, 2)}</td>

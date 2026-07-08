@@ -23,10 +23,14 @@ export type DashboardRow = {
   capacityMw: number;
   commissioningYear: number;
   investorIrr: number;
+  /** TRI PROJET BRUT (non-levier / unlevered), calé BP (cible `trIProjetBrutPct`). En %. */
+  projectIrr: number;
   /** VAN BRUTE (indicateur VAN principal, cible BP). */
   vanBruteKeuro: number;
   /** VAN NETTE (secondaire) = VAN brute − dev fees. */
   vanNetteKeuro: number;
+  /** VAN brute rapportée à la puissance (k€/MWc) = vanBruteKeuro / capacityMw. null si MW ≤ 0. */
+  vanBruteParMWcKeuro: number | null;
   debtKeuro: number;
   equityCcaKeuro: number;
   capexEffectifKeuro: number;
@@ -93,7 +97,9 @@ type SortKey =
   | "capacityMw"
   | "commissioningYear"
   | "investorIrr"
+  | "projectIrr"
   | "vanBruteKeuro"
+  | "vanBruteParMWcKeuro"
   | "debtKeuro"
   | "gearingPct"
   | "dscr"
@@ -539,7 +545,7 @@ export function PortfolioDashboard({ rows }: { rows: DashboardRow[] }) {
           className="overflow-x-auto"
           style={{ borderRadius: "var(--radius-card)", boxShadow: "var(--shadow-card)", background: "white" }}
         >
-          <table className="ps-table" style={{ minWidth: "1100px" }}>
+          <table className="ps-table" style={{ minWidth: "1250px" }}>
             <thead>
               <tr>
                 <SortableTh label="Projet" k="name" current={sortKey} arrow={sortArrow} onClick={toggleSort} align="left" />
@@ -547,7 +553,9 @@ export function PortfolioDashboard({ rows }: { rows: DashboardRow[] }) {
                 <SortableTh label="MW" k="capacityMw" current={sortKey} arrow={sortArrow} onClick={toggleSort} />
                 <SortableTh label="MES" k="commissioningYear" current={sortKey} arrow={sortArrow} onClick={toggleSort} />
                 <SortableTh label="TRI inv." k="investorIrr" current={sortKey} arrow={sortArrow} onClick={toggleSort} />
+                <SortableTh label="TRI projet" k="projectIrr" current={sortKey} arrow={sortArrow} onClick={toggleSort} />
                 <SortableTh label="VAN brute" k="vanBruteKeuro" current={sortKey} arrow={sortArrow} onClick={toggleSort} />
+                <SortableTh label="VAN/MWc" k="vanBruteParMWcKeuro" current={sortKey} arrow={sortArrow} onClick={toggleSort} />
                 <th>VAN nette</th>
                 <SortableTh label="Dette" k="debtKeuro" current={sortKey} arrow={sortArrow} onClick={toggleSort} />
                 <SortableTh label="Gearing" k="gearingPct" current={sortKey} arrow={sortArrow} onClick={toggleSort} />
@@ -567,7 +575,11 @@ export function PortfolioDashboard({ rows }: { rows: DashboardRow[] }) {
                   <td>{fmtNum(r.capacityMw, 1)}</td>
                   <td>{r.commissioningYear > 0 ? r.commissioningYear : "—"}</td>
                   <td className="val-pos">{fmtPct(r.investorIrr)}</td>
+                  <td className={r.projectIrr >= 0 ? "val-pos" : "val-neg"}>{fmtPct(r.projectIrr)}</td>
                   <td className={r.vanBruteKeuro >= 0 ? "val-pos" : "val-neg"}>{fmtMeuro(r.vanBruteKeuro, 2)}</td>
+                  <td className={(r.vanBruteParMWcKeuro ?? 0) >= 0 ? "val-pos" : "val-neg"}>
+                    {r.vanBruteParMWcKeuro == null ? "—" : `${fmtNum(r.vanBruteParMWcKeuro, 1)} k€/MWc`}
+                  </td>
                   <td className={r.vanNetteKeuro >= 0 ? "val-pos" : "val-neg"}>{fmtMeuro(r.vanNetteKeuro, 2)}</td>
                   <td>{fmtMeuro(r.debtKeuro, 2)}</td>
                   <td>{fmtPct(r.gearingPct)}</td>
@@ -581,7 +593,7 @@ export function PortfolioDashboard({ rows }: { rows: DashboardRow[] }) {
               ))}
               {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={10} style={{ textAlign: "center", padding: "2rem", color: "#6b7280" }}>
+                  <td colSpan={12} style={{ textAlign: "center", padding: "2rem", color: "#6b7280" }}>
                     Aucun projet ne correspond aux filtres.
                   </td>
                 </tr>

@@ -313,6 +313,11 @@ export type FinanceEngineInput = FinancialAssumptions & {
 export type FinanceEngineResult = {
   npv: number;
   irr: number;
+  // "TRI projet" BRUT (non-levier / unlevered) calé sur le BP (C_P50 « rng_CF_TRI_Projet_Brut »
+  // r383 → Inp_Assumption r53) : IRR des flux CFADS après IS P50 SANS service de dette, mise en
+  // an0 = CAPEX projet hors frais de financement − montant MOD. Cf calcul dans
+  // calculateScenarioMetrics. Reproduit le XIRR BP au centième.
+  projectIrr: number;
   // "Investor IRR" BP : IRR de la mise SHL pure (ccaKeuro, sans devFees ni marge réintégrés
   // au dénominateur) + fluxActionnaire. Cf CALIBRATION.md, "DIAGNOSTIC FINAL TRI/VAN".
   investorIrr: number;
@@ -2608,9 +2613,25 @@ export function calculateScenarioMetrics(input: FinanceEngineInput): FinanceEngi
       )
     : null;
 
+  // ── TRI PROJET (BRUT, non-levier / unlevered) — calé sur le BP « rng_CF_TRI_Projet_Brut »
+  // (C_P50 r383, XIRR r425 → Inp_Assumption r53). Flux = CFADS après IS P50 unlevered (r261 =
+  // irrCashFlows, avec la/les zéro-année(s) de construction), SANS service de dette. Mise en an0 =
+  // CAPEX projet HORS frais de financement (les fees sont « réintégrés » côté BP : (A) Financial
+  // fees) MOINS le montant MOD (« (C) MOD amount in Capex » = frais de dev réintégrés) :
+  //   an0_brut = capexTotalDetail − financingFees − MOD   (MOD = modRetraitement ?? devFees).
+  // Le « net » BP retient les fees mais pas le MOD (an0_net = capexTotalDetail − financingFees) ;
+  // la version exposée ici est la BRUTE demandée. calculateIrr (IRR annuel) reproduit le XIRR
+  // BP (actual/365) au centième (Sigoulès 6.74 vs BP 6.7364, Villognon 8.27 vs 8.2656,
+  // Baugé 8.26 vs 8.2540). Cf CALIBRATION / diagnostic « IRR & NPV ».
+  const modKeuro = input.modRetraitementKeuro ?? (input.devFeesKEuroPerMW ?? 0) * input.capacityMw;
+  const projectCapexDetails = calculateCapexDetails(input);
+  const projectIrrBaseKeuro =
+    projectCapexDetails.capexTotalKeuro - projectCapexDetails.financingFeesKeuro - modKeuro;
+  const projectIrr = round(calculateIrr(projectIrrBaseKeuro, irrCashFlows) * 100);
   return {
     npv: round(npv),
     irr: round(calculateIrr(miseNetteInvest, shareholderFlows) * 100),
+    projectIrr,
     investorIrr,
     investorNpv,
     lcoe: round(lcoe),

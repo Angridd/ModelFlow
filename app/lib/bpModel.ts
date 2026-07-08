@@ -282,8 +282,11 @@ export function buildBpModel(project: BpProjectFields, scenario: Scenario): BpMo
       title: "Outputs (synthèse)",
       lines: [
         scalarLine("TRI investisseur", "%", metrics.investorIrr),
+        // TRI projet BRUT (non-levier / unlevered), calé BP (cible trIProjetBrutPct).
+        scalarLine("TRI projet brut", "%", finance.projectIrr),
         scalarLine("TRI projet", "%", metrics.irr),
         scalarLine("VAN brute", "kEUR", finance.vanBruteKeuro),
+        scalarLine("VAN brute/MWc", "kEUR/MW", finance.vanBruteParMWcKeuro),
         scalarLine("VAN nette", "kEUR", finance.vanNetteKeuro),
         scalarLine("LCOE", "EUR/MWh", metrics.lcoe),
         scalarLine("DSCR minimum", "ratio", metrics.dscr),

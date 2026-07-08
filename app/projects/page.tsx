@@ -43,6 +43,11 @@ function fmtLcoe(v: number | null | undefined) {
   return `${v.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} €/MWh`;
 }
 
+function fmtVanParMwc(v: number | null | undefined) {
+  if (v == null) return "-";
+  return `${v.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} k€/MWc`;
+}
+
 export default async function ProjectsPage() {
   await connection();
 
@@ -180,9 +185,21 @@ export default async function ProjectsPage() {
                         </span>
                       </div>
                       <div className="project-card-kpi">
+                        <span className="project-card-kpi-label">TRI projet</span>
+                        <span className="project-card-kpi-value">
+                          {fmtIrr(finance.projectIrr)}
+                        </span>
+                      </div>
+                      <div className="project-card-kpi">
                         <span className="project-card-kpi-label">VAN brute</span>
                         <span className="project-card-kpi-value">
                           {fmtNpv(finance.vanBruteKeuro)}
+                        </span>
+                      </div>
+                      <div className="project-card-kpi">
+                        <span className="project-card-kpi-label">VAN/MWc</span>
+                        <span className="project-card-kpi-value">
+                          {fmtVanParMwc(finance.vanBruteParMWcKeuro)}
                         </span>
                       </div>
                       <div className="project-card-kpi">

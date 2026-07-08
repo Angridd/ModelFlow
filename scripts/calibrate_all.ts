@@ -249,6 +249,7 @@ async function main() {
     `${"dette MF".padStart(9)}|${"BP".padStart(9)}|${"Δ%".padStart(6)}|` +
     `${"gearMF".padStart(7)}|${"gearBP".padStart(7)}|` +
     `${"TRIiMF".padStart(7)}|${"TRIiBP".padStart(7)}|${"Δpp".padStart(6)}|` +
+    `${"TRIpMF".padStart(7)}|${"TRIpBP".padStart(7)}|${"Δpp".padStart(6)}|` +
     `${"VANn MF".padStart(8)}|${"VANn BP".padStart(8)}| Statut`;
   console.log("\n" + H);
   console.log("-".repeat(H.length));
@@ -295,6 +296,11 @@ async function main() {
     const gearBP = tt.gearingPct;
     const triInvBP = tt.investorIrrPct;
     const vanNetteBP = tt.vanNetteKeuro;
+    // TRI projet BRUT (non-levier) : repère informatif MF (m.projectIrr) vs BP (trIProjetBrutPct).
+    // N'ENTRE PAS dans le statut VERT/ROUGE (colonnes de contrôle uniquement).
+    const triProjMF = m.projectIrr;
+    const triProjBP = tt.trIProjetBrutPct;
+    const dTriProjPp = triProjBP != null ? triProjMF - triProjBP : null;
 
     const dCapex = pctΔ(capexTotalMF ?? 0, capexBP);
     const dDette = pctΔ(detteMF, detteBP);
@@ -360,6 +366,7 @@ async function main() {
         `${fmt(detteMF, 0).padStart(9)}|${fmt(detteBP, 0).padStart(9)}|${fmt(dDette).padStart(6)}|` +
         `${fmt(gearMF).padStart(7)}|${fmt(gearBP).padStart(7)}|` +
         `${fmt(triInvMF, 2).padStart(7)}|${fmt(triInvBP, 2).padStart(7)}|${fmt(dTriPp, 2).padStart(6)}|` +
+        `${fmt(triProjMF, 2).padStart(7)}|${fmt(triProjBP, 2).padStart(7)}|${fmt(dTriProjPp, 2).padStart(6)}|` +
         `${fmt(vanNetteMF, 0).padStart(8)}|${fmt(vanNetteBP, 0).padStart(8)}| ${statut}`,
     );
   }

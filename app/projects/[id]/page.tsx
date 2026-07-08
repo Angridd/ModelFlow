@@ -129,10 +129,15 @@ export default async function ProjectDetailPage({
       : null;
   const kpiVanBrute =
     referenceVan?.vanBruteKeuro ?? maxValue(scenarios.map((scenario) => scenario.npv));
+  // VAN brute rapportée à la puissance (k€/MWc) : densité économique.
+  const kpiVanBruteParMWc =
+    kpiVanBrute !== null && project.capacityMw > 0 ? kpiVanBrute / project.capacityMw : null;
   // TRI principal = TRI INVESTISSEUR (equity BP, = investorIrr), la métrique calée sur bp_projet_pipe.
   // Fallback legacy (pas de scénario de référence) : max des TRI projet persistés.
   const kpiIrr =
     referenceMetrics?.investorIrr ?? maxValue(scenarios.map((scenario) => scenario.irr));
+  // TRI projet BRUT (non-levier), calé BP (referenceMetrics.projectIrr). null → legacy (pas de réf).
+  const kpiProjectIrr = referenceMetrics?.projectIrr ?? null;
   const kpiDscr = projectReferenceScenario
     ? (referenceMetrics?.dscr ?? null)
     : minValue(scenarios.map((scenario) => scenario.dscr).filter((dscr) => dscr > 0));
@@ -217,6 +222,11 @@ export default async function ProjectDetailPage({
       : null;
   const analysisVanBruteKeuro = analysisVan?.vanBruteKeuro ?? analysisScenario?.npv ?? null;
   const analysisVanNetteKeuro = analysisVan?.vanNetteKeuro ?? null;
+  // VAN brute rapportée à la puissance (k€/MWc) : densité économique du projet.
+  const analysisVanBruteParMWcKeuro =
+    analysisVanBruteKeuro !== null && project.capacityMw > 0
+      ? analysisVanBruteKeuro / project.capacityMw
+      : null;
   const financingChartData =
     sizing !== null && ccaKeuro !== null
       ? [
@@ -384,6 +394,20 @@ export default async function ProjectDetailPage({
             suffix: " %",
             decimals: 2,
             tone: "positive",
+          },
+          {
+            label: "TRI projet brut",
+            value: kpiProjectIrr,
+            suffix: " %",
+            decimals: 2,
+            tone: "positive",
+          },
+          {
+            label: "VAN brute/MWc",
+            value: kpiVanBruteParMWc,
+            suffix: " k€/MWc",
+            decimals: 1,
+            tone: kpiVanBruteParMWc !== null && kpiVanBruteParMWc < 0 ? "negative" : "positive",
           },
           {
             label: projectReferenceScenario ? "DSCR référence" : "DSCR minimum",
@@ -740,11 +764,17 @@ export default async function ProjectDetailPage({
           <h2 className="section-title">Résultats calculés</h2>
           <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>{analysisScenario?.name ?? "-"}</span>
         </div>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <p className="meta-label">VAN brute</p>
             <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--ps-blue-dark)", marginTop: "0.2rem" }}>
               {formatMillionEuros(analysisVanBruteKeuro)}
+            </p>
+          </div>
+          <div>
+            <p className="meta-label">VAN brute / MWc</p>
+            <p style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--ps-blue-dark)", marginTop: "0.2rem" }}>
+              {formatNumber(analysisVanBruteParMWcKeuro, " k€/MWc")}
             </p>
           </div>
           <div>
@@ -770,7 +800,8 @@ export default async function ProjectDetailPage({
           </div>
           <p className="section-subtitle" style={{ marginBottom: "1rem" }}>
             Le <strong>TRI investisseur</strong> (equity BP, mise SHL) est la métrique calée sur le BP.
-            Le <strong>TRI projet</strong> mesure la rentabilité intrinsèque, avant structure de financement.
+            Le <strong>TRI projet brut (non-levier)</strong> mesure la rentabilité intrinsèque du projet
+            avant tout financement (flux CFADS après IS, sans service de dette), également calé sur le BP.
           </p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
@@ -780,8 +811,14 @@ export default async function ProjectDetailPage({
               </p>
             </div>
             <div>
-              <p className="meta-label">TRI projet</p>
+              <p className="meta-label">TRI projet brut (non-levier)</p>
               <p style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--ps-blue-dark)", marginTop: "0.2rem" }}>
+                {formatNumber(cashFlowMetrics.projectIrr, " %")}
+              </p>
+            </div>
+            <div>
+              <p className="meta-label">TRI projet (levier)</p>
+              <p style={{ fontSize: "1.25rem", fontWeight: 600, color: "var(--ps-blue-mid)", marginTop: "0.2rem" }}>
                 {formatNumber(cashFlowMetrics.irr, " %")}
               </p>
             </div>

@@ -100,10 +100,14 @@ export type ProjectMetrics = {
   capacityMw: number;
   commissioningYear: number;
   investorIrr: number;
+  /** TRI PROJET BRUT (non-levier / unlevered), calé BP (cible `trIProjetBrutPct`). En %. */
+  projectIrr: number;
   /** VAN BRUTE (indicateur VAN principal, cible BP). */
   vanBruteKeuro: number;
   /** VAN NETTE (secondaire) = VAN brute − dev fees. */
   vanNetteKeuro: number;
+  /** VAN brute rapportée à la puissance (k€/MWc) = vanBruteKeuro / capacityMw. null si MW ≤ 0. */
+  vanBruteParMWcKeuro: number | null;
   debtKeuro: number;
   ccaKeuro: number;
   capexEffectifKeuro: number;
