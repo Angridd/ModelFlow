@@ -26,6 +26,8 @@ import {
   CAPEX_POSTES,
   OPEX_POSTES,
   IRR_CRITICAL_PCT,
+  GEARING_TENSE_PCT,
+  DSCR_TENSE,
   STRESS_DRIVERS,
   ZERO_STRESS_DELTAS,
   type Anomaly,
@@ -255,6 +257,11 @@ function PipelineTab({ projects }: { projects: ProjectAnalysis[] }) {
       <div className="card">
         <h2 className="section-title">Frise de mise en service</h2>
         <p className="section-subtitle">MW mis en service par année, empilés par santé economics.</p>
+        <p style={{ marginTop: "0.4rem", color: "#6b7280", fontSize: "0.85rem" }}>
+          {HEALTH_META.critical.emoji} <strong>Critique</strong> : VAN brute &lt; 0 ou TRI investisseur &lt; {IRR_CRITICAL_PCT} %.{" "}
+          {HEALTH_META.tense.emoji} <strong>Tendu</strong> : gearing ≥ {GEARING_TENSE_PCT} % (proche du cap 95 %) ou DSCR ≤ {DSCR_TENSE} (proche du plancher bancaire 1,15) — peu de marge.{" "}
+          {HEALTH_META.healthy.emoji} <strong>Sain</strong> : le reste (marge confortable).
+        </p>
         <div style={{ width: "100%", height: 300, marginTop: "1rem" }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={friseData} margin={{ top: 8, right: 16, left: 8, bottom: 4 }}>
@@ -286,7 +293,6 @@ function PipelineTab({ projects }: { projects: ProjectAnalysis[] }) {
               <th>VAN/MWc</th>
               <th>Dette</th>
               <th>Gearing</th>
-              <th>DSCR</th>
               <th>Santé</th>
             </tr>
           </thead>
@@ -308,7 +314,6 @@ function PipelineTab({ projects }: { projects: ProjectAnalysis[] }) {
                 </td>
                 <td>{fmtKeuro(r.debtKeuro)}</td>
                 <td>{fmtPct(r.gearingPct)}</td>
-                <td>{fmtNum(r.dscr, 2)}</td>
                 <td><HealthBadge health={r.health} /></td>
               </tr>
             ))}
@@ -360,7 +365,7 @@ function CostsTab({ projects, anomalies }: { projects: ProjectAnalysis[]; anomal
       <div className="card">
         <h2 className="section-title">Top anomalies de coût du portefeuille</h2>
         <p className="section-subtitle">
-          Poste &gt; médiane portefeuille × 1,5 (soit +50 %). Écart chiffré en k€ vs médiane. 🔺 = au-delà de la barrière IQR (anomalie forte).
+          Poste &gt; médiane portefeuille × 1,5 (soit +50 %). Écart = surcoût du poste vs médiane portefeuille (k€ de coût, pas de VAN). 🔺 = au-delà de la barrière IQR (anomalie forte).
         </p>
         {topAnomalies.length === 0 ? (
           <p style={{ marginTop: "1rem", color: "#6b7280" }}>Aucune anomalie détectée.</p>
@@ -376,7 +381,7 @@ function CostsTab({ projects, anomalies }: { projects: ProjectAnalysis[]; anomal
                 <span>· {a.poste.label}</span>
                 <span style={{ color: COLORS.negative, fontWeight: 700 }}>{fmtSigned(a.deviationPct, 0, " %")} vs médiane</span>
                 <span style={{ marginLeft: "auto", color: "#6b7280", fontSize: "0.82rem" }}>
-                  {fmtNum(a.perMwc, 1)} vs {fmtNum(a.medianPerMwc, 1)} k€/MWc · +{fmtKeuro(a.excessKeuro)}
+                  {fmtNum(a.perMwc, 1)} vs {fmtNum(a.medianPerMwc, 1)} k€/MWc · surcoût +{fmtKeuro(a.excessKeuro)}
                 </span>
               </li>
             ))}

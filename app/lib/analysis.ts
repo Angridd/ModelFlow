@@ -84,6 +84,9 @@ export const OPEX_POSTES: readonly PosteDef[] = [
 
 export const ALL_POSTES: readonly PosteDef[] = [...CAPEX_POSTES, ...OPEX_POSTES];
 
+/** Postes NON OPTIMISABLES : jamais signalés en anomalie, jamais proposés en levier ΔVAN. */
+export const NON_OPTIMIZABLE_POSTES = new Set<PosteKey>(["foncier", "taxes"]);
+
 /** Décomposition d'un projet en k€ absolus (CAPEX total, OPEX an-1). Construite côté serveur. */
 export type ProjectPostes = {
   capex: Record<CapexPosteKey, number>;
@@ -249,6 +252,7 @@ export function detectAnomalies(projects: readonly ProjectAnalysis[]): Anomaly[]
   const anomalies: Anomaly[] = [];
   for (const p of projects) {
     for (const poste of ALL_POSTES) {
+      if (NON_OPTIMIZABLE_POSTES.has(poste.key)) continue;
       const st = stats.get(poste.key);
       if (!st || st.median <= 0) continue;
       const keuro =
